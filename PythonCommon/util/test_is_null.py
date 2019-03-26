@@ -26,3 +26,7 @@ class TestUtil(unittest.TestCase):
     self.assertFalse(isNull(3))
     self.assertFalse(isNull("a"))
     self.assertFalse(isNull([np.nan]))
+
+
+if __name__ == '__main__':
+  unittest.main()

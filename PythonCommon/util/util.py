@@ -4,6 +4,8 @@ import random
 import string
 import os
 
+LETTERS = 'abcdefghijklmnopqrstuvwxyz'
+
 def ConvertType(v):
   # Converts to int, float, str as required
   # Input: v - string representation
@@ -39,7 +41,7 @@ def randomWord(size=5):
   # Output: word
   word = ''
   for n in range(size):
-    word += random.choice(string.letters)
+    word += random.choice(LETTERS)
   return word
 
 # TODO: Add tests

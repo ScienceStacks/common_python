@@ -1,7 +1,7 @@
 '''Tests for utility routines.'''
 
 import unittest
-from . import util as ut
+import util as ut
 
 
 class TestFunctions(unittest.TestCase):
@@ -66,6 +66,7 @@ class TestFunctions(unittest.TestCase):
         to_path = createFilepath(to_ext)
         path = ut.changeFileExtension(from_path, to_ext)
         self.assertEqual(path, to_path)
-    
-    
 
+
+if __name__ == '__main__':
+  unittest.main()
