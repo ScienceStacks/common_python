@@ -1,5 +1,4 @@
 #!/bin/bash
-# Sets environment for tests
-# source setup.sh
+# Sets the python path to run codes in this repo
 PYTHONPATH=${PYTHONPATH}:`pwd`
 export PYTHONPATH
