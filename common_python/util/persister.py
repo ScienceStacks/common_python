@@ -32,3 +32,10 @@ class Persister(object):
     """
     with open(self._path, 'rb') as fd:
       return pickle.load(fd)
+
+  def remove(self):
+    """
+    Deletes the persistence file.
+    """
+    if self.isExist():
+      os.remove(self._path)

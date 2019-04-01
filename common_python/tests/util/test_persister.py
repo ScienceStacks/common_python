@@ -33,6 +33,12 @@ class TestPersister(unittest.TestCase):
     an_object = self.persister.get()
     trues = [x == y for x, y in zip(an_object, OBJECT)]
     self.assertTrue(all(trues))
+
+  def testRemove(self):
+    self.persister.set(OBJECT)
+    self.persister.remove()
+    self.assertFalse(self.persister.isExist())
+    
    
 
 if __name__ == '__main__':
