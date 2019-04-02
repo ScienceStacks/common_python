@@ -1,0 +1,43 @@
+'''Analyzes text terms in a DataFrame.'''
+
+import common_python.constants as cn
+
+import pandas as pd
+import numpy as np
+
+
+NOISE_TERMS = ["the", "(", ")", "a", "and"]
+SEPARATOR = " "
+
+
+class TermAnalyzer(object):
+
+  def __init__(self, noise_terms=NOISE_TERMS):
+    self._noise_terms = noise_terms
+    self.df_term = None
+
+  def makeDF(self, ser):
+    """
+    Constructs a dataframe of the terms found
+    :param pd.Series ser:
+      value: blank separated string of terms
+    Updates self.df_term
+      index: term
+      COUNT - count of occurrences in a row
+      FRAC - fraction of rows in which the term occurs
+    """
+    lines = []
+    _ = [lines.append(s) for _, s in ser.items()]
+    long_string = ' '.join(lines)
+    all_terms = long_string.split(SEPARATOR)
+    for term in self._noise_terms:
+      if term in all_terms:
+        all_terms.remove(term)
+    df = pd.DataFrame({
+        cn.VALUE: all_terms,
+        })
+    dfg = df.groupby(cn.VALUE).size()
+    self.df_term = pd.DataFrame(dfg)
+    col = self.df_term.columns[0]
+    self.df_term = self.df_term.rename(columns={col: cn.COUNT})
+    self.df_term[cn.FRAC] = self.df_term[cn.COUNT]*1.0 / len(dfg)
