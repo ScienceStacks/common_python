@@ -33,8 +33,8 @@ class TestTermAnalyzer(unittest.TestCase):
         zip(self.analyzer._noise_terms, term_analyzer.NOISE_TERMS)]
     self.assertTrue(all(trues))
 
-  def testMakeDF(self):
-    self.analyzer.makeDF(SER)
+  def testMakeSingleGroupDF(self):
+    self.analyzer.makeSingleGroupDF(SER)
     self.assertTrue(helpers.isValidDataFrame(self.analyzer.df_term,
         [cn.COUNT, cn.FRAC]))
     for item, row in self.analyzer.df_term.iterrows():
@@ -42,7 +42,7 @@ class TestTermAnalyzer(unittest.TestCase):
     DELETE_TERM = 'a'
     self.analyzer = term_analyzer.TermAnalyzer(
         noise_terms=[DELETE_TERM])
-    self.analyzer.makeDF(SER)
+    self.analyzer.makeSingleGroupDF(SER)
     self.assertFalse(
         DELETE_TERM in self.analyzer.df_term.index.tolist())
 

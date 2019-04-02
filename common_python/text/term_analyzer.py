@@ -24,9 +24,10 @@ class TermAnalyzer(object):
     while a_list.count(element) > 0:
       a_list.remove(element)
 
-  def makeDF(self, ser):
+  def makeSingleGroupDF(self, ser):
     """
-    Constructs a dataframe of the terms found
+    Constructs a dataframe of the terms found in a single group
+    of genes.
     :param pd.Series ser:
       value: blank separated string of terms
     Updates self.df_term
