@@ -13,8 +13,15 @@ SEPARATOR = " "
 class TermAnalyzer(object):
 
   def __init__(self, noise_terms=NOISE_TERMS):
+    if noise_terms is None:
+      noise_terms = []
     self._noise_terms = noise_terms
     self.df_term = None
+
+  @staticmethod
+  def _removeAll(a_list, element):
+    while a_list.count(element) > 0:
+      a_list.remove(element)
 
   def makeDF(self, ser):
     """
@@ -31,8 +38,7 @@ class TermAnalyzer(object):
     long_string = ' '.join(lines)
     all_terms = long_string.split(SEPARATOR)
     for term in self._noise_terms:
-      if term in all_terms:
-        all_terms.remove(term)
+      self.__class__._removeAll(all_terms, term)
     df = pd.DataFrame({
         cn.VALUE: all_terms,
         })
@@ -41,3 +47,9 @@ class TermAnalyzer(object):
     col = self.df_term.columns[0]
     self.df_term = self.df_term.rename(columns={col: cn.COUNT})
     self.df_term[cn.FRAC] = self.df_term[cn.COUNT]*1.0 / len(dfg)
+
+  def plot(self, is_plot=True):
+    """
+    Constructs a bar plot of the terms present
+    """
+    pass
