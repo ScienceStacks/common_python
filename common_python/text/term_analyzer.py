@@ -1,6 +1,7 @@
 '''Analyzes text terms in a DataFrame.'''
 
 import common_python.constants as cn
+from common_python.types.extended_list import ExtendedList
 
 import pandas as pd
 import numpy as np
@@ -36,9 +37,9 @@ class TermAnalyzer(object):
     lines = []
     _ = [lines.append(s) for _, s in ser.items()]
     long_string = ' '.join(lines)
-    all_terms = long_string.split(SEPARATOR)
+    all_terms = ExtendedList(long_string.split(SEPARATOR))
     for term in self._noise_terms:
-      self.__class__._removeAll(all_terms, term)
+      all_terms.removeAll(term)
     df = pd.DataFrame({
         cn.VALUE: all_terms,
         })
