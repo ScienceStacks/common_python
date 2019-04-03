@@ -30,4 +30,6 @@ class ExtendedList(list):
     :param iterable other:
     :return bool:
     """
-    return self.isSubset(other) and other.isSubset(self)
+    extended_other = ExtendedList([x for x in other])
+    return self.isSubset(extended_other)  \
+        and extended_other.isSubset(self)
