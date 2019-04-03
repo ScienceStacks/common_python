@@ -1,6 +1,7 @@
 """Tests for Term Analyzer."""
 
 from common_python.text import util_text
+from common_python.types.extended_list import ExtendedList
 from common_python.testing import helpers
 
 import os
@@ -21,9 +22,10 @@ class TestFunctions(unittest.TestCase):
 
   def testMakeTermMatrix(self):
     df = util_text.makeTermMatrix(DF[util_text.TERM])
-    columns = list(set(
+    columns = ExtendedList(DF.columns.tolist())
+    columns.unique()
     
-
+    
 
 
 if __name__ == '__main__':

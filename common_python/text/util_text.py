@@ -25,5 +25,4 @@ def makeTermMatrix(ser):
   df1 = dfg.reset_index()
   df_result = df1.pivot(index=GROUP, columns=TERM, values=COUNT)
   df_result = df_result.applymap(lambda x: 0 if np.isnan(x) else x)
-  import pdb; pdb.set_trace()
   return df_result
