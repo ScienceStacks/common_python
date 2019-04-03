@@ -50,6 +50,20 @@ class TermAnalyzer(object):
     self.df_term = self.df_term.rename(columns={col: cn.COUNT})
     self.df_term[cn.FRAC] = self.df_term[cn.COUNT]*1.0 / len(dfg)
 
+  def makeMultipleGroupDF(self, df):
+    """
+    Constructs that a DF that summarizes results from multiple groups.
+    :param pd.Series df:
+      index: group identifier
+      GENE_ID: gene
+      TERMS: blank separated string of terms
+    Updates self.df_term
+      index: term
+      COUNT - count of occurrences in a row
+      FRAC - fraction of rows in which the term occurs
+    """
+    pass
+
   def plot(self, is_plot=True):
     """
     Constructs a bar plot of the terms present

@@ -17,5 +17,11 @@ class TestPersister(unittest.TestCase):
     self.extended_list.removeAll(2)
     self.assertEqual(self.extended_list.count(2), 0)
 
+  def testUnique(self):
+    self.extended_list.unique()
+    for ele in LIST:
+      self.assertTrue(self.extended_list.count(ele) == 1)
+
+
 if __name__ == '__main__':
   unittest.main()
