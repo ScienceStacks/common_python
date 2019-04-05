@@ -11,8 +11,8 @@ import unittest
 
 IGNORE_TEST = False
 
-GROUPS =  ['a', 'b', 'b', 'c', 'a']
-TERMS = ['x', 'x', 'y', 'x', 'x']
+GROUPS =  ['a', 'b', 'b', 'c', 'a', 'a']
+TERMS = ['x', 'x', 'y', 'x', 'x', 'x']
 DF = pd.DataFrame({
     util_text.GROUP: GROUPS,
     util_text.TERM: TERMS,
@@ -24,15 +24,13 @@ class TestFunctions(unittest.TestCase):
 
   def testMakeTermMatrix(self):
     df = util_text.makeTermMatrix(DF[util_text.TERM])
+    self.assertEqual(df.loc['a', 'x'], 3.0)
     terms = ExtendedList(TERMS)
     terms.unique()
     self.assertTrue(helpers.isValidDataFrame(df, terms))
     groups = ExtendedList(GROUPS)
     groups.unique()
     self.assertTrue(groups.isSame(df.index))
-    
-     
-    
 
 
 if __name__ == '__main__':
