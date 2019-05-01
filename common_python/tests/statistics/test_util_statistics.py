@@ -24,6 +24,9 @@ class TestFunctions(unittest.TestCase):
     difference = set(indices).symmetric_difference(df.index)
     self.assertEqual(len(difference), 0)
 
+  def testCalcLogSL(self):
+    pass
+
 
 if __name__ == '__main__':
   unittest.main()
