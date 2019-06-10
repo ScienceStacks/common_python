@@ -9,3 +9,13 @@ TEST_DIR = os.path.join(CODE_DIR, "tests")
 COUNT = "count"  # A count
 FRAC = "frac"  # A fractiona
 VALUE = "value"  # General value
+
+# KEGG Access
+KEGG_CMD_LIST = "list"
+KEGG_CMD_GET = "get"
+KEGG_CMDS = [KEGG_CMD_LIST, KEGG_CMD_GET]
+KEGG_DESCRIPTION = "kegg_description"
+KEGG_PATHWAY = "kegg_pathway"
+KEGG_GENE = "kegg_gene"
+KEGG_EC = "kegg_ec"  # EC number
+KEGG_KO = "kgg_ko"  # KEGG orthology
