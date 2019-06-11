@@ -2,7 +2,6 @@
 
 import common_python.constants as cn
 
-from collections import namedtuple
 import pandas as pd
 import numpy as np
 import requests
@@ -10,11 +9,6 @@ import requests
 SEPARATOR = "/"
 STATUS_GOOD = 200
 GENE = "GENE"
-COMPOUND = "COMPOUND"
-
-PathwayDescription = namedtuple(
-    "PathwayDescription", 
-     "name description")
 
 
 class KeggExtractor(object):
@@ -126,19 +120,21 @@ class KeggExtractor(object):
     result = self.__class__._initializeDict([
         cn.KEGG_PATHWAY, cn.KEGG_GENE, cn.KEGG_DESCRIPTION,
         cn.KEGG_EC, cn.KEGG_KO])
-    for line in lines:
+    for idx, line in enumerate(lines):
       splits = line.split(" ")
       # Is start of gene?
       if splits[0] == GENE:
         is_gene = True
         line = line.replace(GENE, "")
-      # Check for end of genes
-      if splits[0] == COMPOUND:
-        break
       # Process a gene line, handling multiple EC numbers
       if is_gene:
+        # Check for end
+        if line[0] != " ":
+          break
+        # Still have genes
         splits = [t for t in line.split(" ") if len(t) > 0]
         if len(splits) < 1:
+          import pdb; pdb.set_trace()
           continue
         gene = splits[0]
         gene = gene.replace("VBD_", "v")
@@ -151,13 +147,18 @@ class KeggExtractor(object):
         else:
           ecs = ec_stg.split(" ")
         for ec in ecs:
-          result[cn.KEGG_PATHWAY].append(pathway)
-          result[cn.KEGG_GENE].append(gene)
-          result[cn.KEGG_DESCRIPTION].append(description)
-          result[cn.KEGG_EC].append(ec)
-          result[cn.KEGG_KO].append(
-              self.__class__._extractIdentifiedString(
-              "KO", description))
+          ko_stg = self.__class__._extractIdentifiedString(
+            "KO", description)
+          if ko_stg is None:
+            kos = [None]
+          else:
+            kos = ko_stg.split(" ")
+          for ko in kos:
+            result[cn.KEGG_PATHWAY].append(pathway)
+            result[cn.KEGG_GENE].append(gene)
+            result[cn.KEGG_DESCRIPTION].append(description)
+            result[cn.KEGG_EC].append(ec)
+            result[cn.KEGG_KO].append(ko)
     return pd.DataFrame(result)
 
   def getAllPathwayGenes(self, max_count=-1):
