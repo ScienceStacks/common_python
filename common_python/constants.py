@@ -19,3 +19,10 @@ KEGG_PATHWAY = "kegg_pathway"
 KEGG_GENE = "kegg_gene"
 KEGG_EC = "kegg_ec"  # EC number
 KEGG_KO = "kgg_ko"  # KEGG orthology
+
+# Plotting
+PLT_XLABLE = "xlabel"
+PLT_YLABLE = "ylabel"
+PLT_TITLE = "title"
+PLT_FIGSIZE = "figsize"
+PLT_IS_PLOT = "is_plot"  # Flag to plot
