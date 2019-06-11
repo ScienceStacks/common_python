@@ -117,6 +117,7 @@ class KeggExtractor(object):
         KEGG_KO
     Note:
       1. Key is KEGG_GENE, KEGG_EC
+      2. Renames gene to be consisent with Rv* convention
     """
     self._makeBaseURL(cn.KEGG_CMD_GET)
     self._addArguments([pathway])
@@ -137,7 +138,10 @@ class KeggExtractor(object):
       # Process a gene line, handling multiple EC numbers
       if is_gene:
         splits = [t for t in line.split(" ") if len(t) > 0]
+        if len(splits) < 1:
+          continue
         gene = splits[0]
+        gene = gene.replace("VBD_", "v")
         description = " ".join(splits[1:])
         #
         ec_stg = self.__class__._extractIdentifiedString(
@@ -156,7 +160,7 @@ class KeggExtractor(object):
               "KO", description))
     return pd.DataFrame(result)
 
-  def getAllPathwayGenes(self, max_count=None):
+  def getAllPathwayGenes(self, max_count=-1):
     """
     Gets the genes in each pathway.
     :param int max_count: Number of pathways to process
@@ -170,7 +174,7 @@ class KeggExtractor(object):
     df_pathway = self.listPathway()
     dfs = []
     for count, pathway in enumerate(df_pathway[cn.KEGG_PATHWAY]):
-      if count >= max_count:
+      if (count >= max_count) and (max_count > 0):
         break
       dfs.append(self.getPathwayGenes(pathway))
     return pd.concat(dfs)
