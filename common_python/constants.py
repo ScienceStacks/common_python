@@ -26,3 +26,4 @@ PLT_YLABLE = "ylabel"
 PLT_TITLE = "title"
 PLT_FIGSIZE = "figsize"
 PLT_IS_PLOT = "is_plot"  # Flag to plot
+PLT_CMAP = "cmap"

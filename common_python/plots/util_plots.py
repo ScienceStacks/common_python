@@ -45,7 +45,7 @@ def plotTrinaryHeatmap(df, ax=None, is_plot=True, **kwargs):
   if is_plot:
     plt.show()
 
-def plotCategoricalHeatmap(df, is_plot=True, **kwargs):
+def plotCategoricalHeatmap(df, **kwargs):
   """
   Plots a heatmap of numerical values with categorical
   x and y axes.
@@ -53,18 +53,27 @@ def plotCategoricalHeatmap(df, is_plot=True, **kwargs):
   :param pd.DataFrame df:
   :param dict kwargs: plot options
   """
-  def setValue(key, func):
+  def getValue(key):
     if key in kwargs.keys():
-      func(kwargs[key])
+      return kwargs[key]
+    else:
+      return None
+  def setValue(key, func):
+    val = getValue(key)
+    if val is not None:
+      func(val)
   #
-  if cn.PLT_FIGSIZE in kwargs.keys():
-    plt.figure(figsize=kwargs[cn.PLT_FIGSIZE])
+  if getValue(cn.PLT_FIGSIZE) is not None:
+    plt.figure(figsize=getValue(PLT_FIGSIZE))
   ax = plt.gca()
   ax.set_xticks(np.arange(len(df.columns))+0.5)
   ax.set_xticklabels(df.columns)
   ax.set_yticks(np.arange(len(df.index))+0.5)
   ax.set_yticklabels(df.index)
-  heatmap = plt.pcolor(df, cmap='jet')
+  cmap = getValue(cn.PLT_CMAP)
+  if cmap is None:
+    cmap = 'jet'
+  heatmap = plt.pcolor(df, cmap=cmap)
   plt.colorbar(heatmap)
   setValue(cn.PLT_XLABLE, plt.xlabel)
   setValue(cn.PLT_YLABLE, plt.ylabel)
