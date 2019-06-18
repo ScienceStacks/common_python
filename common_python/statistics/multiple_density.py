@@ -49,12 +49,25 @@ class MultipleDensity(object):
     #
     return pd.Series(sort_values)
 
-  def plotMarginals(self, ser_sort_order=None):
+  def plotMarginals(self, ser_sort_order=None, **plot_opts):
     """
     Does a heatmap of the marginals. X-axis is variates; y-axis are features.
+        Values are probabilities.
     :param pd.Series ser_sort_order: Series with features as 
         index with floats defining order. 
+    :param dict plot_opts:
     """
+    def setDefault(opts, key, value):
+      if not key in opts.keys():
+        opts[key] = value
+    #
+    if plot_opts is None:
+      plot_opts = {}
+    df = self.getMarginals()
+    opts = dict(plot_opts)
+    setDefault(opts, cn.PLT_XLABEL, "Variate")
+    setDefault(opts, cn.PLT_YLABEL, "Feature")
+    util_plots.plotCategoricalHeatmap(df.T, **plot_opts)
     return
 
   def plotMarginalComparisons(self, other, ser_sort_order=None):

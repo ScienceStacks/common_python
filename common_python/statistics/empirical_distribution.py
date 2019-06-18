@@ -1,9 +1,5 @@
-"""Manipulation of Empirical Distributions."""
+"""Generates Data from an Empirical Distribution."""
 
-"""
-DataFrames are structured so that columns are features and
-rows are instances (observations).
-"""
 
 import pandas as pd
 import numpy as np
@@ -12,7 +8,18 @@ import common_python.constants as cn
 from common_python.plots import util_plots
 
 
-class EmpiricalDistribution(object):
+class EmpiricalDistributionGenerator(object):
+  """
+  DataFrames are structured so that columns are features and
+  rows are instances (observations).
+  Useage:
+    1. Simple data.
+       generator = EmpiricalDistributionGenerator(df)
+       df_data = generator.sample(nobs)
+    2. Data with replacing values.
+       generator = EmpiricalDistributionGenerator(df)
+       df_data = generator.synthesize(nobs, frac)
+  """
 
   def __init__(self, df):
     """
@@ -43,52 +50,6 @@ class EmpiricalDistribution(object):
       values = df_result[col].tolist()
       df_result[col] = np.random.permutation(values)
     return df_result
-      
-  def getMarginals(self):
-    """
-    Constructs the marginal distributions for all columns.
-    :return pd.DataFrame: index is fraction
-    """
-    dfs = []
-    for col in self._df.columns:
-      df = self._df[col].copy()
-      df = df.sort_values()
-      df.index = range(len(df))
-      dfs.append(df)
-    df_result = pd.concat(dfs, axis=1)
-    df_result.index = [str(int((100*i)/len(self._df)))
-        for i in df_result.index]
-    return df_result
-
-  def getProb(self, col, value):
-    """
-    Computes the probability in the empirical distribution for a
-    column.
-    :param str col:
-    :param float value:
-    :return float:
-    """
-    count = len(self._df[self._df[col] <= value])
-    return (1.0*count)/ len(self._df)
-
-  # TODO: Sort y axis?
-  def plot(self, plot_opts=None):
-    """
-    Creates a heatmap of the marginal distributions.
-    x-axis is percentile; y-axis is feature
-    :param dict plot_opts:
-    """
-    def setDefault(opts, key, value):
-      if not key in opts.keys():
-        opts[key] = value
-    #
-    if plot_opts is None:
-      plot_opts = {}
-    df = self.getMarginals()
-    opts = dict(plot_opts)
-    setDefault(opts, cn.PLT_XLABEL, "Percentile")
-    setDefault(opts, cn.PLT_YLABEL, "Feature")
-    util_plots.plotCategoricalHeatmap(df.T, **opts)
 
   def synthesize(self, nobs, frac, **kwargs):
     """
@@ -99,3 +60,4 @@ class EmpiricalDistribution(object):
     :param dict kwargs: arguments passed to sampler
     :return pd.DataFrame:
     """
+    return

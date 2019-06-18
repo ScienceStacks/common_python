@@ -22,10 +22,11 @@ NUM_SAMPLES = 5000
 TOLERANCE = 0.001
 
 
-class TestEmpiricalDistribution(unittest.TestCase):
+class TestEmpiricalDistributionGenerator(unittest.TestCase):
 
   def setUp(self):
-    self.empirical = empirical_distribution.EmpiricalDistribution(DF)
+    self.cls = empirical_distribution.EmpiricalDistributionGenerator
+    self.empirical = self.cls(DF)
 
   def testSample(self):
     if IGNORE_TEST:
@@ -43,36 +44,9 @@ class TestEmpiricalDistribution(unittest.TestCase):
       return
     df_orig = pd.concat([DF for _ in range(500)], axis=1)
     df_orig.columns = ["%d" % d for d in range(len(df_orig.columns))]
-    df = empirical_distribution.EmpiricalDistribution.decorrelate(
+    df = self.cls.decorrelate(
         df_orig)
     self.assertTrue(helpers.isValidDataFrame(df, df_orig.columns))
-
-  def testPlot(self):
-    # Smoke test only
-    plot_opts = {cn.PLT_IS_PLOT: IS_PLOT}
-    self.empirical._df = self.empirical.__class__.decorrelate(
-        self.empirical._df)
-    self.empirical.plot(plot_opts=plot_opts)
-
-  def testgetMarginals(self):
-    df = empirical_distribution.EmpiricalDistribution.decorrelate(DF)
-    empirical = empirical_distribution.EmpiricalDistribution(df)
-    df_marginals = empirical.getMarginals()
-    df_marginals.index = DF.index
-    self.assertTrue(df_marginals.equals(DF))
-
-  def testGetProb(self):
-    def test(value):
-      prob = self.empirical.getProb(COLA, value)
-      expected = (1.0*(value+1)/SIZE)
-      expected = max(0, expected)
-      expected = min(1, expected)
-      self.assertLess(np.abs(prob - prob), TOLERANCE)
-    #
-    test(6)
-    test(9)
-    test(0)
-    test(20)
 
   def testSynthesize(self):
     return
