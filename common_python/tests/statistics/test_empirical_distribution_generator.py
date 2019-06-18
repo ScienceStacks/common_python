@@ -8,15 +8,19 @@ import numpy as np
 import pandas as pd
 import unittest
 
-IGNORE_TEST = False
+
+def makeData(size):
+  return pd.DataFrame({
+      COLA: range(size),
+      COLB: range(size),
+      })
+
+IGNORE_TEST = True
 IS_PLOT = False
 SIZE = 10
 COLA = "colA"
 COLB = "colB"
-DF = pd.DataFrame({
-    COLA: range(SIZE),
-    COLB: range(SIZE),
-    })
+DF = makeData(SIZE)
 MAX_FRAC_DIFF = 0.05
 NUM_SAMPLES = 5000
 TOLERANCE = 0.001
@@ -49,7 +53,14 @@ class TestEmpiricalDistributionGenerator(unittest.TestCase):
     self.assertTrue(helpers.isValidDataFrame(df, df_orig.columns))
 
   def testSynthesize(self):
-    return
+    size = 500
+    frac = 0.2
+    df = self.empirical.synthesize(size, frac)
+    expected = (1 - (1-frac)**2) * size
+    count = sum([1 if r[COLA] != r[COLB] else 0 
+        for _, r in df.iterrows()])
+    normalized_difference = abs(count - expected) / (1.0*expected)
+    self.assertLess(normalized_difference, 0.2)
 
 if __name__ == '__main__':
   unittest.main()
