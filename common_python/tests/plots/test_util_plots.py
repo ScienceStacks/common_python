@@ -40,8 +40,8 @@ class TestFunction(unittest.TestCase):
     df.index = ['x', 'y', 'z']
     opts = {
         cn.PLT_TITLE: "test",
-        cn.PLT_XLABLE: "x",
-        cn.PLT_YLABLE: "y",
+        cn.PLT_XLABEL: "x",
+        cn.PLT_YLABEL: "y",
         }
     util_plots.plotCategoricalHeatmap(df, **opts)
 

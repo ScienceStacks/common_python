@@ -44,8 +44,6 @@ class EmpiricalDistribution(object):
       df_result[col] = np.random.permutation(values)
     return df_result
       
-    
-
   def getMarginals(self):
     """
     Constructs the marginal distributions for all columns.
@@ -53,36 +51,50 @@ class EmpiricalDistribution(object):
     """
     dfs = []
     for col in self._df.columns:
-      dfs.append(self._df[col].sort_values())
+      df = self._df[col].copy()
+      df = df.sort_values()
+      df.index = range(len(df))
+      dfs.append(df)
     df_result = pd.concat(dfs, axis=1)
-    df_result.index = [str((100*i)/len(dfs)) for i in df_result.index]
+    df_result.index = [str(int((100*i)/len(self._df)))
+        for i in df_result.index]
+    return df_result
 
-  def getProb(self, cols, values):
+  def getProb(self, col, value):
     """
-    Computes the probability in the empirical distribution for columns.
-    :param list-str cols:
-    :param list-float values:
+    Computes the probability in the empirical distribution for a
+    column.
+    :param str col:
+    :param float value:
     :return float:
     """
-    df_sub = self._df[cols]
-    count = 0
-    indicies = self._df.index
-    for idx in indices:
-      for pos, col in enumerate(self._df.columns):
-        ele = self._df.loc[idx, col]
-        if values[pos] > ele:
-          next
-      count += 1
-    return (1.0*count)/len(self._df)
+    count = len(self._df[self._df[col] <= value])
+    return (1.0*count)/ len(self._df)
 
-  def plot(self):
+  def plot(self, plot_opts=None):
     """
-    Creates a heatmap of the distributions.
+    Creates a heatmap of the marginal distributions.
     x-axis is percentile; y-axis is feature
+    :param dict plot_opts:
     """
+    def setDefault(opts, key, value):
+      if not key in opts.keys():
+        opts[key] = value
+    #
+    if plot_opts is None:
+      plot_opts = {}
     df = self.getMarginals()
-    opts =  {
-        cn.PLT_XAXIS: "Percentile",
-        cn.PLT_YAXIS: "Feature",
-        }
+    opts = dict(plot_opts)
+    setDefault(opts, cn.PLT_XLABEL, "Percentile")
+    setDefault(opts, cn.PLT_YLABEL, "Feature")
     util_plots.plotCategoricalHeatmap(df.T, **opts)
+
+  def synthesize(self, nobs, frac, **kwargs):
+    """
+    Returns a random sample of rows with frac values replaced
+    by values from the empirical CDF.
+    :param int nobs: number of observations in the sample
+    :param float frac: fraction of values replaced
+    :param dict kwargs: arguments passed to sampler
+    :return pd.DataFrame:
+    """

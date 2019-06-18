@@ -9,6 +9,7 @@ import pandas as pd
 import unittest
 
 IGNORE_TEST = False
+IS_PLOT = False
 SIZE = 10
 COLA = "colA"
 COLB = "colB"
@@ -18,6 +19,7 @@ DF = pd.DataFrame({
     })
 MAX_FRAC_DIFF = 0.05
 NUM_SAMPLES = 5000
+TOLERANCE = 0.001
 
 
 class TestEmpiricalDistribution(unittest.TestCase):
@@ -44,6 +46,36 @@ class TestEmpiricalDistribution(unittest.TestCase):
     df = empirical_distribution.EmpiricalDistribution.decorrelate(
         df_orig)
     self.assertTrue(helpers.isValidDataFrame(df, df_orig.columns))
+
+  def testPlot(self):
+    # Smoke test only
+    plot_opts = {cn.PLT_IS_PLOT: IS_PLOT}
+    self.empirical._df = self.empirical.__class__.decorrelate(
+        self.empirical._df)
+    self.empirical.plot(plot_opts=plot_opts)
+
+  def testgetMarginals(self):
+    df = empirical_distribution.EmpiricalDistribution.decorrelate(DF)
+    empirical = empirical_distribution.EmpiricalDistribution(df)
+    df_marginals = empirical.getMarginals()
+    df_marginals.index = DF.index
+    self.assertTrue(df_marginals.equals(DF))
+
+  def testGetProb(self):
+    def test(value):
+      prob = self.empirical.getProb(COLA, value)
+      expected = (1.0*(value+1)/SIZE)
+      expected = max(0, expected)
+      expected = min(1, expected)
+      self.assertLess(np.abs(prob - prob), TOLERANCE)
+    #
+    test(6)
+    test(9)
+    test(0)
+    test(20)
+
+  def testSynthesize(self):
+    return
 
 if __name__ == '__main__':
   unittest.main()

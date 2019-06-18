@@ -21,8 +21,8 @@ KEGG_CMD_GET = "get"
 KEGG_CMDS = [KEGG_CMD_LIST, KEGG_CMD_GET]
 
 # Plotting
-PLT_XLABLE = "xlabel"
-PLT_YLABLE = "ylabel"
+PLT_XLABEL = "xlabel"
+PLT_YLABEL = "ylabel"
 PLT_TITLE = "title"
 PLT_FIGSIZE = "figsize"
 PLT_IS_PLOT = "is_plot"  # Flag to plot

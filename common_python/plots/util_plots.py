@@ -75,8 +75,8 @@ def plotCategoricalHeatmap(df, **kwargs):
     cmap = 'jet'
   heatmap = plt.pcolor(df, cmap=cmap)
   plt.colorbar(heatmap)
-  setValue(cn.PLT_XLABLE, plt.xlabel)
-  setValue(cn.PLT_YLABLE, plt.ylabel)
+  setValue(cn.PLT_XLABEL, plt.xlabel)
+  setValue(cn.PLT_YLABEL, plt.ylabel)
   setValue(cn.PLT_TITLE, plt.title)
   if cn.PLT_IS_PLOT in kwargs.keys():
     if kwargs[cn.PLT_IS_PLOT]:
