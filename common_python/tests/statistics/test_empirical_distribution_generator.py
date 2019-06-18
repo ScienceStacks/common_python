@@ -1,6 +1,6 @@
 """Tests for Statistics Utilities."""
 
-from common_python.statistics import empirical_distribution
+from common_python.statistics import empirical_distribution_generator
 import common_python.constants as cn
 from common_python.testing import helpers
 
@@ -25,7 +25,7 @@ TOLERANCE = 0.001
 class TestEmpiricalDistributionGenerator(unittest.TestCase):
 
   def setUp(self):
-    self.cls = empirical_distribution.EmpiricalDistributionGenerator
+    self.cls = empirical_distribution_generator.EmpiricalDistributionGenerator
     self.empirical = self.cls(DF)
 
   def testSample(self):
