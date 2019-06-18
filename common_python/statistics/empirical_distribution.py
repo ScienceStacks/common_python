@@ -71,6 +71,7 @@ class EmpiricalDistribution(object):
     count = len(self._df[self._df[col] <= value])
     return (1.0*count)/ len(self._df)
 
+  # TODO: Sort y axis?
   def plot(self, plot_opts=None):
     """
     Creates a heatmap of the marginal distributions.
