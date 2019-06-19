@@ -6,21 +6,26 @@ TODO
 """
 
 
-import pandas as pd
-import numpy as np
-
 import common_python.constants as cn
 from common_python.plots import util_plots
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 INDEX_MULT = 100
 
 
 class Density(object):
+  """
+  self.ser_density is a Series whose index is the variate
+  and the value is its density.
+  """
 
   def __init__(self, ser, variates=None):
     """
-    :param pd.Series: values for which a density is created
+    :param pd.Series: variate values for which a density is created
     :param list-object: expected values in the density
     """
     if variates is None:
@@ -50,6 +55,7 @@ class Density(object):
   def get(self):
     return self.ser_density
 
+  # TODO: Write tests
   def isLessEqual(self, other):
     """
     Determines if lower values have higher probabilities.
@@ -68,74 +74,10 @@ class Density(object):
           return False
     return True
 
-    
-
-  def sample(self, nobs, is_decorrelate=True):
+  def plot(self, is_plot=True, **kwds):
     """
-    Samples with replacement.
-    :param int nobs:
+    Creates a bar plot of the density.
     """
-    df_sample = self._df.sample(nobs, replace=True)
-    if is_decorrelate:
-      df_sample = self.__class__.decorrelate(df_sample)
-    df_sample = df_sample.reset_index()
-    return df_sample
-
-  @staticmethod
-  def decorrelate(df):
-    """
-    Permutes rows within columns to remove correlations between features.
-    :return pd.DataFrame:
-    """
-    length = len(df)
-    df_result = df.copy()
-    for col in df_result.columns:
-      values = df_result[col].tolist()
-      df_result[col] = np.random.permutation(values)
-    return df_result
-      
-  def getMarginals(self):
-    """
-    Constructs the marginal distributions for all columns.
-    :return pd.DataFrame: index is fraction
-    """
-    dfs = []
-    for col in self._df.columns:
-      df = self._df[col].copy()
-      df = df.sort_values()
-      df.index = range(len(df))
-      dfs.append(df)
-    df_result = pd.concat(dfs, axis=1)
-    df_result.index = [str(int((100*i)/len(self._df)))
-        for i in df_result.index]
-    return df_result
-
-  def getProb(self, col, value):
-    """
-    Computes the probability in the empirical distribution for a
-    column.
-    :param str col:
-    :param float value:
-    :return float:
-    """
-    count = len(self._df[self._df[col] <= value])
-    return (1.0*count)/ len(self._df)
-
-  # TODO: Sort y axis?
-  def plot(self, plot_opts=None):
-    """
-    Creates a heatmap of the marginal distributions.
-    x-axis is percentile; y-axis is feature
-    :param dict plot_opts:
-    """
-    def setDefault(opts, key, value):
-      if not key in opts.keys():
-        opts[key] = value
-    #
-    if plot_opts is None:
-      plot_opts = {}
-    df = self.getMarginals()
-    opts = dict(plot_opts)
-    setDefault(opts, cn.PLT_XLABEL, "Percentile")
-    setDefault(opts, cn.PLT_YLABEL, "Feature")
-    util_plots.plotCategoricalHeatmap(df.T, **opts)
+    self.ser_density.plot.bar(**kwds)
+    if is_plot:
+      plt.show()

@@ -9,14 +9,13 @@ import pandas as pd
 import unittest
 
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_PLOT = False
 SIZE = 10
 MAX_VALUE = 5
 COLA = "colA"
 values = np.random.randint(1, MAX_VALUE, size=20)
 SER = pd.Series(values)
-TOLERANCE = 0.001
 
 
 class TestDensity(unittest.TestCase):
@@ -26,11 +25,28 @@ class TestDensity(unittest.TestCase):
     self.density = self.cls(SER)
     
   def testConstructor(self):
+    if IGNORE_TEST:
+      return
     expected = range(1, MAX_VALUE+1)
     self.assertTrue(set(self.density.variates).issubset(expected))
 
   def testMakeDensity(self):
-    return
+    if IGNORE_TEST:
+      return
+    variates = range(1, MAX_VALUE)
+    ser = self.cls._makeDensity(SER, variates)
+    self.assertTrue(all([v > 0 for v in ser]))
+    #
+    variates = range(0, MAX_VALUE)
+    ser = self.cls._makeDensity(SER, variates)
+    self.assertTrue(all(
+        [v > 0 for i, v in ser.iteritems() if i > 0]))
+    self.assertEqual(ser[0], 0)
+
+  def testPlot(self):
+    if IGNORE_TEST:
+      return
+    self.density.plot(is_plot=IS_PLOT)
     
 
 if __name__ == '__main__':
