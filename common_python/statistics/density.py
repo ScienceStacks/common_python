@@ -23,16 +23,20 @@ class Density(object):
     :param pd.Series: values for which a density is created
     :param list-object: expected values in the density
     """
+    if variates is None:
+      variates = ser.unique().tolist()
     self.variates = variates
-    self.ser_density = self._makeDensity(ser)
+    self.ser_density = self.__class__._makeDensity(ser, self.variates)
 
-  def _makeDensity(self, ser):
-    ser_groupby = ser.groupby()
-    groups = ser_groupby.groups
-    keys = groups.keys()
-    if self.variates is not None:
-      keys.extend(self.variates)
-      keys = list(set(keys))
+  @staticmethod
+  def _makeDensity(ser, variates):
+    col = "dummy"
+    df = pd.DataFrame({col: ser})
+    df_groupby = df.groupby(col)
+    groups = df_groupby.groups
+    keys = [k for k in groups.keys()]
+    keys.extend(variates)
+    keys = list(set(keys))
     keys.sort()
     density = {}
     for key in keys:
@@ -54,7 +58,7 @@ class Density(object):
     """
     is_less = True
     for key in self.ser_density.keys():
-      if_less:
+      if is_less:
         if self.ser_density.loc[key][0] >  \
             other.ser_density.loc[key][0]:
           is_less = False

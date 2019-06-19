@@ -42,7 +42,8 @@ class EmpiricalDistributionGenerator(object):
   @staticmethod
   def decorrelate(df):
     """
-    Permutes rows within columns to remove correlations between features.
+    Permutes rows within columns to remove 
+        correlations between features.
     :return pd.DataFrame:
     """
     length = len(df)
