@@ -20,8 +20,8 @@ class MultipleDensity(object):
     """
     sers = []
     for col in df.columns:
-      density = density.Density(df[col], variates=variates)
-      sers.append(density.ser_density)
+      a_density = density.Density(df[col], variates=variates)
+      sers.append(a_density.ser_density)
     self.df = pd.concat(sers, axis=1)
 
   def calcSortIndex(self, sort_order=None):
