@@ -7,6 +7,9 @@ import common_python.constants as cn
 from common_python.plots import util_plots
 from common_python.statistics import density
 
+INDEX = "index"
+INDEX_MULT = 1000
+
 
 class MultipleDensity(object):
   
@@ -40,11 +43,12 @@ class MultipleDensity(object):
       sort_order.sort()
     # Calculate the sort value
     sort_values = {}
-    for col in df.columns:
+    for col in self.df.columns:
       sort_value = 0
-      for ordinate in sort_order:
-        ordinate_index = int(100*self.df.loc[ordinate, col])
-        sort_value += INDEX_MULT*sort_value + ordinate_index
+      for variate in sort_order:
+        variate_index = int(100*self.df.loc[variate, col])
+        sort_value = INDEX_MULT*sort_value + variate_index  \
+          + INDEX_MULT
       sort_values[col] = sort_value
     #
     return pd.Series(sort_values)
@@ -63,7 +67,10 @@ class MultipleDensity(object):
     #
     if plot_opts is None:
       plot_opts = {}
-    df = self.getMarginals()
+    df = self.df.copy()
+    df[INDEX] = self.calcSortIndex()
+    df = df.sort_values(INDEX)
+    del df[INDEX]
     opts = dict(plot_opts)
     setDefault(opts, cn.PLT_XLABEL, "Variate")
     setDefault(opts, cn.PLT_YLABEL, "Feature")

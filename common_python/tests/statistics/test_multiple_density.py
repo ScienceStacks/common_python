@@ -11,8 +11,8 @@ import unittest
 
 def makeData(maxint, size):
   return pd.DataFrame({
-      COLA: np.random.randint(1, maxint+1, size),
-      COLB: np.random.randint(1, maxint+1, size),
+      COLA: np.repeat(range(1, maxint+1), size),
+      COLB: np.repeat(range(1, maxint+1), size),
       })
 
 IGNORE_TEST = False
@@ -28,12 +28,16 @@ class TestMultipleDensity(unittest.TestCase):
 
   def setUp(self):
     self.cls = multiple_density.MultipleDensity
-    self.multiple= self.cls(DF, range(1, MAX+1))
-    import pdb; pdb.set_trace()
+    self.multiple = self.cls(DF, range(1, MAX+1))
     
   def testConstructor(self):
     if IGNORE_TEST:
       return
+    self.assertEqual(len(self.multiple.df), MAX)
+
+  def testCalcSortIndex(self):
+    ser = self.multiple.calcSortIndex()
+    import pdb; pdb.set_trace()
     
 
 if __name__ == '__main__':
