@@ -43,7 +43,7 @@ class TestFunction(unittest.TestCase):
         cn.PLT_XLABEL: "x",
         cn.PLT_YLABEL: "y",
         }
-    util_plots.plotCategoricalHeatmap(df, **opts)
+    util_plots.plotCategoricalHeatmap(df, is_plot=IS_PLOT, **opts)
 
 
 if __name__ == '__main__':

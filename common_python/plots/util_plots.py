@@ -45,7 +45,7 @@ def plotTrinaryHeatmap(df, ax=None, is_plot=True, **kwargs):
   if is_plot:
     plt.show()
 
-def plotCategoricalHeatmap(df, **kwargs):
+def plotCategoricalHeatmap(df, is_plot=False, **kwargs):
   """
   Plots a heatmap of numerical values with categorical
   x and y axes.
@@ -78,8 +78,5 @@ def plotCategoricalHeatmap(df, **kwargs):
   setValue(cn.PLT_XLABEL, plt.xlabel)
   setValue(cn.PLT_YLABEL, plt.ylabel)
   setValue(cn.PLT_TITLE, plt.title)
-  if cn.PLT_IS_PLOT in kwargs.keys():
-    if kwargs[cn.PLT_IS_PLOT]:
-      plt.show()
-  else:
+  if is_plot:
     plt.show()
