@@ -36,6 +36,11 @@ class Density(object):
 
   @staticmethod
   def _makeDensity(ser, variates):
+    """
+    :param pd.Series ser:
+    :param list-object variates: required to be present in result
+    :return pd.Series:
+    """
     counter = dict(collections.Counter(ser))
     length = len(ser)
     counter = {k: v/length for k, v in counter.items()}
