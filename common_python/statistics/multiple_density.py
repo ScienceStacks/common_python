@@ -1,5 +1,6 @@
 """Multiple densities with the same variates."""
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
@@ -7,8 +8,10 @@ import common_python.constants as cn
 from common_python.plots import util_plots
 from common_python.statistics import density
 
-INDEX = "index"
 INDEX_MULT = 1000
+THIS = "this"
+OTHER = "other"
+COLORS = ["red", "green", "blue", "grey", "brown"]
 
 
 class MultipleDensity(object):
@@ -26,6 +29,7 @@ class MultipleDensity(object):
       a_density = density.Density(df[col], variates=variates)
       sers.append(a_density.ser_density)
     self.df = pd.concat(sers, axis=1)
+    self.df.columns = df.columns
 
   def calcSortIndex(self, sort_order=None):
     """
@@ -53,13 +57,15 @@ class MultipleDensity(object):
     #
     return pd.Series(sort_values)
 
-  def plotMarginals(self, ser_sort_order=None, **plot_opts):
+  def plotMarginals(self, ser_sort_order=None,
+      **plot_opts):
     """
     Does a heatmap of the marginals. X-axis is variates; y-axis are features.
         Values are probabilities.
     :param pd.Series ser_sort_order: Series with features as 
         index with floats defining order. 
     :param dict plot_opts:
+    :return list-str: columns in sorted order
     """
     def setDefault(opts, key, value):
       if not key in opts.keys():
@@ -68,16 +74,44 @@ class MultipleDensity(object):
     if plot_opts is None:
       plot_opts = {}
     df = self.df.copy()
-    df[INDEX] = self.calcSortIndex()
-    df = df.sort_values(INDEX)
-    del df[INDEX]
+    pairs = zip(df.columns, self.calcSortIndex().tolist())
+    sorted_pairs = sorted(pairs, key=lambda x: x[1])
+    sorted_columns = [p[0] for p in sorted_pairs]
+    df = df[sorted_columns]
     opts = dict(plot_opts)
     setDefault(opts, cn.PLT_XLABEL, "Variate")
     setDefault(opts, cn.PLT_YLABEL, "Feature")
-    util_plots.plotCategoricalHeatmap(df.T, **plot_opts)
-    return
+    util_plots.plotCategoricalHeatmap(df.T, **opts)
+    return sorted_columns
 
-  def plotMarginalComparisons(self, other, ser_sort_order=None):
+  def isSameColumns(self, other):
+    """
+    Checks that another MultipleDensity has the same columns.
+    :param MultipleDensity other:
+    """
+    return set(other.df.columns) == set(self.df.columns)
+
+  def isSameIndex(self, other):
+    """
+    Checks that another MultipleDensity has the same iindices.
+    :param MultipleDensity other:
+    """
+    return set(other.df.index) == set(self.df.index)
+
+  @staticmethod
+  def _makeMarginalComparisonDF(ser_this, ser_other):
+    """
+    :param pd.Series this: probabilities indexed by gene
+    :param pd.Series other: probabilities indexed by gene
+    :return pd.DataFrame:
+        columns: THIS, OTHER
+        index: column
+        values: float in [0, 1]
+    """
+    return pd.DataFrame({THIS: ser_this, OTHER: ser_other})
+
+  def plotMarginalComparisons(self, other, ser_sort_order=None, 
+      is_plot=True, **plot_opts):
     """
     Multiple line plots (one for each variate)
       x-axs probability of a in this distribution
@@ -86,4 +120,24 @@ class MultipleDensity(object):
     :param MultipleDensity other:
     :param list-object sort_order:
     """
-    return
+    if not self.isSameColumns(other):
+      raise ValueError("MultipleDensitys don't have the same columns")
+    if not self.isSameIndex(other):
+      raise ValueError("MultipleDensitys don't have the same index")
+    variates = list(set(self.df.index))
+    df_this = self.df.T
+    df_other = other.df.T
+    ax = None
+    for idx, variate in enumerate(variates):
+      df_plot = self.__class__._makeMarginalComparisonDF(
+          df_this[variate], df_other[variate],)
+      if ax is None:
+        ax = df_plot.plot.scatter(THIS, OTHER, 
+            color=COLORS[idx], **plot_opts)
+      else:
+        df_plot.plot.scatter(THIS, OTHER, ax=ax,
+            color=COLORS[idx], **plot_opts)
+    plt.legend(variates)
+    if is_plot:
+      plt.show()
+      

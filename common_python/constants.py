@@ -27,3 +27,6 @@ PLT_TITLE = "title"
 PLT_FIGSIZE = "figsize"
 PLT_IS_PLOT = "is_plot"  # Flag to plot
 PLT_CMAP = "cmap"
+
+# Letters
+UPPER_CASE = [x for x in map(chr, range(65, 91))]
