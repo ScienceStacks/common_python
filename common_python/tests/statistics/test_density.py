@@ -29,6 +29,10 @@ class TestDensity(unittest.TestCase):
       return
     expected = range(1, MAX_VALUE+1)
     self.assertTrue(set(self.density.variates).issubset(expected))
+    self.assertGreater(len(self.density.ser_density), 0)
+    not_valids = [v for v in self.density.ser_density
+        if (v < 0.0) or (v > 1.0)]
+    self.assertEqual(len(not_valids), 0)
 
   def testMakeDensity(self):
     if IGNORE_TEST:

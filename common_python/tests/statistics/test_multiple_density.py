@@ -81,12 +81,13 @@ class TestMultipleDensity(unittest.TestCase):
     self.assertEqual(set(columns), set(df.columns))
 
   def testPlotMarginalComparisons(self):
+    if IGNORE_TEST:
+      return
     offset = 1
     ncols = 12
     df = makeData(MAX, SIZE, ncols=ncols, is_random=True)
     multiple = self.cls(df, range(1, MAX+offset))
-    multiple.plotMarginalComparisons(multiple)
-    import pdb; pdb.set_trace()
+    multiple.plotMarginalComparisons(multiple, is_plot=IS_PLOT)
     
 
 if __name__ == '__main__':

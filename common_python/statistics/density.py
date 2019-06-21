@@ -9,6 +9,7 @@ TODO
 import common_python.constants as cn
 from common_python.plots import util_plots
 
+import collections
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -35,22 +36,15 @@ class Density(object):
 
   @staticmethod
   def _makeDensity(ser, variates):
-    col = "dummy"
-    df = pd.DataFrame({col: ser})
-    df_groupby = df.groupby(col)
-    groups = df_groupby.groups
-    keys = [k for k in groups.keys()]
-    keys.extend(variates)
-    keys = list(set(keys))
-    keys.sort()
-    density = {}
-    for key in keys:
-      if not key in groups.keys():
-        numr = 0.0
-      else:
-        numr = 1.0*len(groups[key])
-      density[key] = numr/len(ser)
-    return pd.Series(density, index=keys)
+    counter = dict(collections.Counter(ser))
+    length = len(ser)
+    counter = {k: v/length for k, v in counter.items()}
+    for variate in variates:
+      if not variate in counter.keys():
+        counter[variate] = 0
+    values = list(counter.values())
+    keys = list(counter.keys())
+    return pd.Series(values, index=keys)
 
   def get(self):
     return self.ser_density
