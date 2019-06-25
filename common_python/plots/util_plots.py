@@ -73,7 +73,11 @@ def plotCategoricalHeatmap(df, is_plot=False, **kwargs):
   cmap = getValue(cn.PLT_CMAP)
   if cmap is None:
     cmap = 'jet'
-  heatmap = plt.pcolor(df, cmap=cmap)
+  if ('vmin' in kwargs) and ('vmax' in kwargs):
+    heatmap = plt.pcolor(df, cmap=cmap,
+        vmin=kwargs['vmin'], vmax=kwargs['vmax'])
+  else:
+    heatmap = plt.pcolor(df, cmap=cmap)
   plt.colorbar(heatmap)
   setValue(cn.PLT_XLABEL, plt.xlabel)
   setValue(cn.PLT_YLABEL, plt.ylabel)
