@@ -140,6 +140,9 @@ class MultipleDensity(object):
         df_plot.plot.scatter(THIS, OTHER, ax=ax,
             color=COLORS[idx], **plot_opts)
     plt.legend(variates)
+    ax.plot([0, 1.0], [0, 1.0], linestyle='dashed', color='black')
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
     if is_plot:
       plt.show()
       
