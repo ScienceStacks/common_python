@@ -43,15 +43,6 @@ class TestEmpiricalDistributionGenerator(unittest.TestCase):
     df = self.empirical.sample(NUM_SAMPLES, is_decorrelate=True)
     self.assertTrue(helpers.isValidDataFrame(df, DF.columns))
 
-  def testDecorelate(self):
-    if IGNORE_TEST:
-      return
-    df_orig = pd.concat([DF for _ in range(500)], axis=1)
-    df_orig.columns = ["%d" % d for d in range(len(df_orig.columns))]
-    df = self.cls.decorrelate(
-        df_orig)
-    self.assertTrue(helpers.isValidDataFrame(df, df_orig.columns))
-
   def testSynthesize(self):
     if IGNORE_TEST:
       return

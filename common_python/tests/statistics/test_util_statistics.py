@@ -37,6 +37,15 @@ class TestFunctions(unittest.TestCase):
       for nn in range(2, len(df.loc[index, :])):
         self.assertLess(df.loc[index, columns[nn-1]],
             df.loc[index, columns[nn]])
+
+    def testDecorelate(self):
+      if IGNORE_TEST:
+        return
+      df_orig = pd.concat([DF for _ in range(500)], axis=1)
+      df_orig.columns = [
+          "%d" % d for d in range(len(df_orig.columns))]
+      df = util_statistics.decorrelate(df_orig)
+      self.assertTrue(helpers.isValidDataFrame(df, df_orig.columns))
       
 
 if __name__ == '__main__':

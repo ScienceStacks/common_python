@@ -43,3 +43,16 @@ def calcLogSL(df, round_decimal=4, is_nan=True):
   else:
     df_log = df4
   return df_log
+
+def decorrelate(df):
+  """
+  Permutes rows within columns to remove 
+      correlations between features.
+  :return pd.DataFrame:
+  """
+  length = len(df)
+  df_result = df.copy()
+  for col in df_result.columns:
+    values = df_result[col].tolist()
+    df_result[col] = np.random.permutation(values)
+  return df_result

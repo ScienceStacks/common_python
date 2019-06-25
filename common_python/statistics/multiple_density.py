@@ -1,12 +1,14 @@
 """Multiple densities with the same variates."""
 
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
 
 import common_python.constants as cn
 from common_python.plots import util_plots
 from common_python.statistics import density
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
 
 INDEX_MULT = 1000
 THIS = "this"
