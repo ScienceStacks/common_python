@@ -54,6 +54,8 @@ class TestEmpiricalDistributionGenerator(unittest.TestCase):
         for _, r in df.iterrows()])
     normalized_difference = abs(count - expected) / (1.0*expected)
     self.assertLess(normalized_difference, 0.4)
+    df = self.empirical.synthesize(-1, 0.0)
+    self.assertEqual(len(df), len(self.empirical._df))
 
 if __name__ == '__main__':
   unittest.main()

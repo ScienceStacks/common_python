@@ -45,13 +45,23 @@ class EmpiricalDistributionGenerator(object):
     Returns a random sample of rows with frac values replaced
     by values from the empirical CDF.
     :param int nobs: number of observations in the sample
+        if nobs < 0, use self._df without sampling
     :param float frac: fraction of values replaced
     :return pd.DataFrame:
     """
+    if nobs < 0:
+      is_sample = False
+    else:
+      is_sample = True
     # Generate base data
     ncols = len(self._df.columns)
     # Get a sample of rows, preserving the covariance structure
-    df_correlated = self.sample(nobs, is_decorrelate=False)
+    if is_sample:
+      df_correlated = self.sample(nobs, is_decorrelate=False)
+    else:
+      df_correlated = self._df.copy()
+      df_correlated.index = range(len(df_correlated))
+      nobs = len(self._df)
     # Draw from the marginals without the covariance structure
     df_uncorrelated = self.sample(nobs, is_decorrelate=True)
     # Determine values to replace
