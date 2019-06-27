@@ -45,13 +45,16 @@ def plotTrinaryHeatmap(df, ax=None, is_plot=True, **kwargs):
   if is_plot:
     plt.show()
 
-def plotCategoricalHeatmap(df, is_plot=False, **kwargs):
+def plotCategoricalHeatmap(df, is_plot=False, xoffset=0.5, 
+    yoffset=0.5, ax=None, **kwargs):
   """
   Plots a heatmap of numerical values with categorical
   x and y axes.
   Row indices are the y-axis; columns are the x-axis
   :param pd.DataFrame df:
+  :param int offset: how much labels are offset
   :param dict kwargs: plot options
+  :return ax:
   """
   def getValue(key):
     if key in kwargs.keys():
@@ -65,10 +68,11 @@ def plotCategoricalHeatmap(df, is_plot=False, **kwargs):
   #
   if getValue(cn.PLT_FIGSIZE) is not None:
     plt.figure(figsize=getValue(PLT_FIGSIZE))
-  ax = plt.gca()
-  ax.set_xticks(np.arange(len(df.columns))+0.5)
+  if ax is None:
+    ax = plt.gca()
+  ax.set_xticks(np.arange(len(df.columns)) + xoffset)
   ax.set_xticklabels(df.columns)
-  ax.set_yticks(np.arange(len(df.index))+0.5)
+  ax.set_yticks(np.arange(len(df.index)) + yoffset)
   ax.set_yticklabels(df.index)
   cmap = getValue(cn.PLT_CMAP)
   if cmap is None:
@@ -84,3 +88,4 @@ def plotCategoricalHeatmap(df, is_plot=False, **kwargs):
   setValue(cn.PLT_TITLE, plt.title)
   if is_plot:
     plt.show()
+  return heatmap
