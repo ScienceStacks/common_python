@@ -21,12 +21,12 @@ KEGG_CMD_GET = "get"
 KEGG_CMDS = [KEGG_CMD_LIST, KEGG_CMD_GET]
 
 # Plotting
+PLT_CMAP = "cmap"
 PLT_XLABEL = "xlabel"
 PLT_YLABEL = "ylabel"
 PLT_TITLE = "title"
 PLT_FIGSIZE = "figsize"
 PLT_IS_PLOT = "is_plot"  # Flag to plot
-PLT_CMAP = "cmap"
 
 # Letters
 UPPER_CASE = [x for x in map(chr, range(65, 91))]

@@ -1,10 +1,12 @@
 """Plot Utilities."""
 
 import common_python.constants as cn
+from common_python.util import util
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 
 # Plot options
@@ -12,10 +14,26 @@ XLABEL = "xlabel"
 YLABEL = "ylabel"
 TITLE = "title"
 
-def getAxis(ax):
+
+###### INTERNAL UTILITIES ######
+def _getAxis(ax):
   if ax is None:
     ax = plt.gca()
   return ax
+
+def _getValue(key, kwargs):
+  if key in kwargs.keys():
+    return kwargs[key]
+  else:
+    return None
+
+def _setValue(key, kwargs, func):
+  val = _getValue(key, kwargs)
+  if val is not None:
+    func(val)
+
+
+########### EXTERNALLY USED ########################
 
 def plotTrinaryHeatmap(df, ax=None, is_plot=True, **kwargs):
   """
@@ -30,7 +48,7 @@ def plotTrinaryHeatmap(df, ax=None, is_plot=True, **kwargs):
   # Plot construct
   if ax is None:
     plt.figure(figsize=(16, 10))
-  ax = getAxis(ax)
+  ax = _getAxis(ax)
   columns = df_plot.columns
   ax.set_xticks(np.arange(len(columns)))
   ax.set_xticklabels(columns)
@@ -56,25 +74,15 @@ def plotCategoricalHeatmap(df, is_plot=False, xoffset=0.5,
   :param dict kwargs: plot options
   :return ax:
   """
-  def getValue(key):
-    if key in kwargs.keys():
-      return kwargs[key]
-    else:
-      return None
-  def setValue(key, func):
-    val = getValue(key)
-    if val is not None:
-      func(val)
-  #
-  if getValue(cn.PLT_FIGSIZE) is not None:
-    plt.figure(figsize=getValue(PLT_FIGSIZE))
+  if _getValue(cn.PLT_FIGSIZE, kwargs) is not None:
+    plt.figure(figsize=_getValue(PLT_FIGSIZE, kwargs))
   if ax is None:
     ax = plt.gca()
   ax.set_xticks(np.arange(len(df.columns)) + xoffset)
   ax.set_xticklabels(df.columns)
   ax.set_yticks(np.arange(len(df.index)) + yoffset)
   ax.set_yticklabels(df.index)
-  cmap = getValue(cn.PLT_CMAP)
+  cmap = _getValue(cn.PLT_CMAP, kwargs)
   if cmap is None:
     cmap = 'jet'
   if ('vmin' in kwargs) and ('vmax' in kwargs):
@@ -83,9 +91,32 @@ def plotCategoricalHeatmap(df, is_plot=False, xoffset=0.5,
   else:
     heatmap = plt.pcolor(df, cmap=cmap)
   plt.colorbar(heatmap)
-  setValue(cn.PLT_XLABEL, plt.xlabel)
-  setValue(cn.PLT_YLABEL, plt.ylabel)
-  setValue(cn.PLT_TITLE, plt.title)
+  _setValue(cn.PLT_XLABEL, kwargs, plt.xlabel)
+  _setValue(cn.PLT_YLABEL, kwargs, plt.ylabel)
+  _setValue(cn.PLT_TITLE, kwargs, plt.title)
   if is_plot:
     plt.show()
   return heatmap
+
+def plotCorr(df, is_plot=True, **kwargs):
+  """
+  Plots correlation of features (columns).
+  :param pd.DataFrame df:  rows are instances; columns are features
+  :param dict kwargs: plot options
+     supported: cmap, xlabel, title, ylabel
+  """
+  df_corr = df.corr()
+  df_corr = df_corr.applymap(lambda v: 0 if np.isnan(v) else v)
+  if _getValue(cn.PLT_CMAP, kwargs) is None:
+    cmap = "seismic"
+  cg = sns.clustermap(df_corr, col_cluster=True, vmin=-1, vmax=1,
+      cbar_kws={"ticks":[0,5]}, cmap=cmap)
+  _ = cg.ax_heatmap.set_xticklabels([])
+  _ = cg.ax_heatmap.set_xticks([])
+  _ = cg.ax_heatmap.set_yticklabels([])
+  _ = cg.ax_heatmap.set_yticks([])
+  _setValue(cn.PLT_TITLE, kwargs, cg.fig.suptitle)
+  _setValue(cn.PLT_XLABEL, kwargs, cg.ax_heatmap.set_xlabel)
+  _setValue(cn.PLT_YLABEL, kwargs, cg.ax_heatmap.set_ylabel)
+  if is_plot:
+    cg.fig.show()

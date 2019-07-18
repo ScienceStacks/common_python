@@ -5,6 +5,7 @@ import common_python.constants as cn
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 import unittest
 
 IGNORE_TEST = False
@@ -44,6 +45,14 @@ class TestFunction(unittest.TestCase):
         cn.PLT_YLABEL: "y",
         }
     util_plots.plotCategoricalHeatmap(df, is_plot=IS_PLOT, **opts)
+
+  def testPlotCorr(self):
+    # Smoke tests
+    if IGNORE_TEST:
+      return
+    size = 10
+    df = pd.DataFrame(np.random.rand(size, size))
+    util_plots.plotCorr(df, is_plot=IS_PLOT, xlabel="x", title="title")
 
 
 if __name__ == '__main__':

@@ -103,3 +103,16 @@ def changeFileExtension(filepath, extension):
     return "%s" % stripped_filepath
   else:
     return "%s.%s" % (stripped_filepath, extension)
+
+def getValue(dictionary, key, value):
+  """
+  Returns the value for the key in the dictionary or the default.
+  :param dict dictionary:
+  :param object key:
+  :param object value:
+  :return object:
+  """
+  if not key in dictionary.keys():
+    return value
+  else:
+    return dictionary[key]
