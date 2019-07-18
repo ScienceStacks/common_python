@@ -6,7 +6,7 @@ from common_python.util import util
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
+import seaborn
 
 
 # Plot options
@@ -104,12 +104,13 @@ def plotCorr(df, is_plot=True, **kwargs):
   :param pd.DataFrame df:  rows are instances; columns are features
   :param dict kwargs: plot options
      supported: cmap, xlabel, title, ylabel
+  :return seaborn.matrix.ClusterGrid:
   """
   df_corr = df.corr()
   df_corr = df_corr.applymap(lambda v: 0 if np.isnan(v) else v)
   if _getValue(cn.PLT_CMAP, kwargs) is None:
     cmap = "seismic"
-  cg = sns.clustermap(df_corr, col_cluster=True, vmin=-1, vmax=1,
+  cg = seaborn.clustermap(df_corr, col_cluster=True, vmin=-1, vmax=1,
       cbar_kws={"ticks":[0,5]}, cmap=cmap)
   _ = cg.ax_heatmap.set_xticklabels([])
   _ = cg.ax_heatmap.set_xticks([])
@@ -120,3 +121,4 @@ def plotCorr(df, is_plot=True, **kwargs):
   _setValue(cn.PLT_YLABEL, kwargs, cg.ax_heatmap.set_ylabel)
   if is_plot:
     cg.fig.show()
+  return cg
