@@ -111,7 +111,7 @@ def plotCorr(df, is_plot=True, **kwargs):
   if _getValue(cn.PLT_CMAP, kwargs) is None:
     cmap = "seismic"
   cg = seaborn.clustermap(df_corr, col_cluster=True, vmin=-1, vmax=1,
-      cbar_kws={"ticks":[0,5]}, cmap=cmap)
+      cbar_kws={"ticks":[-1, 0, 1]}, cmap=cmap)
   _ = cg.ax_heatmap.set_xticklabels([])
   _ = cg.ax_heatmap.set_xticks([])
   _ = cg.ax_heatmap.set_yticklabels([])
