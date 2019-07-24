@@ -28,6 +28,18 @@ class TestOrdinalCollection(unittest.TestCase):
     collection = OrdinalCollection.makeWithOrderings(CC1, orderings)
     cc1.sort()
     self.assertEqual(cc1, collection.ordinals)
+    #
+    orderings = [ [-30, -20, -10 ]]
+    collection = OrdinalCollection.makeWithOrderings(CC1, orderings,
+        is_abs=False)
+    self.assertEqual(CC1, collection.ordinals)
+    #
+    orderings = [ [-30, -20, -10 ]]
+    collection = OrdinalCollection.makeWithOrderings(CC1, orderings,
+        is_abs=True)
+    cc1 = list(CC1)
+    cc1.sort()
+    self.assertEqual(cc1, collection.ordinals)
 
 
 if __name__ == '__main__':
