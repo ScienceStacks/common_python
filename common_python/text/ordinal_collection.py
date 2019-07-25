@@ -47,10 +47,10 @@ class OrdinalCollection(object):
     return cls(sorted_ordinals)
 
   @staticmethod
-  def _calcTopN(ordinals, topN):
-    if topN is None:
-      topN = len(ordinals)
-    return ordinals[-topN:]
+  def _calcTopN(ordinals, top):
+    if top is None:
+      top = len(ordinals)
+    return ordinals[-top:]
 
   def compareOverlap(self, others, topN=None):
     """
@@ -58,6 +58,7 @@ class OrdinalCollection(object):
     Computes the ratio of the size of intersection to the size
     of the union.
     :param list-OrdinalCollection other:
+    :return float: fraction of overlap
     """
     cls = self.__class__
     #
@@ -74,23 +75,38 @@ class OrdinalCollection(object):
     num_union = len(ordinal_union)
     return (1.0*num_intersection)/num_union
 
-  def makeOrderMatrix(self):
+  def makeOrderMatrix(self, top=None):
     """
     Create a matrix where a 1 in cell ij means that ordinal
-    i is less or equal to ordinal j.
+    i is less than ordinal j.
+    :return pd.DataFrame:
     """
-    length = len(self.ordinals)
-    df = pd.DataFrame(np.repeat(0, length, length))
-    df.columns = self.ordinals
-    df.index = self.ordinals
-    for idx, ordinal in enumerate(self.ordinals):
-      df.loc[ordinal, range(idx, length)] = 1
+    ordinals = self.__class__._calcTopN(self.ordinals, top)
+    length = len(ordinals)
+    dfs = [pd.Series(np.repeat(0, length)) for _ in range(length)]
+    df = pd.concat(dfs, axis=1)
+    df.columns = ordinals
+    df.index = ordinals
+    for idx, ordinal in enumerate(ordinals):
+      for pos in range(idx+1, length):
+        df.loc[ordinal, df.columns[pos]] = 1
     return df
     
-  def compareOrder(self, other, top=None):
+  def compareOrder(self, others, top=None):
     """
     Calculates the similarities in ordering of two
     OrdinalCollection.
+    :param list-OrdinalCollection others:
+    :return float: fraction of order preserved
     """
-    ordinals1 = cls._calcTopNSet(self.ordinals)
-    ordinals2 = cls._calcTopNSet(other.ordinals)
+    df_matrix = self.makeOrderMatrix(top)
+    all_ordinals = set(df_matrix.columns)
+    for other in others:
+      df = other.makeOrderMatrix(top)
+      all_ordinals = all_ordinals.union(df.columns)
+      df_matrix = df_matrix * other.makeOrderMatrix(top)
+    #
+    max_satisfied_inequalities =  \
+        (len(all_ordinals)-1)*(len(all_ordinals))/2.0
+    num_satisfied = df_matrix.sum().sum()
+    return (1.0*num_satisfied)/max_satisfied_inequalities
