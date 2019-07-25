@@ -23,6 +23,7 @@ class OrdinalCollection(object):
     """
     :param list-object ordinal_values: ordinals
         values are ordered from smallest to largest
+        in ordinal value
     """
     self.ordinals = list(ordinals)
 
@@ -45,27 +46,51 @@ class OrdinalCollection(object):
     sorted_ordinals = [o for _, o in sorted(zip(keys, ordinals))]
     return cls(sorted_ordinals)
 
-  def compareOverlap(self, other, topN=None):
+  @staticmethod
+  def _calcTopN(ordinals, topN):
+    if topN is None:
+      topN = len(ordinals)
+    return ordinals[-topN:]
+
+  def compareOverlap(self, others, topN=None):
     """
     Calculates the overlap between two OrdinalCollections.
     Computes the ratio of the size of intersection to the size
     of the union.
+    :param list-OrdinalCollection other:
     """
-    if topN is None:
-      topN1 = len(self.ordinals)
-      topN2 = len(other.ordinals)
-    else:
-      topN1 = topN
-      topN2 = topN
-    set1 = set(self.ordinals[0:topN1])
-    set2 = set(other.ordinals[0:topN2])
-    num_intersection = len(set1.intersection(set2))
-    num_union = len(set1.union(set2))
+    cls = self.__class__
+    #
+    ordinal_sets = [set(cls._calcTopN(self.ordinals, topN))]
+    for other in others:
+      ordinal_sets.append(set(cls._calcTopN(other.ordinals, topN)))
+    ordinal_union = set([])
+    for other in ordinal_sets:
+      ordinal_union = ordinal_union.union(other)
+    ordinal_intersection = ordinal_union
+    for other in ordinal_sets:
+      ordinal_intersection = ordinal_intersection.intersection(other)
+    num_intersection = len(ordinal_intersection)
+    num_union = len(ordinal_union)
     return (1.0*num_intersection)/num_union
+
+  def makeOrderMatrix(self):
+    """
+    Create a matrix where a 1 in cell ij means that ordinal
+    i is less or equal to ordinal j.
+    """
+    length = len(self.ordinals)
+    df = pd.DataFrame(np.repeat(0, length, length))
+    df.columns = self.ordinals
+    df.index = self.ordinals
+    for idx, ordinal in enumerate(self.ordinals):
+      df.loc[ordinal, range(idx, length)] = 1
+    return df
     
   def compareOrder(self, other, top=None):
     """
     Calculates the similarities in ordering of two
     OrdinalCollection.
     """
-    pass
+    ordinals1 = cls._calcTopNSet(self.ordinals)
+    ordinals2 = cls._calcTopNSet(other.ordinals)
