@@ -14,11 +14,13 @@ CrossValidationResult = collections.namedtuple(
 
 class ClassifierEnsemble(object):
 
-  def __init__(self, classifiers):
+  def __init__(self, classifiers, features, classes):
     """
     :param list-Classifier classifiers: classifiers
     """
     self.classifiers = classifiers
+    self.features = features
+    self.classes = classes
 
   @classmethod
   def crossVerify(cls, classifier, df_X, ser_y,
@@ -75,12 +77,40 @@ class ClassifierEnsemble(object):
     return CrossValidationResult(
         mean=np.mean(scores), 
         std=np.std(scores), 
-        ensemble=cls(classifiers)
+        ensemble=cls(classifiers, df_X.columns.tolist(), ser_y.unique().tolist())
         )
+
+  def makeRankDF(self):
+    """
+    Constructs a dataframe of feature ranks for importance.
+    A more important feature has a lower rank (closer to 0)
+    :return pd.DataFrame: columns are cn.MEAN, cn.STD
+    """
+    df = pd.DataFrame()
+    for idx, clf in enumerate(self.classifiers):
+      features = self.orderFeatures(clf)
+      df[idx] = pd.Series(range(len(features)), index=features)
+    df_result = pd.DataFrame({
+        cn.MEAN: df.mean(axis=1),
+        cn.STD: df.std(axis=1) / np.sqrt(len(self.classifiers)),
+        })
+    df_result = df_result.sort_values(cn.MEAN)
+    return df_result
+    
         
    
 class LinearSVMEnsemble(ClassifierEnsemble):
 
-  pass   
+  def orderFeatures(self, clf):
+    """
+    Orders features by descending value of importance.
+    :return list-object:
+    """
+    coefs = [max([np.abs(x) for x in xv]) for xv in zip(*clf.coef_)]
+    sorted_tuples = sorted(zip(self.features, coefs),
+        key=lambda v: v[1], reverse=True)
+    result = [t[0] for t in sorted_tuples]
+    return result
+    
     
     

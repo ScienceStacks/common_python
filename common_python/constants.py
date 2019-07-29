@@ -13,6 +13,8 @@ KEGG_PATHWAY = "kegg_pathway"
 KEGG_GENE = "kegg_gene"
 KEGG_EC = "kegg_ec"  # EC number
 KEGG_KO = "kgg_ko"  # KEGG orthology
+MEAN = "mean"
+STD = "std"
 VALUE = "value"  # General value
 
 # KEGG Access
