@@ -7,12 +7,22 @@ import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+
+RF_ESTIMATORS = "n_estimators"
+RF_MAX_FEATURES = "max_features"
+RF_BOOTSTRAP = "bootstrap"
+RF_DEFAULTS = {
+    RF_ESTIMATORS: 100,
+    RF_BOOTSTRAP: True,
+    }
 
 
 CrossValidationResult = collections.namedtuple(
     "CrossValidationResult", "mean std ensemble")
 
 
+##################################################################### 
 class ClassifierEnsemble(object):
 
   def __init__(self, classifiers, features, classes):
@@ -87,14 +97,18 @@ class ClassifierEnsemble(object):
     A more important feature has a lower rank (closer to 0)
     :return pd.DataFrame: columns are cn.MEAN, cn.STD
     """
-    df = pd.DataFrame()
+    ranks = {f: [] for f in self.features}
     for idx, clf in enumerate(self.classifiers):
       features = self.orderFeatures(clf)
-      df[idx] = pd.Series(range(len(features)), index=features)
+      for rank, feature in enumerate(features):
+        ranks[feature].append(rank+1)
     df_result = pd.DataFrame({
-        cn.MEAN: df.mean(axis=1),
-        cn.STD: df.std(axis=1) / np.sqrt(len(self.classifiers)),
+        cn.MEAN: [np.mean(v) for v in ranks.values()],
+        cn.STD: [np.std(v) for v in ranks.values()],
+        cn.COUNT: [len(v) for v in ranks.values()],
         })
+    df_result.index = [r for r in ranks.keys()]
+    df_result = df_result.dropna(how='all')
     df_result = df_result.sort_values(cn.MEAN)
     return df_result
 
@@ -129,6 +143,7 @@ class ClassifierEnsemble(object):
     return fig, ax
     
    
+##################################################################### 
 class LinearSVMEnsemble(ClassifierEnsemble):
 
   def orderFeatures(self, clf):
@@ -142,5 +157,38 @@ class LinearSVMEnsemble(ClassifierEnsemble):
     result = [t[0] for t in sorted_tuples]
     return result
     
-    
-    
+  
+##################################################################### 
+class RandomForestEnsemble(ClassifierEnsemble):
+
+  def __init__(self, df_X, ser_y, **kwargs):
+    """
+    :param pd.DataFrame df_X:
+    :param pd.Series ser_y:
+    :param dict kwargs: arguments passed to classifier
+    """
+    self.features = df_X.columns.tolist()
+    self.classes = ser_y.values.tolist()
+    adjusted_kwargs = dict(kwargs)
+    for key in RF_DEFAULTS.keys():
+      if not key in adjusted_kwargs:
+        adjusted_kwargs[key] = RF_DEFAULTS[key]
+    if not RF_MAX_FEATURES in adjusted_kwargs:
+      adjusted_kwargs[RF_MAX_FEATURES] = len(self.features)
+    self.random_forest = RandomForestClassifier(**adjusted_kwargs)
+    self.random_forest.fit(df_X, ser_y)
+    super().__init__(list(self.random_forest.estimators_),
+        df_X.columns.tolist(), ser_y.unique().tolist())
+
+  def orderFeatures(self, clf):
+    """
+    Orders features by descending value of importance.
+    :return list-object:
+    """
+    importances = list(clf.feature_importances_)
+    tuples = [(i, f) for i, f in 
+        zip(importances, range(len(importances)))
+        if i > 0]
+    indices = sorted(tuples, key=lambda v: v[0], reverse=True)
+    features = [self.features[n] for _, n in tuples]
+    return features

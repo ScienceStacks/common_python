@@ -8,6 +8,7 @@ from common.trinary_data import TrinaryData
 import pandas as pd
 import numpy as np
 from sklearn import svm
+from sklearn.ensemble import RandomForestClassifier
 import unittest
 import warnings
 
@@ -101,7 +102,7 @@ class TestLinearSVMEnsemble(unittest.TestCase):
       return
     df = self.ensemble.makeRankDF()
     self.assertTrue(helpers.isValidDataFrame(df,
-        [cn.MEAN, cn.STD]))
+        [cn.MEAN, cn.STD, cn.COUNT]))
 
   def testPlotRank(self):
    # Smoke tests
@@ -109,6 +110,31 @@ class TestLinearSVMEnsemble(unittest.TestCase):
       return
     _ = self.ensemble.plotRank(top=40, title="SVM", is_plot=IS_PLOT)
 
+
+class TestRandomForestEnsemble(unittest.TestCase):
+
+  def setUp(self):
+    df_X, ser_y = getData()
+    self.cls = classifier_ensemble.RandomForestEnsemble
+    self.ensemble = self.cls(df_X, ser_y)
+
+  def testConstructor(self):
+    if IGNORE_TEST:
+      return
+    self.assertTrue(isinstance(self.ensemble.random_forest,
+        RandomForestClassifier))
+
+  def testOrderFeatures(self):
+    if IGNORE_TEST:
+      return
+    tree = self.ensemble.classifiers[0]
+    result = self.ensemble.orderFeatures(tree)
+    self.assertTrue(set(result).issubset(self.ensemble.features))
+
+  def testMakeRankDF(self):
+    df = self.ensemble.makeRankDF()
+    self.assertTrue(helpers.isValidDataFrame(df,
+        [cn.MEAN, cn.STD, cn.COUNT]))
 
 
 if __name__ == '__main__':
