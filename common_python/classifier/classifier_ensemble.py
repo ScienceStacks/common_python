@@ -4,6 +4,7 @@ import common_python.constants as cn
 
 import collections
 import copy
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -96,8 +97,37 @@ class ClassifierEnsemble(object):
         })
     df_result = df_result.sort_values(cn.MEAN)
     return df_result
+
+  def plotRank(self, top=None, fig=None, ax=None, 
+      is_plot=True, **kwargs):
+    """
+    Plots the rank of features for the top valued features.
+    :param int top:
+    :param bool is_plot: produce the plot
+    :param ax, fig: matplotlib
+    :param dict kwargs: keyword arguments for plot
+    """
+    # Data preparation
+    df = self.makeRankDF()
+    if top == None:
+      top = len(df)
+    indices = df.index.tolist()
+    indices = indices[0:top]
+    df = df.loc[indices, :]
+    # Plot
+    if ax is None:
+      fig, ax = plt.subplots()
+    ax.bar(indices, df[cn.MEAN], yerr=df[cn.STD], align='center', 
+        alpha=0.5, ecolor='black', capsize=10)
+    ax.set_xticklabels(indices, rotation=90)
+    ax.set_xlabel('Gene Group')
+    ax.set_ylabel('Rank')
+    if cn.PLT_TITLE in kwargs:
+      ax.set_title(kwargs[cn.PLT_TITLE])
+    if is_plot:
+      plt.show()
+    return fig, ax
     
-        
    
 class LinearSVMEnsemble(ClassifierEnsemble):
 

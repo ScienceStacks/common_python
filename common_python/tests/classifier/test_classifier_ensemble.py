@@ -12,6 +12,7 @@ import unittest
 import warnings
 
 IGNORE_TEST = False
+IS_PLOT = False
 SIZE = 10
 values = list(range(SIZE))
 values.extend(values)
@@ -64,6 +65,8 @@ class TestClassifierEnsemble(unittest.TestCase):
       pass
 
   def testDo1(self):
+    if IGNORE_TEST:
+      return
     df_X, ser_y = getData()
     holdouts = 1
     result = self.cls.crossVerify(
@@ -82,19 +85,29 @@ class TestLinearSVMEnsemble(unittest.TestCase):
     holdouts = 1
     result = self.cls.crossVerify(
         self.lin_clf, df_X, ser_y, 
-        iterations=7, holdouts=holdouts)
+        iterations=100, holdouts=holdouts)
     self.ensemble = self.cls(result.ensemble.classifiers,
         df_X.columns.tolist(), ser_y.index.tolist())
 
   def testOrderFeatures(self):
+    if IGNORE_TEST:
+      return
     clf = self.ensemble.classifiers[0]
     result = self.ensemble.orderFeatures(clf)
     self.assertEqual(len(result), len(self.ensemble.features))
 
   def testMakeRankDF(self):
+    if IGNORE_TEST:
+      return
     df = self.ensemble.makeRankDF()
     self.assertTrue(helpers.isValidDataFrame(df,
         [cn.MEAN, cn.STD]))
+
+  def testPlotRank(self):
+   # Smoke tests
+    if IGNORE_TEST:
+      return
+    _ = self.ensemble.plotRank(top=40, title="SVM", is_plot=IS_PLOT)
 
 
 
