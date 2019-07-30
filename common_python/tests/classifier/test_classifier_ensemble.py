@@ -12,8 +12,8 @@ from sklearn.ensemble import RandomForestClassifier
 import unittest
 import warnings
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 SIZE = 10
 values = list(range(SIZE))
 values.extend(values)
@@ -46,15 +46,12 @@ class TestClassifierEnsemble(unittest.TestCase):
     self.assertEqual(len(self.ensemble.classes), 0)
 
   def testCrossVerify(self):
-    if IGNORE_TEST:
-      return
     def test(holdouts):
       with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-          result = self.cls.crossVerify(
-              self.lin_clf, DF, SER, 
-              iterations=10, holdouts=holdouts)
+          result = classifier_ensemble.LinearSVMEnsemble.crossVerify(
+              DF, SER, iterations=10, holdouts=holdouts)
           self.assertTrue(isinstance(result, 
               classifier_ensemble.CrossValidationResult))
         except ValueError:
@@ -84,11 +81,29 @@ class TestLinearSVMEnsemble(unittest.TestCase):
     self.cls = classifier_ensemble.LinearSVMEnsemble
     df_X, ser_y = getData()
     holdouts = 1
-    result = self.cls.crossVerify(
-        self.lin_clf, df_X, ser_y, 
+    result = self.cls.crossVerify(df_X, ser_y, 
         iterations=100, holdouts=holdouts)
     self.ensemble = self.cls(result.ensemble.classifiers,
         df_X.columns.tolist(), ser_y.index.tolist())
+
+  def testCrossVerify(self):
+    if IGNORE_TEST:
+      return
+    def test(holdouts):
+      with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+          result = self.cls.crossVerify(DF, SER, 
+              iterations=10, holdouts=holdouts)
+          self.assertTrue(isinstance(result, 
+              classifier_ensemble.CrossValidationResult))
+        except ValueError:
+          raise ValueError
+    #
+    test(1)
+    with self.assertRaises(ValueError):
+      test(2)
+      pass
 
   def testOrderFeatures(self):
     if IGNORE_TEST:
@@ -105,6 +120,8 @@ class TestLinearSVMEnsemble(unittest.TestCase):
         [cn.MEAN, cn.STD]))
 
   def testPlotRank(self):
+    if IGNORE_TEST:
+      return
    # Smoke tests
     _ = self.ensemble.plotRank(top=40, title="SVM", is_plot=IS_PLOT)
 

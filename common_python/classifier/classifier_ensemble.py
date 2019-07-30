@@ -1,12 +1,14 @@
 """Maniuplations of an ensemble of classifiers for same data."""
 
 import common_python.constants as cn
+from common_python.util import util
 
 import collections
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
 
 RF_ESTIMATORS = "n_estimators"
@@ -128,7 +130,9 @@ class ClassifierEnsemble(object):
       fig, ax = plt.subplots()
     ax.bar(indices, df[cn.MEAN], yerr=df[cn.STD], align='center', 
         alpha=0.5, ecolor='black', capsize=10)
-    ax.set_xticklabels(indices, rotation=90)
+    bottom = util.getValue(kwargs, "bottom", 0.25)
+    plt.gcf().subplots_adjust(bottom=bottom)
+    ax.set_xticklabels(indices, rotation=90, fontsize=10)
     ax.set_xlabel('Gene Group')
     ax.set_ylabel('Rank')
     if cn.PLT_TITLE in kwargs:
@@ -168,6 +172,11 @@ class LinearSVMEnsemble(ClassifierEnsemble):
         })
     df_result = df_result.sort_values(cn.MEAN)
     return df_result
+
+  @classmethod
+  def crossVerify(cls, df_X, ser_y, **kwargs):
+    clf = svm.LinearSVC()
+    return ClassifierEnsemble.crossVerify(clf, df_X, ser_y, **kwargs)
     
   
 ##################################################################### 
