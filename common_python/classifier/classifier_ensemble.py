@@ -13,7 +13,7 @@ RF_ESTIMATORS = "n_estimators"
 RF_MAX_FEATURES = "max_features"
 RF_BOOTSTRAP = "bootstrap"
 RF_DEFAULTS = {
-    RF_ESTIMATORS: 100,
+    RF_ESTIMATORS: 500,
     RF_BOOTSTRAP: True,
     }
 
@@ -22,7 +22,6 @@ CrossValidationResult = collections.namedtuple(
     "CrossValidationResult", "mean std ensemble")
 
 
-##################################################################### 
 class ClassifierEnsemble(object):
 
   def __init__(self, classifiers, features, classes):
@@ -94,21 +93,17 @@ class ClassifierEnsemble(object):
   def makeRankDF(self):
     """
     Constructs a dataframe of feature ranks for importance.
-    A more important feature has a lower rank (closer to 0)
+    A more important feature has a lower rank (closer to 1)
     :return pd.DataFrame: columns are cn.MEAN, cn.STD
     """
-    ranks = {f: [] for f in self.features}
+    df = pd.DataFrame()
     for idx, clf in enumerate(self.classifiers):
       features = self.orderFeatures(clf)
-      for rank, feature in enumerate(features):
-        ranks[feature].append(rank+1)
+      df[idx] = pd.Series(range(len(features)), index=features)
     df_result = pd.DataFrame({
-        cn.MEAN: [np.mean(v) for v in ranks.values()],
-        cn.STD: [np.std(v) for v in ranks.values()],
-        cn.COUNT: [len(v) for v in ranks.values()],
+        cn.MEAN: df.mean(axis=1),
+        cn.STD: df.std(axis=1) / np.sqrt(len(self.classifiers)),
         })
-    df_result.index = [r for r in ranks.keys()]
-    df_result = df_result.dropna(how='all')
     df_result = df_result.sort_values(cn.MEAN)
     return df_result
 
@@ -156,6 +151,23 @@ class LinearSVMEnsemble(ClassifierEnsemble):
         key=lambda v: v[1], reverse=True)
     result = [t[0] for t in sorted_tuples]
     return result
+
+  def makeRankDF(self):
+    """
+    Constructs a dataframe of feature ranks for importance.
+    A more important feature has a lower rank (closer to 0)
+    :return pd.DataFrame: columns are cn.MEAN, cn.STD
+    """
+    df = pd.DataFrame()
+    for idx, clf in enumerate(self.classifiers):
+      features = self.orderFeatures(clf)
+      df[idx] = pd.Series(range(len(features)), index=features)
+    df_result = pd.DataFrame({
+        cn.MEAN: df.mean(axis=1),
+        cn.STD: df.std(axis=1) / np.sqrt(len(self.classifiers)),
+        })
+    df_result = df_result.sort_values(cn.MEAN)
+    return df_result
     
   
 ##################################################################### 
@@ -167,6 +179,8 @@ class RandomForestEnsemble(ClassifierEnsemble):
     :param pd.Series ser_y:
     :param dict kwargs: arguments passed to classifier
     """
+    self.df_X = df_X
+    self.ser_y = ser_y
     self.features = df_X.columns.tolist()
     self.classes = ser_y.values.tolist()
     adjusted_kwargs = dict(kwargs)
@@ -176,19 +190,33 @@ class RandomForestEnsemble(ClassifierEnsemble):
     if not RF_MAX_FEATURES in adjusted_kwargs:
       adjusted_kwargs[RF_MAX_FEATURES] = len(self.features)
     self.random_forest = RandomForestClassifier(**adjusted_kwargs)
-    self.random_forest.fit(df_X, ser_y)
+    self.random_forest.fit(self.df_X, self.ser_y)
     super().__init__(list(self.random_forest.estimators_),
         df_X.columns.tolist(), ser_y.unique().tolist())
 
-  def orderFeatures(self, clf):
+  def makeRankDF(self):
     """
-    Orders features by descending value of importance.
-    :return list-object:
+    Constructs a dataframe of feature ranks for importance.
+    A more important feature has a lower rank (closer to 1)
+    :return pd.DataFrame: columns are cn.MEAN, cn.STD
     """
-    importances = list(clf.feature_importances_)
-    tuples = [(i, f) for i, f in 
-        zip(importances, range(len(importances)))
-        if i > 0]
-    indices = sorted(tuples, key=lambda v: v[0], reverse=True)
-    features = [self.features[n] for _, n in tuples]
-    return features
+    NUM_ITERATIONS = 5
+    length = len(self.features)
+    df = pd.DataFrame()
+    df[-1] = np.repeat(0, length)
+    df.index = self.features
+    clf = copy.deepcopy(self.random_forest)
+    for idx in range(NUM_ITERATIONS):
+      clf.fit(self.df_X, self.ser_y)
+      tuples = sorted(zip(clf.feature_importances_, self.features),
+          key=lambda v: v[0], reverse=True)
+      ser = pd.Series([1+x for x in range(length)])
+      ser.index = [t[1] for t in tuples]
+      df[idx] = ser
+    del df[-1]
+    df_result = pd.DataFrame({
+        cn.MEAN: df.mean(axis=1),
+        cn.STD: df.std(axis=1)/np.sqrt(len(df.columns)),
+        })
+    df_result = df_result.sort_values(cn.MEAN, ascending=True)
+    return df_result

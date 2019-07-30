@@ -12,8 +12,8 @@ from sklearn.ensemble import RandomForestClassifier
 import unittest
 import warnings
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 SIZE = 10
 values = list(range(SIZE))
 values.extend(values)
@@ -102,12 +102,10 @@ class TestLinearSVMEnsemble(unittest.TestCase):
       return
     df = self.ensemble.makeRankDF()
     self.assertTrue(helpers.isValidDataFrame(df,
-        [cn.MEAN, cn.STD, cn.COUNT]))
+        [cn.MEAN, cn.STD]))
 
   def testPlotRank(self):
    # Smoke tests
-    if IGNORE_TEST:
-      return
     _ = self.ensemble.plotRank(top=40, title="SVM", is_plot=IS_PLOT)
 
 
@@ -124,17 +122,18 @@ class TestRandomForestEnsemble(unittest.TestCase):
     self.assertTrue(isinstance(self.ensemble.random_forest,
         RandomForestClassifier))
 
-  def testOrderFeatures(self):
+  def testMakeRankDF(self):
     if IGNORE_TEST:
       return
-    tree = self.ensemble.classifiers[0]
-    result = self.ensemble.orderFeatures(tree)
-    self.assertTrue(set(result).issubset(self.ensemble.features))
-
-  def testMakeRankDF(self):
     df = self.ensemble.makeRankDF()
     self.assertTrue(helpers.isValidDataFrame(df,
-        [cn.MEAN, cn.STD, cn.COUNT]))
+        [cn.MEAN, cn.STD]))
+
+  def testPlotRank(self):
+    if IGNORE_TEST:
+      return
+   # Smoke tests
+    _ = self.ensemble.plotRank(top=40, title="RandomForest", is_plot=IS_PLOT)
 
 
 if __name__ == '__main__':
