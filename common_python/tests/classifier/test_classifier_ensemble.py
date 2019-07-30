@@ -50,7 +50,7 @@ class TestClassifierEnsemble(unittest.TestCase):
       with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-          result = classifier_ensemble.LinearSVMEnsemble.crossVerify(
+          result = classifier_ensemble.LinearSVMEnsemble.crossValidate(
               DF, SER, iterations=10, holdouts=holdouts)
           self.assertTrue(isinstance(result, 
               classifier_ensemble.CrossValidationResult))
@@ -67,7 +67,7 @@ class TestClassifierEnsemble(unittest.TestCase):
       return
     df_X, ser_y = getData()
     holdouts = 1
-    result = self.cls.crossVerify(
+    result = self.cls.crossValidate(
         self.lin_clf, df_X, ser_y, 
         iterations=10, holdouts=holdouts)
     self.assertEqual(len(df_X.columns), 
@@ -81,7 +81,7 @@ class TestLinearSVMEnsemble(unittest.TestCase):
     self.cls = classifier_ensemble.LinearSVMEnsemble
     df_X, ser_y = getData()
     holdouts = 1
-    result = self.cls.crossVerify(df_X, ser_y, 
+    result = self.cls.crossValidate(df_X, ser_y, 
         iterations=100, holdouts=holdouts)
     self.ensemble = self.cls(result.ensemble.classifiers,
         df_X.columns.tolist(), ser_y.index.tolist())
@@ -93,7 +93,7 @@ class TestLinearSVMEnsemble(unittest.TestCase):
       with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-          result = self.cls.crossVerify(DF, SER, 
+          result = self.cls.crossValidate(DF, SER, 
               iterations=10, holdouts=holdouts)
           self.assertTrue(isinstance(result, 
               classifier_ensemble.CrossValidationResult))

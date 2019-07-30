@@ -35,7 +35,7 @@ class ClassifierEnsemble(object):
     self.classes = classes
 
   @classmethod
-  def crossVerify(cls, classifier, df_X, ser_y,
+  def crossValidate(cls, classifier, df_X, ser_y,
       iterations=5, holdouts=1):
     """
     Does cross validation wth holdouts for each state.
@@ -174,9 +174,9 @@ class LinearSVMEnsemble(ClassifierEnsemble):
     return df_result
 
   @classmethod
-  def crossVerify(cls, df_X, ser_y, **kwargs):
+  def crossValidate(cls, df_X, ser_y, **kwargs):
     clf = svm.LinearSVC()
-    return ClassifierEnsemble.crossVerify(clf, df_X, ser_y, **kwargs)
+    return ClassifierEnsemble.crossValidate(clf, df_X, ser_y, **kwargs)
     
   
 ##################################################################### 
