@@ -14,7 +14,8 @@ KEGG_GENE = "kegg_gene"
 KEGG_EC = "kegg_ec"  # EC number
 KEGG_KO = "kgg_ko"  # KEGG orthology
 MEAN = "mean"
-STD = "std"
+STERR = "sterr"  # Standard error (std of mean)
+STD = "std"  # Standard deviation of population
 VALUE = "value"  # General value
 
 # KEGG Access

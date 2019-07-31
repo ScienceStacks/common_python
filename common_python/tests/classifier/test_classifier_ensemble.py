@@ -13,7 +13,7 @@ import unittest
 import warnings
 
 IGNORE_TEST = False
-IS_PLOT = True
+IS_PLOT = False
 SIZE = 10
 values = list(range(SIZE))
 values.extend(values)
@@ -116,13 +116,26 @@ class TestLinearSVMEnsemble(unittest.TestCase):
       return
     df = self.ensemble.makeRankDF()
     self.assertTrue(helpers.isValidDataFrame(df,
-        [cn.MEAN, cn.STD]))
+        [cn.MEAN, cn.STD, cn.STERR]))
+
+  def testMakeImportanceDF(self):
+    if IGNORE_TEST:
+      return
+    df = self.ensemble.makeImportanceDF()
+    self.assertTrue(helpers.isValidDataFrame(df,
+        [cn.MEAN, cn.STD, cn.STERR]))
 
   def testPlotRank(self):
     if IGNORE_TEST:
       return
    # Smoke tests
     _ = self.ensemble.plotRank(top=40, title="SVM", is_plot=IS_PLOT)
+
+  def testPlotImportance(self):
+    if IGNORE_TEST:
+      return
+   # Smoke tests
+    _ = self.ensemble.plotImportance(top=40, title="SVM", is_plot=IS_PLOT)
 
 
 class TestRandomForestEnsemble(unittest.TestCase):
@@ -143,13 +156,26 @@ class TestRandomForestEnsemble(unittest.TestCase):
       return
     df = self.ensemble.makeRankDF()
     self.assertTrue(helpers.isValidDataFrame(df,
-        [cn.MEAN, cn.STD]))
+        [cn.MEAN, cn.STD, cn.STERR]))
 
   def testPlotRank(self):
     if IGNORE_TEST:
       return
    # Smoke tests
     _ = self.ensemble.plotRank(top=40, title="RandomForest", is_plot=IS_PLOT)
+
+  def testPlotImportance(self):
+    if IGNORE_TEST:
+      return
+   # Smoke tests
+    _ = self.ensemble.plotImportance(top=40, title="RandomForest", is_plot=IS_PLOT)
+
+  def testMakeImportanceDF(self):
+    if IGNORE_TEST:
+      return
+    df = self.ensemble.makeImportanceDF()
+    self.assertTrue(helpers.isValidDataFrame(df,
+        [cn.MEAN, cn.STD, cn.STERR]))
 
 
 if __name__ == '__main__':

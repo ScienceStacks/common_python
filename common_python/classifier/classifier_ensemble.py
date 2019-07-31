@@ -92,34 +92,17 @@ class ClassifierEnsemble(object):
         ensemble=cls(classifiers, df_X.columns.tolist(), ser_y.unique().tolist())
         )
 
-  def makeRankDF(self):
+  def _plot(self, df, ylabel, top, fig, ax, is_plot, **kwargs):
     """
-    Constructs a dataframe of feature ranks for importance.
-    A more important feature has a lower rank (closer to 1)
-    :return pd.DataFrame: columns are cn.MEAN, cn.STD
-    """
-    df = pd.DataFrame()
-    for idx, clf in enumerate(self.classifiers):
-      features = self.orderFeatures(clf)
-      df[idx] = pd.Series(range(len(features)), index=features)
-    df_result = pd.DataFrame({
-        cn.MEAN: df.mean(axis=1),
-        cn.STD: df.std(axis=1) / np.sqrt(len(self.classifiers)),
-        })
-    df_result = df_result.sort_values(cn.MEAN)
-    return df_result
-
-  def plotRank(self, top=None, fig=None, ax=None, 
-      is_plot=True, **kwargs):
-    """
-    Plots the rank of features for the top valued features.
+    Common plotting codes
+    :param pd.DataFrame: cn.MEAN, cn.STD, indexed by feature
+    :param str ylabel:
     :param int top:
     :param bool is_plot: produce the plot
     :param ax, fig: matplotlib
     :param dict kwargs: keyword arguments for plot
     """
     # Data preparation
-    df = self.makeRankDF()
     if top == None:
       top = len(df)
     indices = df.index.tolist()
@@ -134,7 +117,7 @@ class ClassifierEnsemble(object):
     plt.gcf().subplots_adjust(bottom=bottom)
     ax.set_xticklabels(indices, rotation=90, fontsize=10)
     ax.set_xlabel('Gene Group')
-    ax.set_ylabel('Rank')
+    ax.set_ylabel(ylabel)
     this_max = max(df[cn.MEAN] + df[cn.STD])*1.1
     ylim = util.getValue(kwargs, cn.PLT_YLIM, [0, this_max])
     ax.set_ylim(ylim)
@@ -143,6 +126,31 @@ class ClassifierEnsemble(object):
     if is_plot:
       plt.show()
     return fig, ax
+
+  def plotRank(self, top=None, fig=None, ax=None, 
+      is_plot=True, **kwargs):
+    """
+    Plots the rank of features for the top valued features.
+    :param int top:
+    :param bool is_plot: produce the plot
+    :param ax, fig: matplotlib
+    :param dict kwargs: keyword arguments for plot
+    """
+    # Data preparation
+    df = self.makeRankDF()
+    self._plot(df, "Rank", top, fig, ax, is_plot, **kwargs)
+
+  def plotImportance(self, top=None, fig=None, ax=None, 
+      is_plot=True, **kwargs):
+    """
+    Plots the rank of features for the top valued features.
+    :param int top:
+    :param bool is_plot: produce the plot
+    :param ax, fig: matplotlib
+    :param dict kwargs: keyword arguments for plot
+    """
+    df = self.makeImportanceDF()
+    self._plot(df, "Importance", top, fig, ax, is_plot, **kwargs)
     
    
 ##################################################################### 
@@ -163,7 +171,7 @@ class LinearSVMEnsemble(ClassifierEnsemble):
     """
     Constructs a dataframe of feature ranks for importance.
     A more important feature has a lower rank (closer to 0)
-    :return pd.DataFrame: columns are cn.MEAN, cn.STD
+    :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
     """
     df = pd.DataFrame()
     for idx, clf in enumerate(self.classifiers):
@@ -171,9 +179,29 @@ class LinearSVMEnsemble(ClassifierEnsemble):
       df[idx] = pd.Series(range(len(features)), index=features)
     df_result = pd.DataFrame({
         cn.MEAN: df.mean(axis=1),
-        cn.STD: df.std(axis=1) / np.sqrt(len(self.classifiers)),
+        cn.STD: df.std(axis=1),
         })
+    df_result[cn.STERR] = df_result[cn.STD] / np.sqrt(len(self.classifiers))
     df_result = df_result.sort_values(cn.MEAN)
+    return df_result
+
+  def makeImportanceDF(self):
+    """
+    Constructs a dataframe of feature importances.
+    :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
+    The importance of a feature is the maximum absolute value of its coefficient
+    in the collection of classifiers for the multi-class vector (one vs. rest, ovr).
+    """
+    df = pd.DataFrame()
+    for idx, clf in enumerate(self.classifiers):
+      values = [max(np.abs(x) for x in xv) for xv in  zip(*clf.coef_)]
+      df[idx] = pd.Series(values, index=self.features)
+    df_result = pd.DataFrame({
+        cn.MEAN: df.mean(axis=1),
+        cn.STD: df.std(axis=1),
+        })
+    df_result[cn.STERR] = df_result[cn.STD] / np.sqrt(len(self.classifiers))
+    df_result = df_result.sort_values(cn.MEAN, ascending=False)
     return df_result
 
   @classmethod
@@ -185,14 +213,17 @@ class LinearSVMEnsemble(ClassifierEnsemble):
 ##################################################################### 
 class RandomForestEnsemble(ClassifierEnsemble):
 
-  def __init__(self, df_X, ser_y, **kwargs):
+  def __init__(self, df_X, ser_y, num_iterations=5, **kwargs):
     """
     :param pd.DataFrame df_X:
     :param pd.Series ser_y:
+    :param int num_iterations: Number of random forests created
+        to obtain a distribution
     :param dict kwargs: arguments passed to classifier
     """
     self.df_X = df_X
     self.ser_y = ser_y
+    self.num_iterations = num_iterations
     self.features = df_X.columns.tolist()
     self.classes = ser_y.values.tolist()
     adjusted_kwargs = dict(kwargs)
@@ -210,15 +241,14 @@ class RandomForestEnsemble(ClassifierEnsemble):
     """
     Constructs a dataframe of feature ranks for importance.
     A more important feature has a lower rank (closer to 1)
-    :return pd.DataFrame: columns are cn.MEAN, cn.STD
+    :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
     """
-    NUM_ITERATIONS = 5
     length = len(self.features)
     df = pd.DataFrame()
     df[-1] = np.repeat(0, length)
     df.index = self.features
     clf = copy.deepcopy(self.random_forest)
-    for idx in range(NUM_ITERATIONS):
+    for idx in range(self.num_iterations):
       clf.fit(self.df_X, self.ser_y)
       tuples = sorted(zip(clf.feature_importances_, self.features),
           key=lambda v: v[0], reverse=True)
@@ -228,7 +258,33 @@ class RandomForestEnsemble(ClassifierEnsemble):
     del df[-1]
     df_result = pd.DataFrame({
         cn.MEAN: df.mean(axis=1),
-        cn.STD: df.std(axis=1)/np.sqrt(len(df.columns)),
+        cn.STD: df.std(axis=1),
         })
+    df_result[cn.STERR] = df_result[cn.STD]/np.sqrt(self.num_iterations)
     df_result = df_result.sort_values(cn.MEAN, ascending=True)
+    return df_result
+
+  def makeImportanceDF(self):
+    """
+    Constructs a dataframe of feature importances.
+    :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
+        index is features; sorted descending by cn.MEAN
+    """
+    length = len(self.features)
+    df = pd.DataFrame()
+    df[-1] = np.repeat(0, length)
+    df.index = self.features
+    clf = copy.deepcopy(self.random_forest)
+    for idx in range(self.num_iterations):
+      clf.fit(self.df_X, self.ser_y)
+      ser = pd.Series(clf.feature_importances_,
+          index=self.features)
+      df[idx] = ser
+    del df[-1]
+    df_result = pd.DataFrame({
+        cn.MEAN: df.mean(axis=1),
+        cn.STD: df.std(axis=1),
+        })
+    df_result[cn.STERR] = df_result[cn.STD]/np.sqrt(self.num_iterations)
+    df_result = df_result.sort_values(cn.MEAN, ascending=False)
     return df_result
