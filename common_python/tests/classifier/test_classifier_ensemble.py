@@ -13,7 +13,7 @@ import unittest
 import warnings
 
 IGNORE_TEST = False
-IS_PLOT = False
+IS_PLOT = True
 SIZE = 10
 values = list(range(SIZE))
 values.extend(values)
@@ -67,9 +67,8 @@ class TestClassifierEnsemble(unittest.TestCase):
       return
     df_X, ser_y = getData()
     holdouts = 1
-    result = self.cls.crossValidate(
-        self.lin_clf, df_X, ser_y, 
-        iterations=10, holdouts=holdouts)
+    result = classifier_ensemble.LinearSVMEnsemble.crossValidate(
+        df_X, ser_y, iterations=10, holdouts=holdouts)
     self.assertEqual(len(df_X.columns), 
         len(result.ensemble.features))
 

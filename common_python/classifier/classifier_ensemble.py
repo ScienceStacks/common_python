@@ -35,7 +35,7 @@ class ClassifierEnsemble(object):
     self.classes = classes
 
   @classmethod
-  def crossValidate(cls, classifier, df_X, ser_y,
+  def _crossValidate(cls, classifier, df_X, ser_y,
       iterations=5, holdouts=1):
     """
     Does cross validation wth holdouts for each state.
@@ -135,6 +135,9 @@ class ClassifierEnsemble(object):
     ax.set_xticklabels(indices, rotation=90, fontsize=10)
     ax.set_xlabel('Gene Group')
     ax.set_ylabel('Rank')
+    this_max = max(df[cn.MEAN] + df[cn.STD])*1.1
+    ylim = util.getValue(kwargs, cn.PLT_YLIM, [0, this_max])
+    ax.set_ylim(ylim)
     if cn.PLT_TITLE in kwargs:
       ax.set_title(kwargs[cn.PLT_TITLE])
     if is_plot:
@@ -176,7 +179,7 @@ class LinearSVMEnsemble(ClassifierEnsemble):
   @classmethod
   def crossValidate(cls, df_X, ser_y, **kwargs):
     clf = svm.LinearSVC()
-    return ClassifierEnsemble.crossValidate(clf, df_X, ser_y, **kwargs)
+    return cls._crossValidate(clf, df_X, ser_y, **kwargs)
     
   
 ##################################################################### 
