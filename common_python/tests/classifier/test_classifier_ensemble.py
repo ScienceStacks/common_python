@@ -12,7 +12,7 @@ from sklearn.ensemble import RandomForestClassifier
 import unittest
 import warnings
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 IS_PLOT = False
 SIZE = 10
 values = list(range(SIZE))
@@ -46,12 +46,13 @@ class TestClassifierEnsemble(unittest.TestCase):
     self.assertEqual(len(self.ensemble.classes), 0)
 
   def testCrossVerify(self):
-    def test(holdouts):
+    def test(holdouts, kwargs=None):
       with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
           result = classifier_ensemble.LinearSVMEnsemble.crossValidate(
-              DF, SER, iterations=10, holdouts=holdouts)
+              DF, SER, classifier_args=kwargs,
+              iterations=10, holdouts=holdouts)
           self.assertTrue(isinstance(result, 
               classifier_ensemble.CrossValidationResult))
         except ValueError:
@@ -61,6 +62,7 @@ class TestClassifierEnsemble(unittest.TestCase):
     with self.assertRaises(ValueError):
       test(2)
       pass
+    test(1, kwargs={"C": 0.5})
 
   def testDo1(self):
     if IGNORE_TEST:
@@ -108,7 +110,10 @@ class TestLinearSVMEnsemble(unittest.TestCase):
     if IGNORE_TEST:
       return
     clf = self.ensemble.classifiers[0]
-    result = self.ensemble.orderFeatures(clf)
+    result = self.ensemble._orderFeatures(clf, None)
+    self.assertEqual(len(result), len(self.ensemble.features))
+    #
+    result = self.ensemble._orderFeatures(clf, 1)
     self.assertEqual(len(result), len(self.ensemble.features))
 
   def testMakeRankDF(self):
@@ -124,18 +129,31 @@ class TestLinearSVMEnsemble(unittest.TestCase):
     df = self.ensemble.makeImportanceDF()
     self.assertTrue(helpers.isValidDataFrame(df,
         [cn.MEAN, cn.STD, cn.STERR]))
+    #
+    df1 = self.ensemble.makeImportanceDF(class_selection=1)
+    self.assertTrue(helpers.isValidDataFrame(df,
+        [cn.MEAN, cn.STD, cn.STERR]))
+    trues = [df.loc[i, cn.MEAN] >= df1.loc[i, cn.MEAN] 
+        for i in df.index]
+    self.assertTrue(all(trues))
 
   def testPlotRank(self):
     if IGNORE_TEST:
       return
    # Smoke tests
     _ = self.ensemble.plotRank(top=40, title="SVM", is_plot=IS_PLOT)
+    #
+    _ = self.ensemble.plotRank(top=40, title="SVM-class 2",
+        is_plot=IS_PLOT, class_selection=2)
 
   def testPlotImportance(self):
     if IGNORE_TEST:
       return
    # Smoke tests
-    _ = self.ensemble.plotImportance(top=40, title="SVM", is_plot=IS_PLOT)
+    _ = self.ensemble.plotImportance(top=40, title="SVM",
+        is_plot=IS_PLOT)
+    _ = self.ensemble.plotImportance(top=40, title="SVM-class 2", 
+        class_selection=2, is_plot=IS_PLOT)
 
 
 class TestRandomForestEnsemble(unittest.TestCase):
