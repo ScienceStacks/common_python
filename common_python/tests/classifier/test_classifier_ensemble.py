@@ -12,7 +12,7 @@ from sklearn.ensemble import RandomForestClassifier
 import unittest
 import warnings
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_PLOT = False
 SIZE = 10
 values = list(range(SIZE))
@@ -26,9 +26,9 @@ DATA = TrinaryData()
 
 
 def getData():
-  df_X = DATA.df_X.drop(index="T1")
+  df_X = DATA.df_X
   df_X.columns = DATA.features
-  ser_y = DATA.ser_y.drop(index="T1")
+  ser_y = DATA.ser_y
   return df_X, ser_y
 
 class TestClassifierEnsemble(unittest.TestCase):
@@ -45,7 +45,7 @@ class TestClassifierEnsemble(unittest.TestCase):
     self.assertEqual(len(self.ensemble.features), 0)
     self.assertEqual(len(self.ensemble.classes), 0)
 
-  def testCrossVerify(self):
+  def testCrossValidate(self):
     def test(holdouts, kwargs=None):
       with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -65,14 +65,19 @@ class TestClassifierEnsemble(unittest.TestCase):
     test(1, kwargs={"C": 0.5, "penalty": "l2"})
 
   def testDo1(self):
-    if IGNORE_TEST:
-      return
     df_X, ser_y = getData()
     holdouts = 1
     result = classifier_ensemble.LinearSVMEnsemble.crossValidate(
         df_X, ser_y, iterations=10, holdouts=holdouts)
     self.assertEqual(len(df_X.columns), 
         len(result.ensemble.features))
+    #
+    high_rank = 10
+    result1 = classifier_ensemble.LinearSVMEnsemble.crossValidate(
+        df_X, ser_y, 
+        filter_high_rank=high_rank,
+        iterations=10, holdouts=holdouts)
+    self.assertEqual(len(result1.ensemble.features), high_rank)
 
 
 class TestLinearSVMEnsemble(unittest.TestCase):
@@ -87,7 +92,7 @@ class TestLinearSVMEnsemble(unittest.TestCase):
     self.ensemble = self.cls(result.ensemble.classifiers,
         df_X.columns.tolist(), ser_y.index.tolist())
 
-  def testCrossVerify(self):
+  def testCrossValidate(self):
     if IGNORE_TEST:
       return
     def test(holdouts):

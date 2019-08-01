@@ -20,6 +20,9 @@ RF_DEFAULTS = {
     }
 
 
+# mean - mean accuracy
+# std - standard deviation of accuracy
+# ensemble - ClassifierEnsemble
 CrossValidationResult = collections.namedtuple(
     "CrossValidationResult", "mean std ensemble")
 
@@ -225,11 +228,13 @@ class LinearSVMEnsemble(ClassifierEnsemble):
     return df_result
 
   @classmethod
-  def crossValidate(cls, df_X, ser_y, classifier_args=None, **kwargs):
+  def crossValidate(cls, df_X, ser_y, filter_high_rank=None,
+      classifier_args=None, **kwargs):
     """
     Cross validation for SVM.
     :param pd.DataFrame df_X: feature vectors
     :param pd.Series ser_y: classes
+    :param int filter_high_rank: mean ranks beyond which features are dropped
     :param dict classifier_args: arguments to use in classifier
         constructor
     :param dict kwargs: arguments passed to crossValidate
@@ -237,7 +242,15 @@ class LinearSVMEnsemble(ClassifierEnsemble):
     if classifier_args is None:
       classifier_args = {}
     clf = svm.LinearSVC(**classifier_args)
-    return cls._crossValidate(clf, df_X, ser_y, **kwargs)
+    result = cls._crossValidate(clf, df_X, ser_y, **kwargs)
+    if filter_high_rank is None:
+      return result
+    # Select the features
+    df_rank = result.ensemble.makeRankDF()
+    df_rank = df_rank.loc[df_rank.index[0:10], :]
+    columns = df_rank.index.tolist()
+    df_X_filtered = df_X[columns]
+    return cls._crossValidate(clf, df_X_filtered, ser_y, **kwargs)
     
   
 ##################################################################### 
