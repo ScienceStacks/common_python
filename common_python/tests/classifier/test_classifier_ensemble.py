@@ -62,7 +62,7 @@ class TestClassifierEnsemble(unittest.TestCase):
     with self.assertRaises(ValueError):
       test(2)
       pass
-    test(1, kwargs={"C": 0.5})
+    test(1, kwargs={"C": 0.5, "penalty": "l2"})
 
   def testDo1(self):
     if IGNORE_TEST:
