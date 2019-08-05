@@ -1,9 +1,10 @@
-"""Maniuplations of an ensemble of classifiers for same data."""
+"""Classification done by an ensemble of classifiers."""
 
 import common_python.constants as cn
 from common_python.util import util
+from common_python.classifier.classifier_collection  \
+    import ClassifierCollection
 
-import collections
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,80 +21,7 @@ RF_DEFAULTS = {
     }
 
 
-# mean - mean accuracy
-# std - standard deviation of accuracy
-# ensemble - ClassifierEnsemble
-CrossValidationResult = collections.namedtuple(
-    "CrossValidationResult", "mean std ensemble")
-
-
-class ClassifierEnsemble(object):
-
-  def __init__(self, classifiers, features, classes):
-    """
-    :param list-Classifier classifiers: classifiers
-    """
-    self.classifiers = classifiers
-    self.features = features
-    self.classes = classes
-
-  @classmethod
-  def _crossValidate(cls, classifier, df_X, ser_y,
-      iterations=5, holdouts=1):
-    """
-    Does cross validation wth holdouts for each state.
-    :param Classifier classifier: untrained classifier with fit, score methods
-    :param pd.DataFrame df_X: columns of features, rows of instances
-    :param pd.Series ser_y: state values
-    :param int interations: number of cross validations done
-    :param int holdouts: number of instances per state in test data
-    :return CrossValidationResult:
-    Notes
-      1. df_X, ser_y must have the same index
-    """
-    def sortIndex(container, indices):
-      container = container.copy()
-      container.index = indices
-      return container.sort_index()
-    def partitionData(container, all_indices, test_indices):
-      train_indices = list(set(all_indices).difference(test_indices))
-      if isinstance(container, pd.DataFrame):
-        container_test = container.loc[test_indices, :]
-        container_train = container.loc[train_indices, :]
-      else:
-        container_test = container.loc[test_indices]
-        container_train = container.loc[train_indices]
-      return container_train, container_test
-    #
-    scores = []
-    classifiers = []
-    classes = ser_y.unique()
-    indices = ser_y.index.tolist()
-    for _ in range(iterations):
-      # Construct test set
-      new_classifier = copy.deepcopy(classifier)
-      classifiers.append(new_classifier)
-      indices = np.random.permutation(indices)
-      df_X = sortIndex(df_X, indices)
-      ser_y = sortIndex(ser_y, indices)
-      test_indices = []
-      for cl in classes:
-        ser = ser_y[ser_y == cl]
-        if len(ser) <= holdouts:
-          raise ValueError("Class %s has fewer than %d holdouts" %
-              (cl, holdouts))
-        idx = ser.index[0:holdouts].tolist()
-        test_indices.extend(idx)
-      df_X_train, df_X_test = partitionData(df_X, indices, test_indices)
-      ser_y_train, ser_y_test = partitionData(ser_y, indices, test_indices)
-      new_classifier.fit(df_X_train, ser_y_train)
-      score = new_classifier.score(df_X_test, ser_y_test)
-      scores.append(score)
-    return CrossValidationResult(
-        mean=np.mean(scores), 
-        std=np.std(scores), 
-        ensemble=cls(classifiers, df_X.columns.tolist(), ser_y.unique().tolist())
-        )
+class ClassifierEnsemble(ClassifierCollection):
 
   def _plot(self, df, ylabel, top, fig, ax, is_plot, **kwargs):
     """
@@ -174,6 +102,46 @@ class ClassifierEnsemble(object):
    
 ##################################################################### 
 class LinearSVMEnsemble(ClassifierEnsemble):
+  """
+  A classifier formed by an ensemble of Linear SVM classifiers. Does
+  feature selection based on the rank of features.
+  """
+ 
+  def __init__(self, df_X, ser_y, filter_high_rank=None,
+      holdouts=1, size=1, **kwargs):
+    self.clf = svm.LinearSVC(**kwargs)
+    self.filter_high_rank = filter_high_rank
+    self.holdouts = holdouts
+    self.size = size
+    super().__init__(None, None, None, None)
+
+  def fit(self, df_X, ser_y):
+    """
+    :param pd.DataFrame df_X: feature vectors
+    :param pd.Series ser_y: classes
+    :param int filter_high_rank: mean ranks beyond which features are dropped
+    :param int size: number of classifiers to create
+    :param dict kwargs: arguments to use in classifier
+    """
+    result = classifier_collection.ClassifierCollection(
+        self.clf, df_X, ser_y, count, holdouts=holdouts)
+    if filter_high_rank is None:
+      return result
+    # Select the features
+    df_rank = result.ensemble.makeRankDF()
+    df_rank = df_rank.loc[df_rank.index[0:filter_high_rank], :]
+    columns = df_rank.index.tolist()
+    df_X_filtered = df_X[columns]
+    collection = classifier_collection.ClassifierCollection(
+        clf, df_X_filered, ser_y, count, holdouts=holdouts)
+    super().__init__(collection.clfs, collection.features,
+        collection.classes, collection.scores)
+
+  def predict(self, df_X):
+    pass
+
+  def score(self, df_X, ser_y):
+    pass
 
   def _orderFeatures(self, clf, class_selection):
     """
@@ -247,7 +215,7 @@ class LinearSVMEnsemble(ClassifierEnsemble):
       return result
     # Select the features
     df_rank = result.ensemble.makeRankDF()
-    df_rank = df_rank.loc[df_rank.index[0:10], :]
+    df_rank = df_rank.loc[df_rank.index[0:filter_high_rank], :]
     columns = df_rank.index.tolist()
     df_X_filtered = df_X[columns]
     return cls._crossValidate(clf, df_X_filtered, ser_y, **kwargs)
