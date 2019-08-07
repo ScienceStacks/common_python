@@ -29,6 +29,16 @@ class ClassifierCollection(object):
     self.classes = classes
     self.scores = scores  # Score for each classifier if present
 
+  def update(self, other):
+    """
+    Updates the values of the collection with those in other.
+    :param ClassifierCollection other:
+    """
+    self.clfs = other.clfs
+    self.features = other.features
+    self.classes = other.classes
+    self.scores = other.scores
+
   @classmethod
   def _partitionIndices(cls, container, all_indices, test_indices):
     """

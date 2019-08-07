@@ -5,6 +5,7 @@ from common_python.classifier.classifier_collection  \
 from common_python.testing import helpers
 import common_python.constants as cn
 from common.trinary_data import TrinaryData
+from common_python.tests.classifier import helpers as test_helpers
 
 import pandas as pd
 import numpy as np
@@ -12,7 +13,7 @@ from sklearn import svm
 import unittest
 import warnings
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 SIZE = 10
 values = list(range(SIZE))
 values.extend(values)
@@ -24,12 +25,6 @@ SER = pd.Series(values)
 DATA = TrinaryData()
 EMPTY_LIST = []
 
-
-def getData():
-  df_X = DATA.df_X
-  df_X.columns = DATA.features
-  ser_y = DATA.ser_y
-  return df_X, ser_y
 
 class TestClassifierCollection(unittest.TestCase):
 
@@ -46,18 +41,28 @@ class TestClassifierCollection(unittest.TestCase):
       statement = "isinstance(%s, list)" % item
       self.assertTrue(statement)
 
-  def testMakeByRandomStateHoldout(self):
+  def testMakeByRandomStateHoldout2(self):
+    df_X, ser_y = test_helpers.getData()
+    holdouts = 1
+    result = ClassifierCollection.crossVerifyByState(
+        self.clf, df_X, ser_y, num_clfs=100, holdouts=holdouts)
+    self.assertEqual(len(df_X.columns), 
+        len(result.collection.features))
+    self.assertGreater(result.mean, 0.95)
+
+  def makeTester(self, method):
     if IGNORE_TEST:
       return
     def test(holdouts):
       with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-          result = ClassifierCollection.crossVerifyByState(
+          collection = method(
               self.clf, DF, SER, 10, holdouts=holdouts)
-          for value in [result.mean, result.std]:
+          mean, std = collection.crossVerify()
+          for value in [mean, std]:
             self.assertTrue(isinstance(value, float))
-          self.assertTrue(isinstance(result.collection,
+          self.assertTrue(isinstance(collection,
               ClassifierCollection))
         except ValueError:
           raise ValueError
@@ -68,13 +73,12 @@ class TestClassifierCollection(unittest.TestCase):
       pass
 
   def testMakeByRandomStateHoldout2(self):
-    df_X, ser_y = getData()
-    holdouts = 1
-    result = ClassifierCollection.crossVerifyByState(
-        self.clf, df_X, ser_y, num_clfs=100, holdouts=holdouts)
-    self.assertEqual(len(df_X.columns), 
-        len(result.collection.features))
-    self.assertGreater(result.mean, 0.95)
+    self.makeTester(
+        ClassifierCollection.makeByRandomStateHoldout)
+
+  def testMakeByRandomHoldout(self):
+    self.makeTester(
+        ClassifierCollection.makeByRandomHoldout)
 
 
 if __name__ == '__main__':
