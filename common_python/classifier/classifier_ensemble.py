@@ -99,6 +99,7 @@ class ClassifierEnsemble(ClassifierCollection):
     df_result[cn.STERR] = df_result[cn.STD] / np.sqrt(len(self.clfs))
     return df_result
 
+  # FIXME: Needs test
   def predict(self, df_X):
     """
     Default prediction algorithm. Reports probability of each class.
@@ -124,6 +125,19 @@ class ClassifierEnsemble(ClassifierCollection):
     df = df.applymap(lambda v: 0 if np.isnan(v) else v)
     df = df / len(self.clfs)
     return df.T
+
+  # FIXME: Needs test
+  def score(self, df_X, ser_y):
+    """
+    Returns a float in [0, 1] which is the accuracy of the classifier
+    """
+    ser = self.predict(df_X)
+    accuracies = []
+    for instance in ser_y.index:
+      # Accuracy is the probability of selecting the correct class
+      accuracy = df_X.loc[instance, ser_y.loc[instance]
+      accuracies.append(1 - df_X.loc[instance, ser_y.loc[instance])
+    return np.mean(accuracies)
     
   
 ##################################################################### 
@@ -206,3 +220,6 @@ class RandomForestEnsemble(ClassifierEnsemble):
     # Prepare the result
     df_result = self._makeFeatureDF(df_values)
     return df_result.sort_values(cn.MEAN, ascending=False)
+
+  def predict(self, df_X):
+    return self.random_forest.predict(df_X)

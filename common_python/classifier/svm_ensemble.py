@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn import svm
-from sklearn.ensemble import RandomForestClassifier
 
 
 class SVMEnsemble(ClassifierEnsemble):
@@ -33,6 +32,8 @@ class SVMEnsemble(ClassifierEnsemble):
 
   def fit(self, df_X, ser_y):
     """
+    Fits the number of classifiers desired to the data with
+    holdouts. Current selects holdouts independent of class.
     :param pd.DataFrame df_X: feature vectors; indexed by instance
     :param pd.Series ser_y: classes; indexed by instance
     """
@@ -51,9 +52,6 @@ class SVMEnsemble(ClassifierEnsemble):
         self.base_clf, df_X, ser_y, self.size, 
         holdouts=self.holdouts)
     self.update(collection)
-
-  def score(self, df_X, ser_y):
-    pass
 
   def _orderFeatures(self, clf, class_selection):
     """

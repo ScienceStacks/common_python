@@ -69,9 +69,6 @@ class TestClassifierEnsemble(unittest.TestCase):
       return
    # Smoke tests
     _ = self.ensemble.plotRank(top=40, title="RandomForest", is_plot=IS_PLOT)
-    #
-    _ = self.ensemble.plotRank(top=40, title="RandomForest-class 2",
-        is_plot=IS_PLOT, class_selection=2)
 
   def testPlotImportance(self):
     if IGNORE_TEST:
@@ -79,8 +76,6 @@ class TestClassifierEnsemble(unittest.TestCase):
    # Smoke tests
     _ = self.ensemble.plotImportance(top=40, title="RandomForest",
         is_plot=IS_PLOT)
-    _ = self.ensemble.plotImportance(top=40, title="RandomForest-class 2", 
-        class_selection=2, is_plot=IS_PLOT)
 
 
 if __name__ == '__main__':
