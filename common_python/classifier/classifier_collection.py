@@ -107,7 +107,7 @@ class ClassifierCollection(object):
       new_clf.fit(df_X_train, ser_y_train)
       clfs.append(new_clf)
       scores.append(new_clf.score(df_X_test, ser_y_test))
-    return ClassifierCollection(clfs, df_X.columns.tolist(), classes, scores=scores)
+    return cls(clfs, df_X.columns.tolist(), classes, scores=scores)
 
   @classmethod
   def makeByRandomHoldout(cls, clf, df_X, ser_y, count, holdouts=1):

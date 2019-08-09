@@ -5,6 +5,7 @@ from common_python.util import util
 from common_python.classifier.classifier_collection  \
     import ClassifierCollection
 
+import collections
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
@@ -99,7 +100,6 @@ class ClassifierEnsemble(ClassifierCollection):
     df_result[cn.STERR] = df_result[cn.STD] / np.sqrt(len(self.clfs))
     return df_result
 
-  # FIXME: Needs test
   def predict(self, df_X):
     """
     Default prediction algorithm. Reports probability of each class.
@@ -108,11 +108,16 @@ class ClassifierEnsemble(ClassifierCollection):
     :param pd.DataFrame: features, indexed by instance.
     :return pd.DataFrame:  probability by class;
         columns are classes; index by instance
+    Assumes that self.clfs has been previously populated with fitted
+    classifiers.
     """
     # Change to an array of array of features
     DUMMY_COLUMN = "dummy_column"
+    if isinstance(df_X, pd.Series):
+      df_X = pd.DataFrame(df_X)
+      df_X = df_X.T
     array = df_X.values
-    array = array.reshape(len(df_X), -1) 
+    array = array.reshape(len(df_X.index), len(df_X.columns)) 
     # Create a dataframe of class predictions
     clf_predictions = [clf.predict(df_X) for clf in self.clfs]
     instance_predictions = [dict(collections.Counter(x)) for x in zip(*clf_predictions)]
@@ -126,17 +131,23 @@ class ClassifierEnsemble(ClassifierCollection):
     df = df / len(self.clfs)
     return df.T
 
-  # FIXME: Needs test
   def score(self, df_X, ser_y):
     """
-    Returns a float in [0, 1] which is the accuracy of the classifier
+    Evaluates the accuracy of the ensemble classifier for
+    the instances pvodied.
+    :param pd.DataFrame df_X: columns are features, rows are instances
+    :param pd.Series ser_y: rows are instances, values are classes
+    Returns a float in [0, 1] which is the accuracy of the
+    ensemble classifier.
+    Assumes that self.clfs has been previously populated with fitted
+    classifiers.
     """
-    ser = self.predict(df_X)
+    df_predict = self.predict(df_X)
     accuracies = []
     for instance in ser_y.index:
       # Accuracy is the probability of selecting the correct class
-      accuracy = df_X.loc[instance, ser_y.loc[instance]
-      accuracies.append(1 - df_X.loc[instance, ser_y.loc[instance])
+      accuracy = df_predict.loc[instance, ser_y.loc[instance]]
+      accuracies.append(accuracy)
     return np.mean(accuracies)
     
   
