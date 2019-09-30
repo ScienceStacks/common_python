@@ -98,7 +98,6 @@ class ClassifierCollection(object):
     for _ in range(count):
       # Construct test set
       new_clf = copy.deepcopy(clf)
-      clfs.append(new_clf)
       dff_X, serr_y = copyContainers(dff_X, serr_y)
       test_indices = selTestIndicesFunc(serr_y)
       df_X_train, df_X_test = cls._partitionIndices(dff_X, indices, test_indices)
@@ -163,17 +162,17 @@ class ClassifierCollection(object):
     #
     return cls._make(clf, df_X, ser_y, count, selTestIndices)
 
-  def crossVerify(self):
+  def crossValidate(self):
     """
-    Computes cross verification statistics for a collection
+    Computes cross validation statistics for a collection
     :return float, float:
     """
     return np.mean(self.scores), np.std(self.scores)
 
   @classmethod
-  def crossVerifyByState(cls, clf, df_X, ser_y, num_clfs, **kwargs):
+  def crossValidateByState(cls, clf, df_X, ser_y, num_clfs, **kwargs):
     """
-    Does cross verification for a classification class
+    Does cross validation for a classification class
     that supports the fit and score methods.
     :param Classifier clf: 
     :param pd.DataFrame df_X: feature matrix
@@ -184,6 +183,6 @@ class ClassifierCollection(object):
     """
     collection = cls.makeByRandomStateHoldout(clf, df_X, ser_y,
          num_clfs, **kwargs)
-    clf_mean, clf_std = collection.crossVerify()
+    clf_mean, clf_std = collection.crossValidate()
     return CrossVerificationResult(mean=clf_mean, std=clf_std,
         collection=collection)

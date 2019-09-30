@@ -44,7 +44,7 @@ class TestClassifierCollection(unittest.TestCase):
   def testMakeByRandomStateHoldout2(self):
     df_X, ser_y = test_helpers.getData()
     holdouts = 1
-    result = ClassifierCollection.crossVerifyByState(
+    result = ClassifierCollection.crossValidateByState(
         self.clf, df_X, ser_y, num_clfs=100, holdouts=holdouts)
     self.assertEqual(len(df_X.columns), 
         len(result.collection.features))
@@ -59,7 +59,7 @@ class TestClassifierCollection(unittest.TestCase):
         try:
           collection = method(
               self.clf, DF, SER, 10, holdouts=holdouts)
-          mean, std = collection.crossVerify()
+          mean, std = collection.crossValidate()
           for value in [mean, std]:
             self.assertTrue(isinstance(value, float))
           self.assertTrue(isinstance(collection,

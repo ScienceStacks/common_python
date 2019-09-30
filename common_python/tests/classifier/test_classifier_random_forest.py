@@ -41,26 +41,17 @@ class TestSVMEnsemble(unittest.TestCase):
     self._init()
 
   def _init(self):
-    self.df_X, self.ser_y = getData()
-    self.ensemble = SVMEnsemble(svm.LinearSVC(), size=SIZE)
+    self.df_X, self.df_y = getData()
+    self.ensemble = SVMEnsemble(svm.LinearSVC())
 
   def testConstructor(self):
     if IGNORE_TEST:
       return
     self.assertTrue(isinstance(self.ensemble.base_clf, svm.LinearSVC))
 
-  # TODO: Test training with featuers
-  def testFit(self):
-    if IGNORE_TEST:
-      return
-    self._init()
-    self.ensemble.fit(self.df_X, self.ser_y)
-    for items in [self.ensemble.clfs, self.ensemble.scores]:
-      self.assertEqual(len(items), SIZE)
-
   def testOrderFeatures(self):
-    if IGNORE_TEST:
-      return
+    # TESTING
+    self._init()
     clf = self.ensemble.clfs[0]
     import pdb; pdb.set_trace()
     result = self.ensemble._orderFeatures(clf, None)
@@ -107,6 +98,46 @@ class TestSVMEnsemble(unittest.TestCase):
         is_plot=IS_PLOT)
     _ = self.ensemble.plotImportance(top=40, title="SVM-class 2", 
         class_selection=2, is_plot=IS_PLOT)
+
+
+class TestRandomForestEnsemble(unittest.TestCase):
+
+  def setUp(self):
+    df_X, ser_y = getData()
+    self.cls = classifier_ensemble.RandomForestEnsemble
+    self.ensemble = self.cls(df_X, ser_y)
+
+  def testConstructor(self):
+    if IGNORE_TEST:
+      return
+    self.assertTrue(isinstance(self.ensemble.random_forest,
+        RandomForestClassifier))
+
+  def testMakeRankDF(self):
+    if IGNORE_TEST:
+      return
+    df = self.ensemble.makeRankDF()
+    self.assertTrue(helpers.isValidDataFrame(df,
+        [cn.MEAN, cn.STD, cn.STERR]))
+
+  def testPlotRank(self):
+    if IGNORE_TEST:
+      return
+   # Smoke tests
+    _ = self.ensemble.plotRank(top=40, title="RandomForest", is_plot=IS_PLOT)
+
+  def testPlotImportance(self):
+    if IGNORE_TEST:
+      return
+   # Smoke tests
+    _ = self.ensemble.plotImportance(top=40, title="RandomForest", is_plot=IS_PLOT)
+
+  def testMakeImportanceDF(self):
+    if IGNORE_TEST:
+      return
+    df = self.ensemble.makeImportanceDF()
+    self.assertTrue(helpers.isValidDataFrame(df,
+        [cn.MEAN, cn.STD, cn.STERR]))
 
 
 if __name__ == '__main__':

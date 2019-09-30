@@ -1,9 +1,20 @@
-"""Classification done by an ensemble of SVM classifiers."""
+"""
+Classification done by an ensemble of SVM classifiers.
+
+Usage to select top 10 features:
+  ensemble = SVMEnsemble(svm.LinearSVC(), size=100,
+      filter_high_rank=10)
+  ensemble.fit(df_X_train, df_y_train)
+  ser_y_predicted = ensemble.predict(df_X_test)
+  df_score = ensemble.predict(df_X_test ser_y_test)
+"""
 
 import common_python.constants as cn
 from common_python.util import util
-from common_python.classifier.classifier_ensemble ClassifierEnsemble
-from common_python.classifier.classifier_collection ClassifierCollection
+from common_python.classifier.classifier_ensemble  \
+    import ClassifierEnsemble
+from common_python.classifier.classifier_collection \
+    import ClassifierCollection
 
 import copy
 import matplotlib.pyplot as plt
@@ -18,17 +29,23 @@ class SVMEnsemble(ClassifierEnsemble):
   feature selection based on the rank of the full set of features.
   """
  
-  def __init__(self, clf, filter_high_rank=None, holdouts=1, size=1):
+  def __init__(self, clf, filter_high_rank=None, holdouts=1, size=1,
+      **kwargs):
     """
+    :param Type clf: base classifier. This is the classifier type
+        used to construct the ensemble from random selections
+        of training data. Must implement: fit, score, predict,
+        feature_importances_
     :param int/None filter_high_rank: maxium rank considered
     :param int holdouts: number of holdouts when fitting
     :param int size: size of the ensemble
+    :param dict kwargs: keyword arguments used by parent classes
     """
     self.base_clf = clf
     self.filter_high_rank = filter_high_rank
     self.holdouts = holdouts
     self.size = size
-    super().__init__(None, None, None, None)
+    super().__init__(None, None, None, **kwargs)
 
   def fit(self, df_X, ser_y):
     """
@@ -42,7 +59,7 @@ class SVMEnsemble(ClassifierEnsemble):
         holdouts=self.holdouts)
     self.update(collection)
     if self.filter_high_rank is None:
-      return result
+      return
     # Select the features
     df_rank = self.makeRankDF()
     df_rank_sub = df_rank.loc[df_rank.index[0:filter_high_rank], :]
@@ -77,7 +94,7 @@ class SVMEnsemble(ClassifierEnsemble):
     :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
     """
     df_values = pd.DataFrame()
-    for idx, clf in enumerate(self.classifiers):
+    for idx, clf in enumerate(self.clfs):
       df_values[idx] = pd.Series(self._orderFeatures(clf, class_selection),
           index=self.features)
     df_result = self._makeFeatureDF(df_values)
@@ -93,7 +110,7 @@ class SVMEnsemble(ClassifierEnsemble):
     """
     ABS_MEAN = "abs_mean"
     df_values = pd.DataFrame()
-    for idx, clf in enumerate(self.classifiers):
+    for idx, clf in enumerate(self.clfs):
       if class_selection is None:
         values = [max(np.abs(x) for x in xv) for xv in  zip(*clf.coef_)]
       else:
