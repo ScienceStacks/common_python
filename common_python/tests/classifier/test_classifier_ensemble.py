@@ -1,5 +1,7 @@
 """Tests for classifier_ensemble.ClassifierEnsemble."""
 
+from common_python.classifier import classifier_collection
+from common_python.classifier import classifier_ensemble
 from common_python.classifier.classifier_ensemble  \
     import ClassifierEnsemble, ClassifierDescriptorSVM
 from common_python.classifier.classifier_collection  \
@@ -165,6 +167,22 @@ class TestClassifierEnsemble(unittest.TestCase):
     self.svm_ensemble.fit(self.df_X, self.ser_y)
    # Smoke tests
     _ = self.svm_ensemble.plotRank(top=40, title="SVM", is_plot=IS_PLOT)
+
+  def testCrossValidate(self):
+    # Tests the cross validation of ClassifierEnsemble
+    if IGNORE_TEST:
+      return
+    cvrs = []
+    num_clfs = 10 # number of classifiers created randomly
+    for fltr in [6, 1515]:
+      clf = classifier_ensemble.ClassifierEnsemble(
+          classifier_ensemble.ClassifierDescriptorSVM(),
+          filter_high_rank=fltr, size=10)
+      cvrs.append(
+          classifier_collection.ClassifierCollection.crossValidateByState(
+          clf, self.df_X, self.ser_y, num_clfs))
+    self.assertGreater(cvrs[1], cvrs[0])
+    import pdb; pdb.set_trace()
 
   # TODO: Use or delete
   def testRandomClassifier(self):

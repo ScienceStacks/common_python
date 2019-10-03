@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-CrossVerificationResult = collections.namedtuple(
-    "CrossVerificationResult",
+CrossValidationResult = collections.namedtuple(
+    "CrossValidationResult",
     "mean std collection"
     )
 
@@ -72,6 +72,7 @@ class ClassifierCollection(object):
     :param function selTestIndicesFunc:
          Selects test holdout indices from randomly order indices
          input is pd.Series for class; output is list of indices
+    :param dict kwargs: optional arguments passed to classifier
     :return ClassifierCollection:
     Notes
         1. df_X, ser_y must have the same index
@@ -172,19 +173,18 @@ class ClassifierCollection(object):
     return np.mean(self.scores), np.std(self.scores)
 
   @classmethod
-  def crossValidateByState(cls, clf, df_X, ser_y, num_clfs, **kwargs):
+  def crossValidateByState(cls, clf, df_X, ser_y, num_clfs):
     """
     Does cross validation for a classification class
     that supports the fit and score methods.
-    :param Classifier clf: 
+    :param Classifier clf: Instantiated classifier
     :param pd.DataFrame df_X: feature matrix
     :param pd.DataFrame ser_y: classes
     :param int num_clfs: Number of classifiers to create
-    :param dict kwargs: arguments for construction
-    :return CrossVerificationResult:
+    :return CrossValidationResult:
     """
     collection = cls.makeByRandomStateHoldout(clf, df_X, ser_y,
-         num_clfs, **kwargs)
+         num_clfs)
     clf_mean, clf_std = collection.crossValidate()
-    return CrossVerificationResult(mean=clf_mean, std=clf_std,
+    return CrossValidationResult(mean=clf_mean, std=clf_std,
         collection=collection)

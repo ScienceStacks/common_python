@@ -84,6 +84,7 @@ class ClassifierEnsemble(ClassifierCollection):
     self.filter_high_rank = filter_high_rank
     self.holdouts = holdouts
     self.size = size
+    self.columns = None # Columns used in prediction
     super().__init__(**kwargs)
 
   def fit(self, df_X, ser_y, collectionMaker=None):
@@ -105,13 +106,14 @@ class ClassifierEnsemble(ClassifierCollection):
     collection = collectionMaker(df_X, ser_y)
     self.update(collection)
     if self.filter_high_rank is None:
+      self.columns = df_X.columns.tolist()
       return
     # Select the features
     df_rank = self.makeRankDF()
     df_rank_sub = df_rank.loc[
         df_rank.index[0:self.filter_high_rank], :]
-    columns = df_rank_sub.index.tolist()
-    df_X_sub = df_X[columns]
+    self.columns = df_rank_sub.index.tolist()
+    df_X_sub = df_X[self.columns]
     collection = collectionMaker(df_X_sub, ser_y)
     self.update(collection)
 
@@ -128,23 +130,28 @@ class ClassifierEnsemble(ClassifierCollection):
     """
     # Change to an array of array of features
     DUMMY_COLUMN = "dummy_column"
-    if isinstance(df_X, pd.Series):
-      df_X = pd.DataFrame(df_X)
-      df_X = df_X.T
-    array = df_X.values
-    array = array.reshape(len(df_X.index), len(df_X.columns)) 
+    if not isinstance(df_X, pd.DataFrame):
+      raise ValueError("Must pass dataframe indexed by instance")
+    #
+    indices = df_X.index
+    df_X_sub = df_X[self.columns]
+    array = df_X_sub.values
+    array = array.reshape(len(df_X.index), len(df_X_sub.columns)) 
     # Create a dataframe of class predictions
-    clf_predictions = [clf.predict(df_X) for clf in self.clfs]
+    clf_predictions = [clf.predict(df_X_sub) for clf in self.clfs]
     instance_predictions = [dict(collections.Counter(x)) for x in zip(*clf_predictions)]
     df = pd.DataFrame()
     df[DUMMY_COLUMN] = np.repeat(-1, len(self.classes))
     for idx, instance in enumerate(instance_predictions):
-        ser = pd.Series([x for x in instance.values()], index=instance.keys())
+        ser = pd.Series(
+            [x for x in instance.values()], index=instance.keys())
         df[idx] = ser
     del df[DUMMY_COLUMN]
     df = df.fillna(0)
     df = df / len(self.clfs)
-    return df.T
+    df_result = df.T
+    df_result.index = indices
+    return df_result
 
   def score(self, df_X, ser_y):
     """
@@ -161,7 +168,10 @@ class ClassifierEnsemble(ClassifierCollection):
     accuracies = []
     for instance in ser_y.index:
       # Accuracy is the probability of selecting the correct class
-      accuracy = df_predict.loc[instance, ser_y.loc[instance]]
+      try:
+        accuracy = df_predict.loc[instance, ser_y.loc[instance]]
+      except:
+        import pdb; pdb.set_trace()
       accuracies.append(accuracy)
     return np.mean(accuracies)
 
@@ -290,5 +300,6 @@ class ClassifierEnsemble(ClassifierCollection):
         cn.MEAN: df_values.mean(axis=1),
         cn.STD: df_values.std(axis=1),
         })
+    df_result.index = df_values.index
     df_result[cn.STERR] = df_result[cn.STD] / np.sqrt(len(self.clfs))
     return df_result
