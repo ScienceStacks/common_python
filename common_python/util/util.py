@@ -116,3 +116,12 @@ def getValue(dictionary, key, value):
     return value
   else:
     return dictionary[key]
+
+def setList(value):
+  """
+  Sets a list to empty if None.
+  """
+  if value is None:
+    return []
+  else:
+    return value

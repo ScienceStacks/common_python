@@ -1,4 +1,17 @@
-"""Classification done by an ensemble of classifiers."""
+"""
+Ensemble of classifiers formed by training with different data.
+The underlying classifier is called the base classifier.
+1. Requirements
+  a. The base classifier must expose methods for fit, predict, score.
+  b. Sub-class ClassifierDescriptor and implement getImportance
+2. The EnsembleClassifer is trained using randomly selecting data
+subsets using a specified number of holdouts.
+3. The ClassifierEnsemble exposes fit, predict, score.
+4. In addition, features can be exampled and plotted
+  a. Importance is float for a feature that indicates its contribution
+     to classifications
+  b. Rank is an ordering of features based on their importance
+"""
 
 import common_python.constants as cn
 from common_python.util import util
@@ -11,18 +24,191 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn import svm
-from sklearn.ensemble import RandomForestClassifier
-
-RF_ESTIMATORS = "n_estimators"
-RF_MAX_FEATURES = "max_features"
-RF_BOOTSTRAP = "bootstrap"
-RF_DEFAULTS = {
-    RF_ESTIMATORS: 500,
-    RF_BOOTSTRAP: True,
-    }
 
 
+###############################################
+class ClassifierDescriptor(object):
+  # Describes a classifier used to create an ensemble
+
+  def __init__(self):
+    self.clf = None # Must assign to a classifier Type
+    raise RuntimeError("Must override ClassifierDescriptor.__init__")
+
+  def getImportance(self, clf, **kwargs):
+    """
+    Returns the importances of features.
+    :return list-float:
+    """
+    raise RuntimeError(
+        "Must override ClassifierDescriptor.getImportance")
+
+
+class ClassifierDescriptorSVM(ClassifierDescriptor):
+  # Descriptor information needed for SVM classifiers
+  # Descriptor is for one-vs-rest. So, there is a separate
+  # classifier for each class.
+  
+  def __init__(self, clf=svm.LinearSVC()):
+    self.clf = clf
+
+  def getImportance(self, clf, class_selection=None):
+    """
+    Calculates the importances of features.
+    :param Classifier clf:
+    :param int class_selection: class for which importance is computed
+    :return list-float:
+    """
+    if class_selection is None:
+      # If none specified, choose the largest value.
+      coefs = [max([np.abs(x) for x in xv]) for xv in zip(*clf.coef_)]
+    else:
+      coefs = [np.abs(x) for x in clf.coef_[class_selection]]
+    return coefs
+
+
+###################################################
 class ClassifierEnsemble(ClassifierCollection):
+ 
+  def __init__(self, clf_desc=ClassifierDescriptorSVM(),
+      holdouts=1, size=1,
+      filter_high_rank=None,
+      **kwargs):
+    """
+    :param ClassifierDescriptor clf_desc:
+    :param int holdouts: number of holdouts when fitting
+    :param int size: size of the ensemble
+    :param int/None filter_high_rank: maxium rank considered
+    :param dict kwargs: keyword arguments used by parent classes
+    """
+    self.clf_desc = clf_desc
+    self.filter_high_rank = filter_high_rank
+    self.holdouts = holdouts
+    self.size = size
+    super().__init__(**kwargs)
+
+  def fit(self, df_X, ser_y):
+    """
+    Fits the number of classifiers desired to the data with
+    holdouts. Current selects holdouts independent of class.
+    :param pd.DataFrame df_X: feature vectors; indexed by instance
+    :param pd.Series ser_y: classes; indexed by instance
+    """
+    collection = ClassifierCollection.makeByRandomHoldout(
+        self.clf_desc.clf, df_X, ser_y, self.size, 
+        holdouts=self.holdouts)
+    self.update(collection)
+    if self.filter_high_rank is None:
+      return
+    # Select the features
+    df_rank = self.makeRankDF()
+    df_rank_sub = df_rank.loc[
+        df_rank.index[0:self.filter_high_rank], :]
+    columns = df_rank_sub.index.tolist()
+    df_X_sub = df_X[columns]
+    collection = ClassifierCollection.makeByRandomHoldout(
+        self.clf_desc.clf, df_X_sub, ser_y, self.size, 
+        holdouts=self.holdouts)
+    self.update(collection)
+
+  def predict(self, df_X):
+    """
+    Default prediction algorithm. Reports probability of each class.
+    The probability of a class is the fraction of classifiers that
+    predict that class.
+    :param pd.DataFrame: features, indexed by instance.
+    :return pd.DataFrame:  probability by class;
+        columns are classes; index by instance
+    Assumes that self.clfs has been previously populated with fitted
+    classifiers.
+    """
+    # Change to an array of array of features
+    DUMMY_COLUMN = "dummy_column"
+    if isinstance(df_X, pd.Series):
+      df_X = pd.DataFrame(df_X)
+      df_X = df_X.T
+    array = df_X.values
+    array = array.reshape(len(df_X.index), len(df_X.columns)) 
+    # Create a dataframe of class predictions
+    clf_predictions = [clf.predict(df_X) for clf in self.clfs]
+    instance_predictions = [dict(collections.Counter(x)) for x in zip(*clf_predictions)]
+    df = pd.DataFrame()
+    df[DUMMY_COLUMN] = np.repeat(-1, len(self.classes))
+    for idx, instance in enumerate(instance_predictions):
+        ser = pd.Series([x for x in instance.values()], index=instance.keys())
+        df[idx] = ser
+    del df[DUMMY_COLUMN]
+    df = df.applymap(lambda v: 0 if np.isnan(v) else v)
+    df = df / len(self.clfs)
+    return df.T
+
+  def score(self, df_X, ser_y):
+    """
+    Evaluates the accuracy of the ensemble classifier for
+    the instances pvodied.
+    :param pd.DataFrame df_X: columns are features, rows are instances
+    :param pd.Series ser_y: rows are instances, values are classes
+    Returns a float in [0, 1] which is the accuracy of the
+    ensemble classifier.
+    Assumes that self.clfs has been previously populated with fitted
+    classifiers.
+    """
+    df_predict = self.predict(df_X)
+    accuracies = []
+    for instance in ser_y.index:
+      # Accuracy is the probability of selecting the correct class
+      accuracy = df_predict.loc[instance, ser_y.loc[instance]]
+      accuracies.append(accuracy)
+    return np.mean(accuracies)
+
+  def _orderFeatures(self, clf, class_selection=None):
+    """
+    Orders features by descending value of importance.
+    :param int class_selection: restrict analysis to a single class
+    :return list-int:
+    """
+    coefs = self.clf_desc.getImportance(clf,
+        class_selection=class_selection)
+    length = len(coefs)
+    sorted_tuples = np.argsort(coefs).tolist()
+    # Calculate rank in descending order
+    result = [length - sorted_tuples.index(v) for v in range(length)]
+    return result
+
+  def makeRankDF(self, class_selection=None):
+    """
+    Constructs a dataframe of feature ranks for importance,
+    where the rank is the feature order of importance.
+    A more important feature has a lower rank (closer to 0)
+    :param int class_selection: restrict analysis to a single class
+    :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
+    """
+    df_values = pd.DataFrame()
+    for idx, clf in enumerate(self.clfs):
+      df_values[idx] = pd.Series(self._orderFeatures(clf,
+          class_selection=class_selection),
+          index=self.features)
+    df_result = self._makeFeatureDF(df_values)
+    return df_result.sort_values(cn.MEAN)
+
+  def makeImportanceDF(self, class_selection=None):
+    """
+    Constructs a dataframe of feature importances.
+    :param int class_selection: restrict analysis to a single class
+    :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
+    The importance of a feature is the maximum absolute value of its coefficient
+    in the collection of classifiers for the multi-class vector (one vs. rest, ovr).
+    """
+    ABS_MEAN = "abs_mean"
+    df_values = pd.DataFrame()
+    for idx, clf in enumerate(self.clfs):
+      values = self.clf_desc.getImportance(clf,
+         class_selection=class_selection)
+      df_values[idx] = pd.Series(values, index=self.features)
+    df_result = self._makeFeatureDF(df_values)
+    df_result[ABS_MEAN] = [np.abs(x) for x in df_result[cn.MEAN]]
+    df_result = df_result.sort_values(ABS_MEAN, ascending=False)
+    del df_result[ABS_MEAN]
+    return df_result
 
   def _plot(self, df, ylabel, top, fig, ax, is_plot, **kwargs):
     """
@@ -99,138 +285,3 @@ class ClassifierEnsemble(ClassifierCollection):
         })
     df_result[cn.STERR] = df_result[cn.STD] / np.sqrt(len(self.clfs))
     return df_result
-
-  def predict(self, df_X):
-    """
-    Default prediction algorithm. Reports probability of each class.
-    The probability of a class is the fraction of classifiers that
-    predict that class.
-    :param pd.DataFrame: features, indexed by instance.
-    :return pd.DataFrame:  probability by class;
-        columns are classes; index by instance
-    Assumes that self.clfs has been previously populated with fitted
-    classifiers.
-    """
-    # Change to an array of array of features
-    DUMMY_COLUMN = "dummy_column"
-    if isinstance(df_X, pd.Series):
-      df_X = pd.DataFrame(df_X)
-      df_X = df_X.T
-    array = df_X.values
-    array = array.reshape(len(df_X.index), len(df_X.columns)) 
-    # Create a dataframe of class predictions
-    clf_predictions = [clf.predict(df_X) for clf in self.clfs]
-    instance_predictions = [dict(collections.Counter(x)) for x in zip(*clf_predictions)]
-    df = pd.DataFrame()
-    df[DUMMY_COLUMN] = np.repeat(-1, len(self.classes))
-    for idx, instance in enumerate(instance_predictions):
-        ser = pd.Series([x for x in instance.values()], index=instance.keys())
-        df[idx] = ser
-    del df[DUMMY_COLUMN]
-    df = df.applymap(lambda v: 0 if np.isnan(v) else v)
-    df = df / len(self.clfs)
-    return df.T
-
-  def score(self, df_X, ser_y):
-    """
-    Evaluates the accuracy of the ensemble classifier for
-    the instances pvodied.
-    :param pd.DataFrame df_X: columns are features, rows are instances
-    :param pd.Series ser_y: rows are instances, values are classes
-    Returns a float in [0, 1] which is the accuracy of the
-    ensemble classifier.
-    Assumes that self.clfs has been previously populated with fitted
-    classifiers.
-    """
-    df_predict = self.predict(df_X)
-    accuracies = []
-    for instance in ser_y.index:
-      # Accuracy is the probability of selecting the correct class
-      accuracy = df_predict.loc[instance, ser_y.loc[instance]]
-      accuracies.append(accuracy)
-    return np.mean(accuracies)
-    
-  
-##################################################################### 
-class RandomForestEnsemble(ClassifierEnsemble):
-
-  def __init__(self, df_X, ser_y, iterations=5, **kwargs):
-    """
-    :param pd.DataFrame df_X:
-    :param pd.Series ser_y:
-    :param int iterations: Number of random forests created
-        to obtain a distribution
-    :param dict kwargs: arguments passed to classifier
-    """
-    self.df_X = df_X
-    self.ser_y = ser_y
-    self.iterations = iterations
-    self.features = df_X.columns.tolist()
-    self.classes = ser_y.values.tolist()
-    adjusted_kwargs = dict(kwargs)
-    for key in RF_DEFAULTS.keys():
-      if not key in adjusted_kwargs:
-        adjusted_kwargs[key] = RF_DEFAULTS[key]
-    if not RF_MAX_FEATURES in adjusted_kwargs:
-      adjusted_kwargs[RF_MAX_FEATURES] = len(self.features)
-    self.random_forest = RandomForestClassifier(**adjusted_kwargs)
-    self.random_forest.fit(self.df_X, self.ser_y)
-    super().__init__(
-        list(self.random_forest.estimators_),
-        df_X.columns.tolist(), ser_y.unique().tolist())
-
-  def _initMakeDF(self):
-    """
-    Sets initial values for dataframe construction.
-    :return pd.DataFrame, RandomForestClassifier, int (length):
-    """
-    length = len(self.features)
-    df_values = pd.DataFrame()
-    df_values[-1] = np.repeat(0, length)
-    df_values.index = self.features
-    return df_values, copy.deepcopy(self.random_forest), length
-
-  def makeRankDF(self, **kwargs):
-    """
-    Constructs a dataframe of feature ranks for importance.
-    A more important feature has a lower rank (closer to 1)
-    :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
-    Ignore unused keyword arguments
-    """
-    # Construct the values
-    df_values, clf, length = self._initMakeDF()
-    # Construct the values dataframe
-    for idx in range(self.iterations):
-      clf.fit(self.df_X, self.ser_y)
-      tuples = sorted(zip(clf.feature_importances_, self.features),
-          key=lambda v: v[0], reverse=True)
-      ser = pd.Series([1+x for x in range(length)])
-      ser.index = [t[1] for t in tuples]
-      df_values[idx] = ser
-    del df_values[-1]
-    # Prepare the result
-    df_result = self._makeFeatureDF(df_values)
-    return df_result.sort_values(cn.MEAN, ascending=True)
-
-  def makeImportanceDF(self):
-    """
-    Constructs a dataframe of feature importances.
-    :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
-        index is features; sorted descending by cn.MEAN
-    Ignore unused keyword arguments
-    """
-    # Construct the values
-    df_values, clf, length = self._initMakeDF()
-    # Construct the values
-    for idx in range(self.iterations):
-      clf.fit(self.df_X, self.ser_y)
-      ser = pd.Series(clf.feature_importances_,
-          index=self.features)
-      df_values[idx] = ser
-    del df_values[-1]
-    # Prepare the result
-    df_result = self._makeFeatureDF(df_values)
-    return df_result.sort_values(cn.MEAN, ascending=False)
-
-  def predict(self, df_X):
-    return self.random_forest.predict(df_X)

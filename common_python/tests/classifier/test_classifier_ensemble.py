@@ -1,7 +1,7 @@
 """Tests for classifier_ensemble.ClassifierEnsemble."""
 
 from common_python.classifier.classifier_ensemble  \
-    import ClassifierEnsemble, RandomForestEnsemble
+    import ClassifierEnsemble, ClassifierDescriptorSVM
 from common_python.classifier.classifier_collection  \
     import ClassifierCollection
 from common_python.testing import helpers
@@ -12,6 +12,7 @@ import collections
 import os
 import pandas as pd
 import random
+from sklearn import svm
 import numpy as np
 import unittest
 
@@ -29,12 +30,14 @@ SER = pd.Series(values)
 
 
 ######## Helper Classes ######
+# TODO: Create tests that use RandomClassifier or delete this
 class RandomClassifier(object):
 
   def __init__(self):
     self.class_probs = None
+    self.coef_ = []
 
-  def fit(self, _, ser_y):
+  def fit(self, df_X, ser_y):
     """
     Fits by recording probability of each class.
     :param object _:
@@ -43,6 +46,7 @@ class RandomClassifier(object):
     class_counts = dict(collections.Counter(ser_y.values.tolist()))
     self.class_probs = {k: v / len(ser_y) 
          for k,v in class_counts.items()}
+    self.coef_ = np.repeat(0.1, len(df_X.columns))
 
   def predict(self, df_X):
     """
@@ -64,68 +68,107 @@ class RandomClassifier(object):
 ######## Test Classes ######
 class TestClassifierEnsemble(unittest.TestCase):
 
-  def init(self):
+  def _init(self):
     self.df_X, self.ser_y = test_helpers.getData()
     holdouts = 1
-    self.ensemble = RandomForestEnsemble(
-        self.df_X, self.ser_y, iterations=ITERATIONS)
-    self.random_classifier_ensemble =  \
-      ClassifierEnsemble.makeByRandomHoldout(
-      RandomClassifier(), DF, SER, 100, 1)
+    self.svm_ensemble = ClassifierEnsemble(ClassifierDescriptorSVM(),
+        size=SIZE, holdouts=holdouts)
   
   def setUp(self):
     if IGNORE_TEST:
       return
-    self.init()
+    self._init()
 
   def testConstructor(self):
     if IGNORE_TEST:
       return
-    self.assertGreater(len(self.ensemble.clfs), 0)
-    self.assertGreater(len(self.ensemble.features), 0)
-    self.assertGreater(len(self.ensemble.classes), 0)
+    self.assertEqual(len(self.svm_ensemble.clfs), 0)
+    self.assertEqual(len(self.svm_ensemble.features), 0)
+    self.assertEqual(len(self.svm_ensemble.classes), 0)
+    self.assertTrue(isinstance(self.svm_ensemble.clf_desc.clf,
+        svm.LinearSVC))
+
+  # TODO: Test training with featuers
+  def testFit(self):
+    # TESTING
+    self._init()
+    holdouts = 1
+    #
+    def test(filter_high_rank):
+      if filter_high_rank is None:
+        filter_high_rank = len(self.df_X.columns)
+      svm_ensemble = ClassifierEnsemble(ClassifierDescriptorSVM(),
+        size=SIZE, holdouts=holdouts,
+        filter_high_rank=filter_high_rank)
+      svm_ensemble.fit(self.df_X, self.ser_y)
+      for items in [svm_ensemble.clfs, svm_ensemble.scores]:
+        self.assertEqual(len(items), SIZE)
+      self.assertEqual(len(svm_ensemble.features), filter_high_rank)
+    #
+    test(None)
+    test(10)
+
+  def testOrderFeatures(self):
+    if IGNORE_TEST:
+      return
+    self.svm_ensemble.fit(self.df_X, self.ser_y)
+    clf = self.svm_ensemble.clfs[0]
+    #
+    def test(class_selection):
+       result = self.svm_ensemble._orderFeatures(clf,
+           class_selection=class_selection)
+       self.assertEqual(len(result), len(self.svm_ensemble.features))
+       trues = [ v in range(1, len(result)+1) for v in result]
+       self.assertTrue(all(trues))
+    #
+    test(None)
+    test(1)
 
   def testMakeRankDF(self):
     if IGNORE_TEST:
       return
-    df = self.ensemble.makeRankDF()
+    self.svm_ensemble.fit(self.df_X, self.ser_y)
+    df = self.svm_ensemble.makeRankDF()
     self.assertTrue(helpers.isValidDataFrame(df,
         [cn.MEAN, cn.STD, cn.STERR]))
 
   def testMakeImportanceDF(self):
     if IGNORE_TEST:
       return
-    def test(df):
+    self.svm_ensemble.fit(self.df_X, self.ser_y)
+    #
+    def test(class_selection):
+      df = self.svm_ensemble.makeImportanceDF(
+          class_selection=class_selection)
       self.assertTrue(helpers.isValidDataFrame(df,
           [cn.MEAN, cn.STD, cn.STERR]))
-      trues = [df.loc[i, cn.STD] >= df.loc[i, cn.STERR] 
-          for i in df.index]
-      self.assertTrue(all(trues))
+      trues = [df.loc[df.index[i], cn.MEAN]
+           >= df.loc[df.index[i+1], cn.MEAN] 
+          for i in range(len(df.index)-1)]
     #
-    df = self.ensemble.makeImportanceDF()
-    test(df)
-    #
-    ensemble = RandomForestEnsemble(self.df_X, self.ser_y,
-        iterations=10)
-    df1 = ensemble.makeImportanceDF()
-    test(df1)
-
-  def testPlotRank(self):
-    if IGNORE_TEST:
-      return
-   # Smoke tests
-    _ = self.ensemble.plotRank(top=40, title="RandomForest", is_plot=IS_PLOT)
+    test(None)
+    test(1)
 
   def testPlotImportance(self):
     if IGNORE_TEST:
       return
-   # Smoke tests
-    _ = self.ensemble.plotImportance(top=40, title="RandomForest",
+    self.svm_ensemble.fit(self.df_X, self.ser_y)
+    # Smoke tests
+    _ = self.svm_ensemble.plotImportance(top=40, title="SVM",
         is_plot=IS_PLOT)
+    _ = self.svm_ensemble.plotImportance(top=40, title="SVM-class 2", 
+        class_selection=2, is_plot=IS_PLOT)
 
-  def testRandomClassifier(self):
+  def testPlotRank(self):
     if IGNORE_TEST:
       return
+    self.svm_ensemble.fit(self.df_X, self.ser_y)
+   # Smoke tests
+    _ = self.svm_ensemble.plotRank(top=40, title="SVM", is_plot=IS_PLOT)
+
+  # TODO: Use or delete
+  def testRandomClassifier(self):
+    return
     clf = RandomClassifier()
     clf.fit(DF, SER)
     self.assertEqual(clf.class_probs[0], 1/SIZE)
@@ -133,16 +176,19 @@ class TestClassifierEnsemble(unittest.TestCase):
     trues = [c in range(SIZE) for c in ser_predict.values]
     self.assertTrue(all(trues))
 
+  # TODO: Use or delete
   def testPredict(self):
-    if IGNORE_TEST:
-      return
+    return
+    self._init()
     ser = self.random_classifier_ensemble.predict(DF.loc[0,:])
     mean = ser.mean(axis=1).values[0]
     expected = 1/SIZE
     self.assertLess(abs(mean - expected), 0.1)
 
+  # TODO: Use or delete
   def testScore(self):
-    self.init()
+    return
+    self._init()
     score = self.random_classifier_ensemble.score(DF, SER)
     expected = 1/SIZE
     self.assertLess(abs(score- expected), 0.1)

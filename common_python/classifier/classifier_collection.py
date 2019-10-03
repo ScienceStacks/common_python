@@ -17,17 +17,19 @@ CrossVerificationResult = collections.namedtuple(
 
 class ClassifierCollection(object):
 
-  def __init__(self, clfs, features, classes, scores=None):
+  def __init__(self, clfs=None, features=None, 
+      classes=None, scores=None):
     """
     :param list-Classifier clfs: methods-fit, predict, score
     :param list-object features:
     :param list-object classes:
     :param list-float scores:
     """
-    self.clfs = clfs
-    self.features = features
-    self.classes = classes
-    self.scores = scores  # Score for each classifier if present
+    self.clfs = util.setList(clfs)
+    self.features = util.setList(features)
+    self.classes = util.setList(classes)
+    # Score for each classifier if present
+    self.scores = util.setList(scores)
 
   def update(self, other):
     """
