@@ -86,16 +86,23 @@ class ClassifierEnsemble(ClassifierCollection):
     self.size = size
     super().__init__(**kwargs)
 
-  def fit(self, df_X, ser_y):
+  def fit(self, df_X, ser_y, collectionMaker=None):
     """
     Fits the number of classifiers desired to the data with
     holdouts. Current selects holdouts independent of class.
+    :param Function collectionMaker: function of df_X, ser_y
+        that makes a collection
     :param pd.DataFrame df_X: feature vectors; indexed by instance
     :param pd.Series ser_y: classes; indexed by instance
     """
-    collection = ClassifierCollection.makeByRandomHoldout(
-        self.clf_desc.clf, df_X, ser_y, self.size, 
-        holdouts=self.holdouts)
+    def defaultCollectionMaker(df_X, ser_y):
+      return ClassifierCollection.makeByRandomHoldout(
+          self.clf_desc.clf, df_X, ser_y, self.size, 
+          holdouts=self.holdouts)
+    #
+    if collectionMaker is None:
+      collectionMaker = defaultCollectionMaker
+    collection = collectionMaker(df_X, ser_y)
     self.update(collection)
     if self.filter_high_rank is None:
       return
@@ -105,9 +112,7 @@ class ClassifierEnsemble(ClassifierCollection):
         df_rank.index[0:self.filter_high_rank], :]
     columns = df_rank_sub.index.tolist()
     df_X_sub = df_X[columns]
-    collection = ClassifierCollection.makeByRandomHoldout(
-        self.clf_desc.clf, df_X_sub, ser_y, self.size, 
-        holdouts=self.holdouts)
+    collection = collectionMaker(df_X_sub, ser_y)
     self.update(collection)
 
   def predict(self, df_X):
@@ -137,7 +142,7 @@ class ClassifierEnsemble(ClassifierCollection):
         ser = pd.Series([x for x in instance.values()], index=instance.keys())
         df[idx] = ser
     del df[DUMMY_COLUMN]
-    df = df.applymap(lambda v: 0 if np.isnan(v) else v)
+    df = df.fillna(0)
     df = df / len(self.clfs)
     return df.T
 
@@ -166,10 +171,10 @@ class ClassifierEnsemble(ClassifierCollection):
     :param int class_selection: restrict analysis to a single class
     :return list-int:
     """
-    coefs = self.clf_desc.getImportance(clf,
+    values = self.clf_desc.getImportance(clf,
         class_selection=class_selection)
-    length = len(coefs)
-    sorted_tuples = np.argsort(coefs).tolist()
+    length = len(values)
+    sorted_tuples = np.argsort(values).tolist()
     # Calculate rank in descending order
     result = [length - sorted_tuples.index(v) for v in range(length)]
     return result
@@ -188,6 +193,7 @@ class ClassifierEnsemble(ClassifierCollection):
           class_selection=class_selection),
           index=self.features)
     df_result = self._makeFeatureDF(df_values)
+    df_result = df_result.fillna(0)
     return df_result.sort_values(cn.MEAN)
 
   def makeImportanceDF(self, class_selection=None):
@@ -208,6 +214,7 @@ class ClassifierEnsemble(ClassifierCollection):
     df_result[ABS_MEAN] = [np.abs(x) for x in df_result[cn.MEAN]]
     df_result = df_result.sort_values(ABS_MEAN, ascending=False)
     del df_result[ABS_MEAN]
+    df_result = df_result.fillna(0)
     return df_result
 
   def _plot(self, df, ylabel, top, fig, ax, is_plot, **kwargs):
