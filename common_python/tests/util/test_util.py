@@ -1,7 +1,7 @@
 '''Tests for utility routines.'''
 
 import unittest
-import util as ut
+import common_python.util.util as ut
 
 
 class TestFunctions(unittest.TestCase):
@@ -20,6 +20,19 @@ class TestFunctions(unittest.TestCase):
     word = ut.randomWord(size=WORDLEN)
     self.assertTrue(isinstance(word, str))
     self.assertEqual(len(word), WORDLEN)
+
+  def testGetValue(self):
+    dictionary = {'a': 1}
+    self.assertEqual(ut.getValue(dictionary, 'a', 0), 1)
+    self.assertEqual(ut.getValue(dictionary, 'b', 0), 0)
+
+  def testSetValue(self):
+    dictionary = {'a': 1}
+    new_dict = ut.setValue(dictionary, 'a', 2)
+    self.assertEqual(new_dict['a'], 1)
+    #
+    new_dict = ut.setValue(dictionary, 'b', 2)
+    self.assertEqual(new_dict['b'], 2)
 
   def testRandomWords(self):
     LEN = 10

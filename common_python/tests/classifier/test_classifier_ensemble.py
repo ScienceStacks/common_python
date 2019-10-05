@@ -18,7 +18,7 @@ from sklearn import svm
 import numpy as np
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_PLOT = False
 SIZE = 10
 ITERATIONS = 3
@@ -92,8 +92,8 @@ class TestClassifierEnsemble(unittest.TestCase):
 
   # TODO: Test training with featuers
   def testFit(self):
-    # TESTING
-    self._init()
+    if IGNORE_TEST:
+      return
     holdouts = 1
     #
     def test(filter_high_rank):
@@ -157,7 +157,7 @@ class TestClassifierEnsemble(unittest.TestCase):
     self.svm_ensemble.fit(self.df_X, self.ser_y)
     # Smoke tests
     _ = self.svm_ensemble.plotImportance(top=40, title="SVM",
-        is_plot=IS_PLOT)
+        is_plot=IS_PLOT, ylabel="XXX")
     _ = self.svm_ensemble.plotImportance(top=40, title="SVM-class 2", 
         class_selection=2, is_plot=IS_PLOT)
 
@@ -182,7 +182,6 @@ class TestClassifierEnsemble(unittest.TestCase):
           classifier_collection.ClassifierCollection.crossValidateByState(
           clf, self.df_X, self.ser_y, num_clfs))
     self.assertGreater(cvrs[1], cvrs[0])
-    import pdb; pdb.set_trace()
 
   # TODO: Use or delete
   def testRandomClassifier(self):

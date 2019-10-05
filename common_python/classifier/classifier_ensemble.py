@@ -227,7 +227,7 @@ class ClassifierEnsemble(ClassifierCollection):
     df_result = df_result.fillna(0)
     return df_result
 
-  def _plot(self, df, ylabel, top, fig, ax, is_plot, **kwargs):
+  def _plot(self, df, top, fig, ax, is_plot, **kwargs):
     """
     Common plotting codes
     :param pd.DataFrame: cn.MEAN, cn.STD, indexed by feature
@@ -251,8 +251,8 @@ class ClassifierEnsemble(ClassifierCollection):
     bottom = util.getValue(kwargs, "bottom", 0.25)
     plt.gcf().subplots_adjust(bottom=bottom)
     ax.set_xticklabels(indices, rotation=90, fontsize=10)
-    ax.set_xlabel('Gene Group')
-    ax.set_ylabel(ylabel)
+    ax.set_ylabel(kwargs[cn.PLT_YLABEL])
+    ax.set_xlabel(util.getValue(kwargs, cn.PLT_XLABEL, "Gene Group"))
     this_max = max(df[cn.MEAN] + df[cn.STD])*1.1
     this_min = min(df[cn.MEAN] - df[cn.STD])*1.1
     this_min = min(this_min, 0)
@@ -275,7 +275,8 @@ class ClassifierEnsemble(ClassifierCollection):
     """
     # Data preparation
     df = self.makeRankDF()
-    self._plot(df, "Rank", top, fig, ax, is_plot, **kwargs)
+    kwargs = util.setValue(kwargs, cn.PLT_YLABEL, "Rank")
+    self._plot(df, top, fig, ax, is_plot, **kwargs)
 
   def plotImportance(self, top=None, fig=None, ax=None, 
       is_plot=True, **kwargs):
@@ -287,7 +288,8 @@ class ClassifierEnsemble(ClassifierCollection):
     :param dict kwargs: keyword arguments for plot
     """
     df = self.makeImportanceDF()
-    self._plot(df, "Importance", top, fig, ax, is_plot, **kwargs)
+    kwargs = util.setValue(kwargs, cn.PLT_YLABEL, "Importance")
+    self._plot(df, top, fig, ax, is_plot, **kwargs)
 
   def _makeFeatureDF(self, df_values):
     """

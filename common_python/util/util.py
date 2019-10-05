@@ -117,6 +117,20 @@ def getValue(dictionary, key, value):
   else:
     return dictionary[key]
 
+def setValue(dictionary, key, default_value):
+  """
+  Returns an updated dictionary set to the default value if
+  none is present
+  :param dict dictionary:
+  :param object key:
+  :param object default_value:
+  :return dictionary:
+  """
+  value = getValue(dictionary, key, default_value)
+  new_dict = dict(dictionary)
+  new_dict[key] = value
+  return new_dict
+
 def setList(value):
   """
   Sets a list to empty if None.
