@@ -134,7 +134,10 @@ class ClassifierEnsemble(ClassifierCollection):
       raise ValueError("Must pass dataframe indexed by instance")
     #
     indices = df_X.index
-    df_X_sub = df_X[self.columns]
+    try:
+      df_X_sub = df_X[self.columns]
+    except:
+      import pdb; pdb.set_trace()
     array = df_X_sub.values
     array = array.reshape(len(df_X.index), len(df_X_sub.columns)) 
     # Create a dataframe of class predictions
