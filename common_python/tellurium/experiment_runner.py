@@ -29,10 +29,10 @@ class ExperimentRunner(Model):
     """
     super().__init__(model_str, constants, simulation_time, num_points)
     self.noise_std = noise_std
-    self.df_observation, self.ser_time = self.generateObservations()
+    self.df_observation, self.ser_time = self.makeObservations()
     self.df_noisey = None
 
-  def generateObservations(self, parameters=None):
+  def makeObservations(self, parameters=None):
     """
     Creates random observations by adding normally distributed
     noise.
@@ -63,7 +63,7 @@ class ExperimentRunner(Model):
         estimates[constant] = []  # Initialize to empty list
     # Do the analysis multiple times with different observations
     for _ in range(count):
-      self.df_observation, self_df_time = self.generateObservations()
+      self.df_observation, self_df_time = self.makeObservations()
       if parameters is None:
         parameters = lmfit.Parameters()
         for constant in self.constants:

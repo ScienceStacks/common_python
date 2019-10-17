@@ -55,7 +55,7 @@ class TestExperimentRunner(unittest.TestCase):
   def testGenerateObservations(self):
     runner = experiment_runner.ExperimentRunner(MODEL, CONSTANTS,
         SIMULATION_TIME, NUM_POINTS)
-    df, _ = runner.generateObservations()
+    df, _ = runner.makeObservations()
     assert(len(set(df.columns).symmetric_difference(
         runner.df_observation.columns)) == 0)
   
