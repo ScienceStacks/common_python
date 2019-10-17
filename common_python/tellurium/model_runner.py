@@ -1,16 +1,11 @@
 "Runs a tellurium model"
 
-import tellurium as te
-import numpy as np
-import pandas as pd
+import common_python.tellurium.constants as cn
+import common_python.tellurium.util as util
+from common_python.tellurium.model_maker import ModelMaker
+
 import lmfit   # Fitting lib
 import random 
-import matplotlib.pyplot as plt
-
-# Column names
-TIME = 'time'
-MEAN = 'mean'
-STD = 'std'
 
 # Globals
 runner = None
@@ -25,20 +20,12 @@ def residuals(parameters):
   """
   df_sim_data, _ = runner.runSimulation(parameters=parameters)
   df_residuals = runner.df_observation - df_sim_data
-  ser = dfToSer(df_residuals)
+  ser = util.dfToSer(df_residuals)
   return np.array(ser.tolist())
-
-def dfToSer(df):
-  """
-  Converts a dataframe to a series.
-  :param pd.DataFrame df:
-  :return pd.Series:
-  """
-  return pd.concat([df[c] for c in df.columns])
 
 
 ############ CLASSES ######################
-class ModelRunner(object):
+class ModelRunner(Model):
 
   def __init__(self, model_str, constants,
       simulation_time, num_points, noise_std=0.5):
@@ -48,41 +35,10 @@ class ModelRunner(object):
     :param int simulation_time: length of simulation
     :param int num_points: number of data points
     """
-    self.model_str = model_str
-    self.road_runner = te.loada(self.model_str)
-    self.constants = constants
-    self.simulation_time = simulation_time
-    self.num_points = num_points
+    super().__init__(model_str, constants, simulation_time, num_points)
     self.noise_std = noise_std
     self.df_observation, self.ser_time = self.generateObservations()
-    self.species = self.df_observation.columns.tolist()
     self.df_noisey = None
-
-  def runSimulation(self, parameters=None):
-    """
-    Runs a simulation.
-    :param Parameters parameters: If None, use existing values.
-    :return pd.Series, pd.DataFrame: time, concentrations
-    """
-    self.road_runner.reset()
-    if parameters is not None:
-      # Set the value of constants in the simulation
-      param_dict = parameters.valuesdict()
-      for constant in param_dict.keys():
-        stmt = "runner.road_runner.%s = param_dict['%s']" % (
-            constant, constant)
-        exec(stmt)
-    #
-    data = self.road_runner.simulate(0,
-        self.simulation_time, self.num_points)
-    # Construct the data frames
-    df_alldata = pd.DataFrame(data)
-    columns = [c[1:-1] for c in data.colnames]  # Eliminate square brackets
-    columns[0] = TIME
-    df_alldata.columns = columns
-    ser_time = df_alldata[TIME]
-    df_data = df_alldata[df_alldata.columns[1:]]
-    return df_data, ser_time
 
   def generateObservations(self, parameters=None, std=None):
     """
@@ -107,7 +63,7 @@ class ModelRunner(object):
     Performs multiple fits.
     :param int count: Number of fits to do, each with different
                       noisey data
-    :return pd.DataFrame: columns species; rows are MEAN, STD
+    :return pd.DataFrame: columns species; rows are cn.MEAN, cn.STD
     Assigns value to df_noisey to communicate with func
     """
     if func is None:
@@ -134,7 +90,7 @@ class ModelRunner(object):
            result.params.get(constant).value)
     df_estimates = pd.DataFrame(estimates)
     df_result = pd.DataFrame()
-    df_result[MEAN] = df_estimates.mean(axis=0)
-    df_result[STD] = df_estimates.std(axis=0)
+    df_result[cn.MEAN] = df_estimates.mean(axis=0)
+    df_result[cn.STD] = df_estimates.std(axis=0)
     return df_result
         
