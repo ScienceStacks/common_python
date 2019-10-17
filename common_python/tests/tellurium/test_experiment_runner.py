@@ -43,47 +43,29 @@ NUM_POINTS = 5
 COLUMN1S = ['time', 'A', 'B']
 
 
-class TestModelRunner(unittest.TestCase):
+class TestExperimentRunner(unittest.TestCase):
 
   def testConstructor(self):
-    runner = experiment_runner.ModelRunner(MODEL, CONSTANTS,
+    runner = experiment_runner.ExperimentRunner(MODEL, CONSTANTS,
         SIMULATION_TIME, NUM_POINTS)
     trues = [c in COLUMNS for c in runner.df_observation.columns]
     assert(all(trues))
     assert(len(runner.df_observation) > 0)
   
   def testGenerateObservations(self):
-    runner = experiment_runner.ModelRunner(MODEL, CONSTANTS,
+    runner = experiment_runner.ExperimentRunner(MODEL, CONSTANTS,
         SIMULATION_TIME, NUM_POINTS)
-    df, _ = runner.generateObservations(std=0.1)
+    df, _ = runner.generateObservations()
     assert(len(set(df.columns).symmetric_difference(
         runner.df_observation.columns)) == 0)
   
-  def testResiduals(self):
-    runner = experiment_runner.ModelRunner(MODEL, CONSTANTS,
-        SIMULATION_TIME, NUM_POINTS)
-    runner.df_observation, _ = runner.generateObservations(std=0.1)
-    experiment_runner.runner = runner
-    parameters = lmfit.Parameters()
-    for constant in CONSTANTS:
-      parameters.add(constant, value=1, min=0, max=10)
-    residuals = experiment_runner.residuals(parameters)
-    assert(len(residuals) ==  \
-        NUM_POINTS*len(runner.df_observation.columns))
-  
   def testFit(self):
     for constants, model in [(CONSTANTS, MODEL), (CONSTANT1S, MODEL1)]:
-      runner = experiment_runner.ModelRunner(model, constants,
+      runner = experiment_runner.ExperimentRunner(model, constants,
           SIMULATION_TIME, NUM_POINTS, noise_std=0.0)
       df = runner.fit(count=20)
       assert(len(df.columns) == 2)
       assert(len(df) == len(constants))
-  
-  def testDfToSer(self):
-    data = range(5)
-    df = pd.DataFrame({'a': data, 'b': [2*d for d in data]})
-    ser = experiment_runner.dfToSer(df)
-    assert(len(ser) == len(df.columns)*len(df))
 
 
 if __name__ == '__main__':

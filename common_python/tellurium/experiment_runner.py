@@ -5,6 +5,8 @@ import common_python.tellurium.util as util
 from common_python.tellurium.model import Model
 
 import lmfit   # Fitting lib
+import pandas as pd
+import numpy as np
 import random 
 
 
@@ -44,10 +46,11 @@ class ExperimentRunner(Model):
     df = df.applymap(lambda v: 0 if v < 0 else v)
     return df, ser_time
   
-  # FIXME: Allow for specifying min/max for constants 
-  def fit(self, count=1, method='leastsq'):
+  def fit(self, parameters=None, count=1, method='leastsq'):
     """
     Performs multiple fits.
+    :param lmfit.Parameters parameters: parameters to fit or use default.
+                                        default: set to 1
     :param int count: Number of fits to do, each with different
                       noisey data
     :return pd.DataFrame: columns species; rows are cn.MEAN, cn.STD
@@ -61,9 +64,10 @@ class ExperimentRunner(Model):
     # Do the analysis multiple times with different observations
     for _ in range(count):
       self.df_observation, self_df_time = self.generateObservations()
-      parameters = lmfit.Parameters()
-      for constant in self.constants:
-          parameters.add(constant, value=1, min=0, max=10)
+      if parameters is None:
+        parameters = lmfit.Parameters()
+        for constant in self.constants:
+            parameters.add(constant, value=1, min=0, max=10)
       # Create the minimizer
       fitter = lmfit.Minimizer(residuals, parameters)
       result = fitter.minimize (method=method)
