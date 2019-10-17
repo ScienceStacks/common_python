@@ -9,6 +9,10 @@ import pandas as pd
 import numpy as np
 import random 
 
+PARAMETER_DEFAULT_MIN = 0
+PARAMETER_DEFAULT_MAX = 10
+PARAMETER_DEFAULT_VALUE = 1
+
 
 ############ CLASSES ######################
 class ExperimentRunner(Model):
@@ -54,6 +58,8 @@ class ExperimentRunner(Model):
     :param int count: Number of fits to do, each with different
                       noisey data
     :return pd.DataFrame: columns species; rows are cn.MEAN, cn.STD
+    GLOBALS
+      self.parameters - set to final fitted value
     """
     def residuals(parameters):
       return self.calcResiduals(self.df_observation, parameters=parameters)
@@ -65,9 +71,7 @@ class ExperimentRunner(Model):
     for _ in range(count):
       self.df_observation, self_df_time = self.makeObservations()
       if parameters is None:
-        parameters = lmfit.Parameters()
-        for constant in self.constants:
-            parameters.add(constant, value=1, min=0, max=10)
+        parameters = self._makeParameters()
       # Create the minimizer
       fitter = lmfit.Minimizer(residuals, parameters)
       result = fitter.minimize (method=method)
@@ -78,4 +82,24 @@ class ExperimentRunner(Model):
     df_result = pd.DataFrame()
     df_result[cn.MEAN] = df_estimates.mean(axis=0)
     df_result[cn.STD] = df_estimates.std(axis=0)
+    self.parameters = self._makeParameters(
+        df_result[cn.MEAN].tolist())
     return df_result
+
+  def _makeParameters(self, values=None, mins=None, maxs=None):
+    """
+    :return Parameters: parameters for constants
+    """
+    def get(a_list, idx, default):
+      if a_list is None:
+        return default
+      else:
+        return a_list[idx]
+    #
+    parameters = lmfit.Parameters()
+    for idx, constant in enumerate(self.constants):
+        parameters.add(constant,
+            value=get(values, idx, PARAMETER_DEFAULT_VALUE),
+            min=get(mins, idx, PARAMETER_DEFAULT_MIN),
+            max=get(maxs, idx, PARAMETER_DEFAULT_MAX))
+    return parameters

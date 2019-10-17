@@ -23,19 +23,22 @@ class Model(object):
   """
 
   def __init__(self, model_str, constants,
-      simulation_time, num_points):
+      simulation_time, num_points, parameters=None):
     """
     :param str model_str: Antimony model
     :param list-str constants: list of constants to fit in model
     :param int simulation_time: length of simulation
     :param int num_points: number of data points
+    :param lmfit.Parameters parameters:
     """
     self.model_str = model_str
     self.road_runner = te.loada(self.model_str)
     self.constants = constants
     self.simulation_time = simulation_time
     self.num_points = num_points
-    self.df_data, self.ser_time = self.runSimulation()
+    self.parameters = parameters
+    self.df_data, self.ser_time = self.runSimulation(
+        parameters=self.parameters)
     self.species = self.df_data.columns.tolist()
 
   def runSimulation(self, parameters=None):
@@ -76,7 +79,9 @@ class Model(object):
     """
     if model is None:
       model = self
-    df_species_data, _ = model.runSimulation(parameters=parameters)
+    self.parameters = parameters
+    df_species_data, _ = model.runSimulation(
+        parameters=self.parameters)
     df_residuals = df_observation - df_species_data
     ser = util.dfToSer(df_residuals)
     return np.array(ser.tolist())
@@ -106,4 +111,14 @@ class Model(object):
     plt.xlabel("Time")
     plt.ylabel("Concentration")
     plt.legend(self.species)
+
+  def print(self):
+    """
+    Prints the model
+    """
+    print(self.model_str)
+
+  # TODO: Implement a pickle serializaiton?
+  def serialize(self):
+    pass
     
