@@ -3,27 +3,31 @@
 import common_python.tellurium.constants as cn
 import common_python.tellurium.util as util
 
-import tellurium as te
+import lmfit
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
-# Globals
-runner = None
+import tellurium as te
 
 
 ############ CLASSES ######################
 class Model(object):
   """
   Abstraction for creating a simulation that can be run repeatedly
-  with making changes to parameters.
+  with making changes to parameters. Maintains the value of
+  the data, time, and parameters
   Key methods:
     runSimulation() - calculates values for species and times
     calcResiduals() - calculates residuals w.r.t. observations
+  Key state:
+    self.parameters - parameter value changes
+    self.ser_time - time
+    self.df_data - species concentrations
+    self.species - chemical species
   """
 
   def __init__(self, model_str, constants,
-      simulation_time, num_points, parameters=None):
+      simulation_time, num_points, parameters=lmfit.Parameters()):
     """
     :param str model_str: Antimony model
     :param list-str constants: list of constants to fit in model
@@ -37,8 +41,7 @@ class Model(object):
     self.simulation_time = simulation_time
     self.num_points = num_points
     self.parameters = parameters
-    self.df_data, self.ser_time = self.runSimulation(
-        parameters=self.parameters)
+    self.df_data, self.ser_time = self.runSimulation()
     self.species = self.df_data.columns.tolist()
 
   def runSimulation(self, parameters=None):
@@ -46,17 +49,18 @@ class Model(object):
     Runs a simulation.
     :param Parameters parameters: If None, use existing values.
     :return pd.Series, pd.DataFrame: time, concentrations
-    Notes:
-      1. Updates self.df_data, self.ser_time
+    Instance variables modified:
+        self.df_data, self.ser_time, self.parameters
     """
     self.road_runner.reset()
     if parameters is not None:
-      # Set the value of constants in the simulation
-      param_dict = parameters.valuesdict()
-      for constant in param_dict.keys():
-        stmt = "self.road_runner.%s = param_dict['%s']" % (
-            constant, constant)
-        exec(stmt)
+      self.parameters = parameters
+    # Set the value of constants in the simulation
+    param_dict = self.parameters.valuesdict()
+    for constant in param_dict.keys():
+      stmt = "self.road_runner.%s = param_dict['%s']" % (
+          constant, constant)
+      exec(stmt)
     #
     data = self.road_runner.simulate(0,
         self.simulation_time, self.num_points)
@@ -79,9 +83,7 @@ class Model(object):
     """
     if model is None:
       model = self
-    self.parameters = parameters
-    df_species_data, _ = model.runSimulation(
-        parameters=self.parameters)
+    df_species_data, _ = model.runSimulation(parameters=parameters)
     df_residuals = df_observation - df_species_data
     ser = util.dfToSer(df_residuals)
     return np.array(ser.tolist())

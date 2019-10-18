@@ -24,14 +24,16 @@ class ExperimentRunner(Model):
   """
 
   def __init__(self, model_str, constants,
-      simulation_time, num_points, noise_std=0.5):
+      simulation_time, num_points, noise_std=0.5, **kwargs):
     """
     :param str model_str: Antimony model
     :param list-str constants: list of constants to fit in model
     :param int simulation_time: length of simulation
     :param int num_points: number of data points
+    :param dict kwargs: keyword arguments for Model
     """
-    super().__init__(model_str, constants, simulation_time, num_points)
+    super().__init__(model_str, constants, simulation_time, 
+        num_points, **kwargs)
     self.noise_std = noise_std
     self.df_observation, self.ser_time = self.makeObservations()
     self.df_noisey = None
