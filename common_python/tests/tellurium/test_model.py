@@ -65,8 +65,10 @@ class TestModel(unittest.TestCase):
 
   def testCalcResiduals(self):
     df, _ = self.model.runSimulation()
-    residuals = self.model.calcResiduals(df)
+    result = self.model.calcResiduals(df)
+    residuals = result[0]
     self.assertTrue(all([r == 0 for r in residuals]))
+    self.assertEqual(result[1], 1.0)
 
   def testPlotResiduals(self):
     df, _ = self.model.runSimulation()

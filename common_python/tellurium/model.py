@@ -73,23 +73,36 @@ class Model(object):
     self.df_data = df_alldata[df_alldata.columns[1:]]
     return self.df_data, self.ser_time
 
-  def calcResiduals(self, df_observation, model=None, parameters=None):
+  def calcResiduals(self, df_observation, model=None, 
+      parameters=None, indices=None):
     """
     Calculates residuals for a model specified by the parameters.
     :param pd.DataFrame df_observation: observational data over time
     :param Model model: model to run. Default is parent.
     :param lmfit.Parameters parameters: parameters
-    :return list-float: residuals
+    :return list-float, float: residuals, rsq
     """
+    def trimRows(df, indices):
+      dfindices = [df.index.tolist()[i] for i in indices]
+      return df.loc[dfindices, :]
+    #
     if model is None:
       model = self
+    if indices is None:
+      indices = [i for i in range(self.num_points)]
     df_species_data, _ = model.runSimulation(parameters=parameters)
+    df_species_data = trimRows(df_species_data, indices)
+    df_observation = trimRows(df_observation, indices)
     df_residuals = df_observation - df_species_data
-    ser = util.dfToSer(df_residuals)
-    return np.array(ser.tolist())
+    ser_res = util.dfToSer(df_residuals)
+    res = np.array(ser_res.tolist())
+    ser_obs = util.dfToSer(df_observation)
+    obs = np.array(ser_obs.tolist())
+    rsq = 1 - np.var(res)/np.var(obs)
+    return res, rsq
 
   def plotResiduals(self, df_observation, is_plot=True, **kwargs):
-    residuals = self.calcResiduals(df_observation, **kwargs)
+    residuals = self.calcResiduals(df_observation, **kwargs)[0]
     plt.scatter(range(len(residuals)), residuals)
     plt.plot([0, len(residuals)], [0, 0],
         color='blue')
