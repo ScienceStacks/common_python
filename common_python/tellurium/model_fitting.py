@@ -1,10 +1,11 @@
 '''Cross validation codes.'''
 
-import tellurium as te
-import numpy as np
 import lmfit   # Fitting lib
+import matplotlib.pyplot as plt
+import numpy as np
 import math
 import random 
+import tellurium as te
 
 
 
@@ -32,16 +33,18 @@ SIM_TIME = 30
 
 
 ############## FUNCTIONS ######################
-def reshapeData(matrix, indices=None, first_col=0):
+def reshapeData(matrix, indices=None):
   """
   Re-structures matrix as an array for just the rows
   in indices.
+  :param array matrix: matrix of data
+  :param list-int indices: indexes to include in reshape
   """
   if indices is None:
     nrows = np.shape(matrix)[0]
     indices = range(nrows)
-  num_columns = np.shape(matrix)[1] - first_col
-  trimmed_matrix = matrix[indices, first_col:]
+  num_columns = np.shape(matrix)[1]
+  trimmed_matrix = matrix[indices, :]
   return np.reshape(trimmed_matrix, num_columns*len(indices))
 
 def arrayDifference(matrix1, matrix2, indices=None):
@@ -66,16 +69,46 @@ def calcRsq(observations, estimates, indices=None):
   array_observations = reshapeData(observations, indices=indices)
   return 1 - np.var(array_residuals)/np.var(array_observations)
 
-def makeParameters(constants=CONSTANTS,
-     values=np.repeat(1, len(CONSTANTS)),
-     mins=np.repeat(0, len(CONSTANTS)),
-     maxs=np.repeat(10, len(CONSTANTS)),
-  ):
+def makeParameters(constants=CONSTANTS, values=1, mins=0, maxs=10):
+  """
+  Constructs parameters for the constants provided.
+  :param list-str constants: names of parameters
+  :param list-float values: initial value of parameter
+                            if not list, the value for list
+  :param list-float mins: minimum values
+                            if not list, the value for list
+  :param list-float maxs: maximum values
+                            if not list, the value for list
+  """
+  def makeList(val, list_length):
+    if isinstance(val, list):
+      return val
+    else:
+      return list(np.repeat(val, list_length))
+  # 
+  values = makeList(values, len(constants))
+  mins = makeList(mins, len(constants))
+  maxs = makeList(maxs, len(constants))
   parameters = lmfit.Parameters()
   for idx, constant in enumerate(constants):
     parameters.add(constant,
         value=values[idx], min=mins[idx], max=maxs[idx])
   return parameters
+
+def makeAverageParameters(list_parameters):
+  """
+  Averages the values of parameters in a list.
+  :param list-lmfit.Parameters list_parameters:
+  :return lmfit.Parameters:
+  """
+  result_parameters = lmfit.Parameters()
+  names = list_parameters[0].valuesdict().keys()
+  for name in names:
+    values = []
+    for parameters in list_parameters:
+      values.append(parameters.valuesdict()[name])
+    result_parameters.add(name, value=np.mean(values))
+  return result_parameters
 
 def runSimulation(sim_time=SIM_TIME, 
     num_points=NUM_POINTS, parameters=None,
@@ -100,6 +133,27 @@ def runSimulation(sim_time=SIM_TIME,
       stmt = "road_runner.%s = parameter_dict['%s']" % (constant, constant)
       exec(stmt)
   return road_runner.simulate (0, sim_time, num_points)
+
+def plotTimeSeries(data, is_scatter=False, title="", 
+    columns=None, is_plot=True):
+  """
+  Constructs a time series plot of simulation data.
+  :param array data: first column is time
+  :param bool is_scatter: do a scatter plot
+  :param str title: plot title
+  """
+  if is_scatter:
+    plt.plot (data[:, 0], data[:, 1:], marker='*', linestyle='None')
+  else:
+    plt.plot (data[:, 0], data[:, 1:])
+  plt.title(title)
+  plt.xlabel("Time")
+  plt.ylabel("Concentration")
+  if columns is None:
+    columns = np.repeat("", np.shape(data)[1])
+  plt.legend(columns)
+  if is_plot:
+    plt.show() 
 
 def foldGenerator(num_points, num_folds):
   """
@@ -145,14 +199,15 @@ def fit(obs_data, indices=None, parameters=PARAMETERS, method='leastsq',
     **kwargs):
   """
   Does a fit of the model to the observations.
-  :param ndarray obs_data: matrix of observed (non-time) values
+  :param ndarray obs_data: matrix of observed values with time
+                           as the first column
   :param list-int indices: indices on which fit is performed
   :param lmfit.Parameters parameters: parameters fit
   :param str method: optimization method
   :param dict kwargs: optional parameters passed to runSimulation
   :return lmfit.Parameters:
   """
-  def calcSimulationResiduals(parameters, **kwargs):
+  def calcSimulationResiduals(parameters):
     """
     Runs a simulation with the specified parameters and calculates residuals
     for the train_indices.
@@ -160,45 +215,48 @@ def fit(obs_data, indices=None, parameters=PARAMETERS, method='leastsq',
     :param dict kwargs: optional parameters passed to simulation
     """
     sim_data = runSimulation(parameters=parameters, **kwargs)
-    sim_data = sim_data[:, 1:]  # Skip time
-    residuals = arrayDifference(obs_data, sim_data, indices=indices)
+    residuals = arrayDifference(obs_data[:, 1:], sim_data[:, 1:],
+        indices=indices)
     return residuals
   # Estimate the parameters for this fold
   fitter = lmfit.Minimizer(calcSimulationResiduals, parameters)
   fitter_result = fitter.minimize(method=method)
   return fitter_result.params
 
-def cross_validate(obs_data, model=MODEL, sim_time=SIM_TIME,
+def crossValidate(obs_data, sim_time=SIM_TIME,
     num_points=NUM_POINTS, parameters=PARAMETERS,
-    num_folds=3):
+    num_folds=3, **kwargs):
   """
   Performs cross validation on an antimony model.
-  :param ndarray obs_data: data to fit; columns are species; rows are time instances
-  :param str model: antimony model
+  :param ndarray obs_data: data to fit; 
+                           columns are species; 
+                           rows are time instances
+                           first column is time
   :param int sim_time: length of simulation run
   :param int num_points: number of time points produced.
   :param lmfit.Parameters: parameters to be estimated
+  :param dict kwargs: optional arguments used in simulation
   :return list-lmfit.Parameters, list-float: parameters and RSQ from folds
   """
   # Iterate for for folds
-  fold_generator = foldGenerator(num_points, num_folds)  # Create the iterator object
+  fold_generator = foldGenerator(num_points, num_folds)
   result_parameters = []
   result_rsqs = []
   for train_indices, test_indices in fold_generator:
     # This function is defined inside the loop because it references a loop variable
     new_parameters = parameters.copy()
-    fitter_result = fit(obs_data, model=MODEL,
-      indices=None, parameters=new_parameters,
+    fitted_parameters = fit(obs_data,
+      indices=train_indices, parameters=new_parameters,
       sim_time=SIM_TIME, num_points=NUM_POINTS,
-      road_runner=ROAD_RUNNER)
-    result_parameters.append(fitter_result.params)
+      **kwargs)
+    result_parameters.append(fitted_parameters)
     # Run the simulation using
     # the parameters estimated using the training data.
-    test_estimates = runSimulation(sim_time, num_points,
-        model=model, road_runner=road_runner,
-        parameters=fitter_result.params)
-    test_estimates = test_estimates[:, 1:]
+    test_estimates = runSimulation(sim_time=sim_time,
+        num_points=num_points,
+        parameters=fitted_parameters, **kwargs)
     # Calculate RSQ
-    rsq = calcRsq(obs_data, test_estimates, indices=test_indices)
+    rsq = calcRsq(obs_data[:, 1:], test_estimates[:, 1:],
+        indices=test_indices)
     result_rsqs.append(rsq)
   return result_parameters, result_rsqs

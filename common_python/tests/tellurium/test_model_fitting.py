@@ -6,6 +6,7 @@ import lmfit
 import numpy as np
 
 ############ CONSTANTS #############
+IS_PLOT = False
 NROWS = 10
 NROWS_SUBSET = 5
 NCOLS = 3
@@ -57,9 +58,22 @@ def testCalcRsq():
   assert(np.abs(var_est - var_exp) < 0.5)
 
 def testMakeParameters():
-  parameters = model_fitting.makeParameters(model_fitting.CONSTANTS)
-  assert(len(parameters.valuesdict()) == len(model_fitting.CONSTANTS))
- 
+  constants =  ['k1', 'k2', 'k3']
+  parameters = model_fitting.makeParameters(constants=constants)
+  assert(len(parameters.valuesdict()) == len(constants))
+
+def testMakeAverageParameters():
+  """
+  Constructs parameter values that are the average of existing parameters.
+  """
+  list_parameters = [TEST_PARAMETERS, TEST_PARAMETERS]
+  average_parameters = model_fitting.makeAverageParameters(
+      list_parameters)
+  test_dict = TEST_PARAMETERS.valuesdict()
+  result_dict = average_parameters.valuesdict()
+  for name in test_dict.keys():
+    assert(test_dict[name] == result_dict[name])
+
 def testRunSimulation():
   data1 = model_fitting.runSimulation() 
   assert(data1[-1, 0] == model_fitting.SIM_TIME)
@@ -70,37 +84,58 @@ def testRunSimulation():
     for j in range(ncols):
       assert(np.isclose(data1[i,j], data2[i,j]))
 
+def testPlotTimeSeries():
+  # Smoke test only
+  data = model_fitting.runSimulation() 
+  model_fitting.plotTimeSeries(data, is_plot=IS_PLOT)
+  model_fitting.plotTimeSeries(data, is_scatter=True, is_plot=IS_PLOT)
+  
+
 def testMakeObservations():
   obs_data = model_fitting.makeObservations(
       num_points=model_fitting.NUM_POINTS,
       road_runner=model_fitting.ROAD_RUNNER)
-  obs_data = obs_data[:, 1:]
   data = model_fitting.runSimulation(
       num_points=model_fitting.NUM_POINTS,
       road_runner=model_fitting.ROAD_RUNNER)
   data = data[:, 1:]
   nrows, _ = np.shape(data)
   assert(nrows == model_fitting.NUM_POINTS)
-  std = np.sqrt(np.var(model_fitting.arrayDifference(obs_data, data)))
+  std = np.sqrt(np.var(model_fitting.arrayDifference(
+      obs_data[:, 1:], data)))
   assert(std < 3*model_fitting.NOISE_STD)
   assert(std > model_fitting.NOISE_STD/3.0)
 
 def testFit():
   obs_data = model_fitting.makeObservations()
-  parameters = model_fitting.fit(obs_data[:, 1:])
+  parameters = model_fitting.fit(obs_data)
   param_dict = dict(parameters.valuesdict())
   expected_param_dict = dict(model_fitting.PARAMETERS.valuesdict())
   diff = set(param_dict.keys()).symmetric_difference(
       expected_param_dict.keys())
   assert(len(diff) == 0)
-  
+
+def testCrossValidate():
+  obs_data = model_fitting.makeObservations(
+      parameters=TEST_PARAMETERS)
+  results_parameters, results_rsq = model_fitting.crossValidate(
+      obs_data)
+  parameters_avg = model_fitting.makeAverageParameters(
+      results_parameters)
+  params_dict = parameters_avg.valuesdict()
+  for name in params_dict.keys():
+    assert(np.abs(params_dict[name]  \
+    - TEST_PARAMETERS.valuesdict()[name]) < 2*params_dict[name])
   
 if __name__ == '__main__':
   testReshapeData() 
   testArrayDifference() 
   testCalcRsq()
   testMakeParameters()
+  testMakeAverageParameters()
   testRunSimulation()
+  testPlotTimeSeries()
   testMakeObservations()
   testFit()
+  testCrossValidate()
   print("OK")
