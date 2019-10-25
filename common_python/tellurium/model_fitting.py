@@ -24,6 +24,7 @@ MODEL = """
 CONSTANTS = ['k1', 'k2']
 NOISE_STD = 0.5
 NUM_POINTS = 10
+KWARGS_NUM_POINTS = "num_points"
 PARAMETERS = lmfit.Parameters()
 PARAMETERS.add('k1', value=1, min=0, max=10)
 PARAMETERS.add('k2', value=1, min=0, max=10)
@@ -131,7 +132,10 @@ def runSimulation(sim_time=SIM_TIME,
     # Set the simulation constants for all parameters
     for constant in parameter_dict.keys():
       stmt = "road_runner.%s = parameter_dict['%s']" % (constant, constant)
-      exec(stmt)
+      try:
+        exec(stmt)
+      except:
+        import pdb; pdb.set_trace()
   return road_runner.simulate (0, sim_time, num_points)
 
 def plotTimeSeries(data, is_scatter=False, title="", 
@@ -186,14 +190,34 @@ def makeObservations(sim_time=SIM_TIME, num_points=NUM_POINTS,
   :return namedarray: simulation results with randomness
   """
   # Create true values
-  data = runSimulation(sim_time=sim_time, num_points=NUM_POINTS, **kwargs)
-  num_cols = len(data.colnames) - 1
+  data = runSimulation(sim_time=sim_time, num_points=num_points,
+      **kwargs)
+  num_cols = len(data.colnames)
   # Add randomness
   for i in range (num_points):
     for j in range(1, num_cols):
       data[i, j] = max(data[i, j]  \
           + np.random.normal(0, noise_std, 1), 0)
   return data
+
+def calcSimulationResiduals(parameters, obs_data, indices=None, **kwargs):
+  """
+  Runs a simulation with the specified parameters and calculates residuals
+  for the train_indices.
+  :param lmfit.Parameters parameters:
+  :param array obs_data: matrix of data, first col is time.
+  :param list-int indices: indices for which calculation is done
+                           if None, then all.
+  :param dict kwargs: optional parameters passed to simulation
+  """
+  if not KWARGS_NUM_POINTS in kwargs.keys():
+    kwargs[KWARGS_NUM_POINTS] = np.shape(obs_data)[0]
+  sim_data = runSimulation(parameters=parameters,
+      **kwargs)
+  length = np.shape(sim_data)[0]
+  residuals = arrayDifference(obs_data[:, 1:], sim_data[:, 1:],
+      indices=indices)
+  return residuals
 
 def fit(obs_data, indices=None, parameters=PARAMETERS, method='leastsq',
     **kwargs):
@@ -207,24 +231,17 @@ def fit(obs_data, indices=None, parameters=PARAMETERS, method='leastsq',
   :param dict kwargs: optional parameters passed to runSimulation
   :return lmfit.Parameters:
   """
-  def calcSimulationResiduals(parameters):
-    """
-    Runs a simulation with the specified parameters and calculates residuals
-    for the train_indices.
-    :param lmfit.Parameters parameters:
-    :param dict kwargs: optional parameters passed to simulation
-    """
-    sim_data = runSimulation(parameters=parameters, **kwargs)
-    residuals = arrayDifference(obs_data[:, 1:], sim_data[:, 1:],
-        indices=indices)
-    return residuals
+  def calcLmfitResiduals(parameters):
+    return calcSimulationResiduals(parameters, obs_data,
+        indices, **kwargs)
+  #
   # Estimate the parameters for this fold
-  fitter = lmfit.Minimizer(calcSimulationResiduals, parameters)
+  fitter = lmfit.Minimizer(calcLmfitResiduals, parameters)
   fitter_result = fitter.minimize(method=method)
   return fitter_result.params
 
 def crossValidate(obs_data, sim_time=SIM_TIME,
-    num_points=NUM_POINTS, parameters=PARAMETERS,
+    num_points=None, parameters=PARAMETERS,
     num_folds=3, **kwargs):
   """
   Performs cross validation on an antimony model.
@@ -238,6 +255,8 @@ def crossValidate(obs_data, sim_time=SIM_TIME,
   :param dict kwargs: optional arguments used in simulation
   :return list-lmfit.Parameters, list-float: parameters and RSQ from folds
   """
+  if num_points is None:
+    num_points = np.shape(obs_data)[0]
   # Iterate for for folds
   fold_generator = foldGenerator(num_points, num_folds)
   result_parameters = []
@@ -247,7 +266,7 @@ def crossValidate(obs_data, sim_time=SIM_TIME,
     new_parameters = parameters.copy()
     fitted_parameters = fit(obs_data,
       indices=train_indices, parameters=new_parameters,
-      sim_time=SIM_TIME, num_points=NUM_POINTS,
+      sim_time=SIM_TIME, num_points=num_points,
       **kwargs)
     result_parameters.append(fitted_parameters)
     # Run the simulation using
@@ -260,3 +279,74 @@ def crossValidate(obs_data, sim_time=SIM_TIME,
         indices=test_indices)
     result_rsqs.append(rsq)
   return result_parameters, result_rsqs
+
+def makeResidualsBySpecies(obs_data, parameters, model, **kwargs):
+  """
+  Calculate residuals for each chemical species.
+  :param np.array obs_data: matrix of observations; first column is time; number of rows is num_points
+  :param lmfit.Parameters parameters:
+  :param dict kwargs: optional arguments to runSimulation
+  :return np.array: matrix of residuals; columns are chemical species
+  """
+  data = runSimulation(parameters=parameters, model=model, **kwargs)
+  residuals = calcSimulationResiduals(parameters, obs_data, 
+      model=model, **kwargs)
+  # Reshape the residuals by species
+  rr = te.loada(model)
+  num_species = rr.getNumFloatingSpecies()
+  nrows = int(len(residuals) / num_species)
+  return np.reshape(residuals, (nrows, num_species))
+
+def makeSyntheticObservations(residual_matrix, **kwargs):
+  """
+  Constructs synthetic observations for the model.
+  :param np.array residual_matrix: matrix of residuals; columns are species; number of rows is num_points
+  :param dict kwargs: optional arguments to runSimulation
+  :return np.array: matrix; first column 
+  """
+  model_data = runSimulation(**kwargs)
+  data = model_data.copy()
+  nrows, ncols = np.shape(data)
+  for icol in range(1, ncols):  # Avoid the time column
+    indices = np.random.randint(0, nrows, nrows)
+    for irow in range(nrows):
+      data[irow, icol] = max(data[irow, icol] + residual_matrix[indices[irow], icol-1], 0)
+  return data
+
+def doBootstrap(residuals_matrix, count=10, **kwargs):
+  """
+  Performs bootstrapping by repeatedly generating synthetic observations.
+  :param np.array residuals_matrix: no time col
+  :param int count: number of iterations in bootstrap
+  :param dict kwargs: optional arguments to runSimulation
+  """
+  list_parameters = []
+  for _ in range(count):
+      obs_data = makeSyntheticObservations(residuals_matrix, **kwargs)
+      parameters = fit(obs_data, **kwargs)
+      list_parameters.append(parameters)
+  return list_parameters
+
+def makeParameterStatistics(list_parameters, confidence_limits=(5, 95)):
+  """
+  Computes the mean and standard deviation of the parameters in a list of parameters.
+  :param list-lmfit.Parameters
+  :param (float, float) confidence_limits: if none, report mean and variance
+  :return dict: key is the parameter name; value is the tuple (mean, stddev) or confidence limits
+  """
+  parameter_statistics = {}  # This is a dictionary that will have the parameter name as key, and mean, std as values
+  parameter_names = list(list_parameters[0].valuesdict().keys())
+  for name in parameter_names:
+    parameter_statistics[name] = []  # We will accumulate values in this list
+    for parameters in list_parameters:
+      parameter_statistics[name].append(parameters.valuesdict()[name])
+  # Calculate the statistics
+  for name in parameter_statistics.keys():
+    if confidence_limits is not None:
+      parameter_statistics[name] = np.percentile(parameter_statistics[name], confidence_limits)
+    else:
+      mean = np.mean(parameter_statistics[name])
+      std = np.std(parameter_statistics[name])
+      std = std/np.sqrt(len(list_parameters))  # adjustments for the standard deviation of the mean
+      parameter_statistics[name] = (mean, std)
+  return parameter_statistics
