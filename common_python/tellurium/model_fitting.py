@@ -40,6 +40,7 @@ SIM_TIME = 30
 DF_CONFIDENCE_INTERVAL = (5, 95)
 DF_BOOTSTRAP_COUNT = 5
 DF_NUM_FOLDS = 3
+DF_METHOD = "least_squares"
 
 
 ############## FUNCTIONS ######################
@@ -140,7 +141,8 @@ def runSimulation(sim_time=SIM_TIME,
     parameter_dict = parameters.valuesdict()
     # Set the simulation constants for all parameters
     for constant in parameter_dict.keys():
-      stmt = "road_runner.%s = parameter_dict['%s']" % (constant, constant)
+      stmt = "road_runner.%s = float(parameter_dict['%s'])" % (
+          constant, constant)
       try:
         exec(stmt)
       except:
@@ -249,7 +251,8 @@ def fit(obs_data, indices=None, parameters=PARAMETERS, method='leastsq',
   fitter_result = fitter.minimize(method=method)
   return fitter_result.params
 
-def crossValidate(obs_data, sim_time=SIM_TIME,
+def crossValidate(obs_data, method=DF_METHOD,
+    sim_time=SIM_TIME,
     num_points=None, parameters=PARAMETERS,
     num_folds=3, **kwargs):
   """
@@ -273,7 +276,7 @@ def crossValidate(obs_data, sim_time=SIM_TIME,
   for train_indices, test_indices in fold_generator:
     # This function is defined inside the loop because it references a loop variable
     new_parameters = parameters.copy()
-    fitted_parameters = fit(obs_data,
+    fitted_parameters = fit(obs_data, method=method,
       indices=train_indices, parameters=new_parameters,
       sim_time=SIM_TIME, num_points=num_points,
       **kwargs)
@@ -322,7 +325,8 @@ def makeSyntheticObservations(residual_matrix, **kwargs):
       data[irow, icol] = max(data[irow, icol] + residual_matrix[indices[irow], icol-1], 0)
   return data
 
-def doBootstrapWithResiduals(residuals_matrix, count=DF_BOOTSTRAP_COUNT, **kwargs):
+def doBootstrapWithResiduals(residuals_matrix, 
+    method=DF_METHOD, count=DF_BOOTSTRAP_COUNT, **kwargs):
   """
   Performs bootstrapping by repeatedly generating synthetic observations.
   :param np.array residuals_matrix: no time col
@@ -332,11 +336,12 @@ def doBootstrapWithResiduals(residuals_matrix, count=DF_BOOTSTRAP_COUNT, **kwarg
   list_parameters = []
   for _ in range(count):
       obs_data = makeSyntheticObservations(residuals_matrix, **kwargs)
-      parameters = fit(obs_data, **kwargs)
+      parameters = fit(obs_data, method=method, **kwargs)
       list_parameters.append(parameters)
   return list_parameters
 
-def doBootstrap(obs_data, model, parameters, count=DF_BOOTSTRAP_COUNT,
+def doBootstrap(obs_data, model, parameters, 
+    method=DF_METHOD, count=DF_BOOTSTRAP_COUNT,
     confidence_limits=DF_CONFIDENCE_INTERVAL, **kwargs):
   """
   Performs bootstrapping by repeatedly generating synthetic observations,
@@ -351,6 +356,7 @@ def doBootstrap(obs_data, model, parameters, count=DF_BOOTSTRAP_COUNT,
   residual_matrix = makeResidualsMatrix(obs_data, model,
       parameters, **kwargs)
   list_parameters = doBootstrapWithResiduals(residual_matrix,
+      method=method,
       count=count, model=model, parameters=parameters, **kwargs)
   return makeParameterStatistics(list_parameters,
       confidence_limits=confidence_limits)

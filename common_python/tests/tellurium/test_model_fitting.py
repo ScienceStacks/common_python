@@ -201,6 +201,31 @@ def testDoBootstrap():
   assert(len(diff) == 0)
   for value in confidence_dict.values():
     assert(len(value) == 2)
+
+def testDoBootstrap2():
+  model0 = """
+       # True model
+       A  -> B + D; k1*A
+       B -> D; k2*B
+       D -> C; k3*A*B
+        
+       A = 5;
+       B = 0;
+       C = 0;
+       D = 0;
+       k1 = 0.08
+       k2 = 0.1
+       k3 = 0.1
+  """
+  num_points = 20
+  sim_time = 20
+  unfitted_parameters = mf.makeParameters(
+      constants=['k1', 'k2', 'k3'])
+  full_obs_data = mf.makeObservations(model=model0, 
+      noise_std=0.3, num_points=num_points, sim_time=sim_time)
+  result = mf.doBootstrap(full_obs_data, 
+      model=model0, parameters=unfitted_parameters, 
+      num_points=num_points, sim_time=sim_time, count=5)
   
  
 def testMakeParameterStatistics():
@@ -220,6 +245,7 @@ def testMakeParameterStatistics():
    
   
 if __name__ == '__main__':
+  testDoBootstrap2()
   if True:
     testReshapeData() 
     testArrayDifference() 
