@@ -112,8 +112,8 @@ def testMakeObservations():
 def testCalcSimulationResiduals():
   obs_data = mf.runSimulation(
       parameters=TEST_PARAMETERS)
-  residuals = mf.calcSimulationResiduals(
-      TEST_PARAMETERS, obs_data)
+  residuals = mf.calcSimulationResiduals(obs_data,
+      TEST_PARAMETERS)
   assert(sum(residuals*residuals) == 0)
 
 def testFit():
@@ -150,13 +150,6 @@ def testCrossValidate2():
     assert(np.abs(params_dict[name]  \
     - TEST_PARAMETERS.valuesdict()[name]) < 2*params_dict[name])
 
-def _getResiduals(num_points, model=mf.MODEL):
-  obs_data = mf.makeObservations(model=model,
-      parameters=TEST_PARAMETERS, num_points=num_points)
-  return mf.makeResidualsBySpecies(obs_data,
-      TEST_PARAMETERS, model=model,
-      num_points=num_points)
-
 def testMakeResidualsBySpecies():
   num_points = 20
   max_val = 10 
@@ -175,10 +168,10 @@ def testMakeSyntheticObservations():
 
 def _makeParameterList(num_points, count, **kwargs):
   residual_matrix = _getResiduals(num_points, model=kwargs['model'])
-  return mf.doBootstrap(residual_matrix, count=count,
+  return mf.doBootstrapWithResiduals(residual_matrix, count=count,
       **kwargs)
 
-def testDoBootstrap():
+def testDoBootstrapWithResiduals():
   num_points = 20
   count = 3
   list_parameters = _makeParameterList(num_points, count,
@@ -186,6 +179,29 @@ def testDoBootstrap():
   assert(len(list_parameters) == count)
   for parameters in list_parameters:
     assert(isinstance(parameters, lmfit.Parameters))
+
+def _getResiduals(num_points, model=mf.MODEL):
+  obs_data = mf.makeObservations(model=model,
+      parameters=TEST_PARAMETERS, num_points=num_points)
+  return mf.makeResidualsMatrix(obs_data, model,
+      TEST_PARAMETERS, num_points=num_points)
+
+def testDoBootstrap():
+  num_points = 20
+  count = 3
+  model = mf.MODEL
+  obs_data = mf.makeObservations(model=model,
+      parameters=TEST_PARAMETERS, num_points=num_points)
+  confidence_dict = mf.doBootstrap(obs_data, model,
+      TEST_PARAMETERS, count=count,
+      num_points=num_points)
+  params_dict = TEST_PARAMETERS.valuesdict()
+  diff = set(params_dict.keys()).symmetric_difference(
+      confidence_dict.keys())
+  assert(len(diff) == 0)
+  for value in confidence_dict.values():
+    assert(len(value) == 2)
+  
  
 def testMakeParameterStatistics():
   num_points = 20
@@ -204,7 +220,6 @@ def testMakeParameterStatistics():
    
   
 if __name__ == '__main__':
-  testMakeParameterStatistics()
   if True:
     testReshapeData() 
     testArrayDifference() 
@@ -220,5 +235,7 @@ if __name__ == '__main__':
     testCrossValidate2()
     testMakeResidualsBySpecies()
     testMakeSyntheticObservations()
+    testDoBootstrapWithResiduals()
     testDoBootstrap()
+    testMakeParameterStatistics()
   print("OK")

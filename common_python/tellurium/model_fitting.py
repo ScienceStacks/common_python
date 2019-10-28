@@ -1,5 +1,10 @@
 '''Cross validation codes.'''
 
+"""
+kwargs: keyword arguments to runSimulation
+order of positional arguments: obs_data, model, parameters
+"""
+
 import lmfit   # Fitting lib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -30,7 +35,11 @@ PARAMETERS.add('k1', value=1, min=0, max=10)
 PARAMETERS.add('k2', value=1, min=0, max=10)
 ROAD_RUNNER = None
 SIM_TIME = 30
-#ROAD_RUNNER = te.loada(MODEL)
+
+# Default parameters values
+DF_CONFIDENCE_INTERVAL = (5, 95)
+DF_BOOTSTRAP_COUNT = 5
+DF_NUM_FOLDS = 3
 
 
 ############## FUNCTIONS ######################
@@ -200,12 +209,12 @@ def makeObservations(sim_time=SIM_TIME, num_points=NUM_POINTS,
           + np.random.normal(0, noise_std, 1), 0)
   return data
 
-def calcSimulationResiduals(parameters, obs_data, indices=None, **kwargs):
+def calcSimulationResiduals(obs_data, parameters, indices=None, **kwargs):
   """
   Runs a simulation with the specified parameters and calculates residuals
   for the train_indices.
-  :param lmfit.Parameters parameters:
   :param array obs_data: matrix of data, first col is time.
+  :param lmfit.Parameters parameters:
   :param list-int indices: indices for which calculation is done
                            if None, then all.
   :param dict kwargs: optional parameters passed to simulation
@@ -232,7 +241,7 @@ def fit(obs_data, indices=None, parameters=PARAMETERS, method='leastsq',
   :return lmfit.Parameters:
   """
   def calcLmfitResiduals(parameters):
-    return calcSimulationResiduals(parameters, obs_data,
+    return calcSimulationResiduals(obs_data, parameters,
         indices, **kwargs)
   #
   # Estimate the parameters for this fold
@@ -280,7 +289,7 @@ def crossValidate(obs_data, sim_time=SIM_TIME,
     result_rsqs.append(rsq)
   return result_parameters, result_rsqs
 
-def makeResidualsBySpecies(obs_data, parameters, model, **kwargs):
+def makeResidualsMatrix(obs_data, model, parameters, **kwargs):
   """
   Calculate residuals for each chemical species.
   :param np.array obs_data: matrix of observations; first column is time; number of rows is num_points
@@ -289,7 +298,7 @@ def makeResidualsBySpecies(obs_data, parameters, model, **kwargs):
   :return np.array: matrix of residuals; columns are chemical species
   """
   data = runSimulation(parameters=parameters, model=model, **kwargs)
-  residuals = calcSimulationResiduals(parameters, obs_data, 
+  residuals = calcSimulationResiduals(obs_data, parameters,
       model=model, **kwargs)
   # Reshape the residuals by species
   rr = te.loada(model)
@@ -302,7 +311,7 @@ def makeSyntheticObservations(residual_matrix, **kwargs):
   Constructs synthetic observations for the model.
   :param np.array residual_matrix: matrix of residuals; columns are species; number of rows is num_points
   :param dict kwargs: optional arguments to runSimulation
-  :return np.array: matrix; first column 
+  :return np.array: matrix; first column is time
   """
   model_data = runSimulation(**kwargs)
   data = model_data.copy()
@@ -313,7 +322,7 @@ def makeSyntheticObservations(residual_matrix, **kwargs):
       data[irow, icol] = max(data[irow, icol] + residual_matrix[indices[irow], icol-1], 0)
   return data
 
-def doBootstrap(residuals_matrix, count=10, **kwargs):
+def doBootstrapWithResiduals(residuals_matrix, count=DF_BOOTSTRAP_COUNT, **kwargs):
   """
   Performs bootstrapping by repeatedly generating synthetic observations.
   :param np.array residuals_matrix: no time col
@@ -327,7 +336,27 @@ def doBootstrap(residuals_matrix, count=10, **kwargs):
       list_parameters.append(parameters)
   return list_parameters
 
-def makeParameterStatistics(list_parameters, confidence_limits=(5, 95)):
+def doBootstrap(obs_data, model, parameters, count=DF_BOOTSTRAP_COUNT,
+    confidence_limits=DF_CONFIDENCE_INTERVAL, **kwargs):
+  """
+  Performs bootstrapping by repeatedly generating synthetic observations,
+  calculating the residuals as well.
+  :param array obs_data: matrix of data, first col is time.
+  :param str model:
+  :param lmfit.Parameters parameters:
+  :param int count: number of iterations in bootstrap
+  :param dict kwargs: optional arguments to runSimulation
+  :return dict: confidence limits
+  """
+  residual_matrix = makeResidualsMatrix(obs_data, model,
+      parameters, **kwargs)
+  list_parameters = doBootstrapWithResiduals(residual_matrix,
+      count=count, model=model, parameters=parameters, **kwargs)
+  return makeParameterStatistics(list_parameters,
+      confidence_limits=confidence_limits)
+
+def makeParameterStatistics(list_parameters,
+    confidence_limits=DF_CONFIDENCE_INTERVAL):
   """
   Computes the mean and standard deviation of the parameters in a list of parameters.
   :param list-lmfit.Parameters
