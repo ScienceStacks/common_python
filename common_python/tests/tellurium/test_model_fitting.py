@@ -245,7 +245,6 @@ def testMakeParameterStatistics():
    
   
 if __name__ == '__main__':
-  testDoBootstrap2()
   if True:
     testReshapeData() 
     testArrayDifference() 
@@ -263,5 +262,6 @@ if __name__ == '__main__':
     testMakeSyntheticObservations()
     testDoBootstrapWithResiduals()
     testDoBootstrap()
+    testDoBootstrap2()
     testMakeParameterStatistics()
   print("OK")
