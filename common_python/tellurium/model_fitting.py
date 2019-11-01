@@ -122,21 +122,31 @@ def makeAverageParameters(list_parameters):
   return result_parameters
 
 def runSimulation(sim_time=SIM_TIME, 
-    num_points=NUM_POINTS, parameters=None,
-    road_runner=ROAD_RUNNER, model=MODEL):
+    num_points=NUM_POINTS, road_runner=ROAD_RUNNER,
+    **kwargs):
   """
   Runs the simulation model rr for the parameters.
   :param int sim_time: time to run the simulation
   :param int num_points: number of timepoints simulated
-  :param lmfit.Parameters parameters:
   :param ExtendedRoadRunner road_runner:
-  :param str model:
+  :param dict kwargs: parameters used in makeSimulation
   :return named_array:
   """
   if road_runner is None:
-     road_runner = te.loada(model)
+     road_runner = makeSimulation(**kwargs)
   else:
     road_runner.reset()
+  return road_runner.simulate (0, sim_time, num_points)
+
+def makeSimulation(parameters=None, model=MODEL):
+  """
+  Creates an road runner instance for the simulation.
+  :param lmfit.Parameters parameters:
+  :param str model:
+  :return ExtendedRoadRunner:
+  """
+  road_runner = te.loada(model)
+  road_runner.reset()
   if parameters is not None:
     parameter_dict = parameters.valuesdict()
     # Set the simulation constants for all parameters
@@ -147,7 +157,7 @@ def runSimulation(sim_time=SIM_TIME,
         exec(stmt)
       except:
         import pdb; pdb.set_trace()
-  return road_runner.simulate (0, sim_time, num_points)
+  return road_runner
 
 def plotTimeSeries(data, is_scatter=False, title="", 
     columns=None, is_plot=True):
