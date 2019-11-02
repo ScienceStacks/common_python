@@ -17,6 +17,7 @@ import common_python.constants as cn
 from common_python.util import util
 from common_python.classifier.classifier_collection  \
     import ClassifierCollection
+from common_python.util import persister
 
 import collections
 import copy
@@ -308,3 +309,21 @@ class ClassifierEnsemble(ClassifierCollection):
     df_result.index = df_values.index
     df_result[cn.STERR] = df_result[cn.STD] / np.sqrt(len(self.clfs))
     return df_result
+
+  def exportEnsembleFile(self, file_path):
+    """
+    Exports the classifiers
+    :param str file_path:
+    """
+    exporter = persister.Persister(file_path)
+    exporter.set(self)
+
+  @classmethod
+  def importEnsembleFile(cls, file_path):
+    """
+    Imports the classifiers
+    :param str file_path:
+    :return ClassifierEnsemble:
+    """
+    exporter = persister.Persister(file_path)
+    return exporter.get()

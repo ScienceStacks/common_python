@@ -4,6 +4,7 @@ import os
 
 CODE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR = os.path.join(CODE_DIR, "tests")
+ENSEMBLE_PATH = os.path.join(CODE_DIR, "ensemble_file.pcl")
 
 # Column names
 COUNT = "count"  # A count
