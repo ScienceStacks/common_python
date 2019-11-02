@@ -310,7 +310,7 @@ class ClassifierEnsemble(ClassifierCollection):
     df_result[cn.STERR] = df_result[cn.STD] / np.sqrt(len(self.clfs))
     return df_result
 
-  def exportEnsembleFile(self, file_path):
+  def serialize(self, file_path):
     """
     Exports the classifiers
     :param str file_path:
@@ -319,7 +319,7 @@ class ClassifierEnsemble(ClassifierCollection):
     exporter.set(self)
 
   @classmethod
-  def importEnsembleFile(cls, file_path):
+  def deserialize(cls, file_path):
     """
     Imports the classifiers
     :param str file_path:

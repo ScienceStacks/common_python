@@ -213,12 +213,12 @@ class TestClassifierEnsemble(unittest.TestCase):
     expected = 1/SIZE
     self.assertLess(abs(score- expected), 0.1)
 
-  def testExportAndExport(self):
+  def testSerializeAndDeserialize(self):
     if IGNORE_TEST:
       return
     self.svm_ensemble.fit(self.df_X, self.ser_y)
-    self.svm_ensemble.exportEnsembleFile(TEST_FILE)
-    svm_ensemble = ClassifierEnsemble.importEnsembleFile(TEST_FILE)
+    self.svm_ensemble.serialize(TEST_FILE)
+    svm_ensemble = ClassifierEnsemble.deserialize(TEST_FILE)
     diff = set(self.svm_ensemble.features).symmetric_difference(
         svm_ensemble.features)
     self.assertEqual(len(diff), 0)
