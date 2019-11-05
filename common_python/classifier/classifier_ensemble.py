@@ -324,6 +324,9 @@ class ClassifierEnsemble(ClassifierCollection):
     Imports the classifiers
     :param str file_path:
     :return ClassifierEnsemble:
+    :exceptions ValueError: no persister file
     """
     exporter = persister.Persister(file_path)
+    if not exporter.isExists():
+      raise ValueError
     return exporter.get()
