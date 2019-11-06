@@ -327,6 +327,6 @@ class ClassifierEnsemble(ClassifierCollection):
     :exceptions ValueError: no persister file
     """
     exporter = persister.Persister(file_path)
-    if not exporter.isExists():
+    if not exporter.isExist():
       raise ValueError
     return exporter.get()
