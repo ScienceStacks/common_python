@@ -119,6 +119,17 @@ def makeArrayFromMatrix(df_mat, indices):
   array = df.T.values
   return np.reshape(array, len(indices)*len(df.columns))
 
+def makeDFWithCommonColumns(df1, df2):
+  """
+  Returns dataframes that have columns in common.
+  """
+  columns = set(df1.columns).intersection(df2.columns)
+  df1_sub = df1.copy()
+  df2_sub = df2.copy()
+  df1_sub = df1_sub[columns]
+  df2_sub = df2_sub[columns]
+  return df1_sub, df2_sub
+
 def calcRsq(observations, estimates, indices=None):
   """
   Computes RSQ for simulation results.
@@ -134,9 +145,13 @@ def calcRsq(observations, estimates, indices=None):
   if indices is None:
     indices = range(len(df_obs))
   #
-  arr_obs = makeArrayFromMatrix(df_obs, indices)
-  arr_est = makeArrayFromMatrix(df_est, indices)
-  arr_rsq = arr_obs - arr_est
+  df_obs_sub, df_est_sub = makeDFWithCommonColumns(df_obs, df_est)
+  arr_obs = makeArrayFromMatrix(df_obs_sub, indices)
+  arr_est = makeArrayFromMatrix(df_est_sub, indices)
+  try:
+    arr_rsq = arr_obs - arr_est
+  except:
+    import pdb; pdb.set_trace()
   arr_rsq = arr_rsq*arr_rsq
   rsq = 1 - sum(arr_rsq) / np.var(arr_obs)
   return rsq
@@ -283,14 +298,13 @@ def makeObservations(sim_time=SIM_TIME, num_points=NUM_POINTS,
   return data
 
 def calcSimulationResiduals(obs_data, parameters,
-    indices=None, columns=None, **kwargs):
+    indices=None, **kwargs):
   """
   Runs a simulation with the specified parameters and calculates residuals
   for the train_indices.
   :param array obs_data: matrix of data, first col is time.
          pd.DataFrame  : index is time
   :param lmfit.Parameters parameters:
-  :param list-str columns: columns to use in residual calculations
   :param list-int indices: indices for which calculation is done
                            if None, then all.
   :param dict kwargs: optional parameters passed to simulation
@@ -304,18 +318,20 @@ def calcSimulationResiduals(obs_data, parameters,
   raw_data = runSimulation(parameters=parameters,
       **kwargs)
   df_sim = matrixToDFWithoutTime(raw_data)
-  if columns is not None:
-    df_sim = df_sim[columns]
-  #
+  # Compute differences
+  df_obs, df_sim = makeDFWithCommonColumns(df_obs, df_sim)
   arr_obs = makeArrayFromMatrix(df_obs, indices)
   arr_sim = makeArrayFromMatrix(df_sim, indices)
-  residuals = arr_obs - arr_sim
+  try:
+    residuals = arr_obs - arr_sim
+  except:
+    import pdb; pdb.set_trace()
   return residuals
 
 # TODO: Fix handling of obs_data columns. May not be
 #       a named array, as in bootstrap.
 def fit(obs_data, indices=None, parameters=PARAMETERS, 
-    method='leastsq', columns=None,
+    method='leastsq',
     **kwargs):
   """
   Does a fit of the model to the observations.
@@ -325,13 +341,12 @@ def fit(obs_data, indices=None, parameters=PARAMETERS,
   :param list-int indices: indices on which fit is performed
   :param lmfit.Parameters parameters: parameters fit
   :param str method: optimization method
-  :param list-str columns: columns to use in fit
   :param dict kwargs: optional parameters passed to runSimulation
   :return lmfit.Parameters:
   """
   def calcLmfitResiduals(parameters):
     return calcSimulationResiduals(obs_data, parameters,
-        indices, columns=columns, **kwargs)
+        indices, **kwargs)
   #
   # Estimate the parameters for this fold
   fitter = lmfit.Minimizer(calcLmfitResiduals, parameters)
@@ -340,7 +355,6 @@ def fit(obs_data, indices=None, parameters=PARAMETERS,
 
 def crossValidate(obs_data, method=DF_METHOD,
     sim_time=SIM_TIME,
-    columns=None,
     num_points=None, parameters=PARAMETERS,
     num_folds=3, **kwargs):
   """
@@ -368,8 +382,7 @@ def crossValidate(obs_data, method=DF_METHOD,
     new_parameters = parameters.copy()
     fitted_parameters = fit(df_obs, method=method,
       indices=train_indices, parameters=new_parameters,
-      sim_time=SIM_TIME, num_points=num_points,
-      columns=columns,
+      sim_time=sim_time, num_points=num_points,
       **kwargs)
     result_parameters.append(fitted_parameters)
     # Run the simulation using
@@ -417,6 +430,7 @@ def makeSyntheticObservations(residual_matrix, **kwargs):
       data[irow, icol] = max(data[irow, icol] + residual_matrix[indices[irow], icol-1], 0)
   return data
 
+# FIXME: Getting divide by 0
 def doBootstrapWithResiduals(residuals_matrix, 
     method=DF_METHOD, count=DF_BOOTSTRAP_COUNT, **kwargs):
   """

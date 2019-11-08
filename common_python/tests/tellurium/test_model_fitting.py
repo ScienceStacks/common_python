@@ -289,7 +289,7 @@ def testMatrixToDFWithoutTime():
   
 if __name__ == '__main__':
   testCrossValidate()
-  if True:
+  if False:
     testReshapeData() 
     testArrayDifference() 
     testCalcRsq()
