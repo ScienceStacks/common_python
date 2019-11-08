@@ -48,14 +48,15 @@ def testArrayDifference():
 
 def testCalcRsq():
   std = 0.5
-  residuals = np.reshape(np.random.normal(0, std, LENGTH),
+  matrix = np.reshape(np.random.normal(0, std, LENGTH),
       (NROWS, NCOLS))
-  matrix1 =  makeData(NROWS, NCOLS)
-  matrix2 = matrix1 + residuals
-  rsq = mf.calcRsq(matrix2, matrix1)
-  var_est = (1 - rsq)*np.var(matrix1)
-  var_exp = std*std
-  assert(np.abs(var_est - var_exp) < 0.5)
+  rsq = mf.calcRsq(matrix, matrix)
+  assert(np.isclose(rsq, 1))
+  #
+  matrix2 = np.reshape(np.random.normal(0, std, LENGTH),
+      (NROWS, NCOLS))
+  rsq = mf.calcRsq(matrix, matrix2)
+  assert(rsq < 0.01)
 
 def testMakeParameters():
   constants =  ['k1', 'k2', 'k3']
@@ -110,11 +111,15 @@ def testMakeObservations():
   test(2*mf.NUM_POINTS)
 
 def testCalcSimulationResiduals():
-  obs_data = mf.runSimulation(
-      parameters=TEST_PARAMETERS)
-  residuals = mf.calcSimulationResiduals(obs_data,
-      TEST_PARAMETERS)
-  assert(sum(residuals*residuals) == 0)
+  def test(data):
+    residuals = mf.calcSimulationResiduals(data,
+        TEST_PARAMETERS)
+    assert(sum(residuals*residuals) == 0)
+  #
+  matrix = mf.runSimulation(parameters=TEST_PARAMETERS)
+  test(matrix)
+  df = mf.matrixToDF(matrix)
+  test(df)
 
 def testFit():
   obs_data = mf.makeObservations()
@@ -126,16 +131,24 @@ def testFit():
   assert(len(diff) == 0)
 
 def testCrossValidate():
-  obs_data = mf.makeObservations(
-      parameters=TEST_PARAMETERS)
-  results_parameters, results_rsqs = mf.crossValidate(
-      obs_data)
-  parameters_avg = mf.makeAverageParameters(
-      results_parameters)
-  params_dict = parameters_avg.valuesdict()
-  for name in params_dict.keys():
-    assert(np.abs(params_dict[name]  \
-    - TEST_PARAMETERS.valuesdict()[name]) < 2*params_dict[name])
+  def test(data, min_rsq):
+    results_parameters, results_rsqs = mf.crossValidate(data)
+    parameters_avg = mf.makeAverageParameters(
+        results_parameters)
+    params_dict = parameters_avg.valuesdict()
+    for name in params_dict.keys():
+      assert(np.abs(params_dict[name]  \
+      - TEST_PARAMETERS.valuesdict()[name]) < 2*params_dict[name])
+    for rsq in results_rsqs:
+      assert(rsq >= min_rsq)
+  #
+  obs_data = mf.makeObservations(parameters=TEST_PARAMETERS,
+      noise_std=0)
+  test(obs_data, 1)
+  test(mf.matrixToDF(obs_data), 1)
+  obs_data = mf.makeObservations(parameters=TEST_PARAMETERS,
+      noise_std=0.1)
+  test(obs_data, 0.7)
 
 def testCrossValidate2():
   num_points = 20
@@ -241,10 +254,41 @@ def testMakeParameterStatistics():
   #
   test((5, 95))
   test(None)
-  
+
+def testMatrixToDF():
+  size = 10
+  ncol = 2
+  colnames = ['Time', 'B']
+  def test(columns=None):
+    matrix = np.reshape(list(range(size)), (int(size/ncol), ncol))
+    df = mf.matrixToDF(matrix, columns=colnames)
+    assert(len(df) == int(size/ncol))
+    if columns is not None:
+      assert(len(
+          set(columns).symmetric_difference(df.columns)) == 0)
+  #
+  test()
+  test(columns=colnames)
+
+def testMatrixToDFWithoutTime():
+  size = 10
+  ncol = 2
+  colnames = ['Time', 'B']
+  def test(columns=None):
+    matrix = np.reshape(list(range(size)), (int(size/ncol), ncol))
+    df = mf.matrixToDFWithoutTime(matrix, columns=colnames)
+    assert(len(df) == int(size/ncol))
+    assert(len(df.columns) == ncol - 1)
+    if columns is not None:
+      assert(len(
+          set(columns).symmetric_difference(df.columns)) == 1)
+  #
+  test()
+  test(columns=colnames)
    
   
 if __name__ == '__main__':
+  testCrossValidate()
   if True:
     testReshapeData() 
     testArrayDifference() 
@@ -264,4 +308,6 @@ if __name__ == '__main__':
     testDoBootstrap()
     testDoBootstrap2()
     testMakeParameterStatistics()
+    testMatrixToDF()
+    testMatrixToDFWithoutTime()
   print("OK")

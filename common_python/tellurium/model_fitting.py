@@ -7,11 +7,13 @@ order of positional arguments: obs_data, model, parameters
 
 import lmfit   # Fitting lib
 import matplotlib.pyplot as plt
-import numpy as np
 import math
+import numpy as np
+import pandas as pd
 import random 
 import tellurium as te
 
+TIME = "time"
 
 
 ############## CONSTANTS ######################
@@ -44,6 +46,44 @@ DF_METHOD = "least_squares"
 
 
 ############## FUNCTIONS ######################
+def matrixToDF(matrix, columns=None):
+  """
+  Converts an array to a dataframe.
+  :param np.arrayy matrix:
+         pd.DataFrame    : already converted
+  :return pd.DataFrame: Columns are variables w/o [, ].
+                        index is time.
+  """
+  if isinstance(matrix, pd.DataFrame):
+    return matrix
+  df = pd.DataFrame(matrix)
+  try:
+    # Assign column names if present
+    columns = [c[1:-1] for c in matrix.colnames]
+    columns[0] = TIME
+  except:
+    pass
+  if columns is not None:
+    df.columns = columns
+  if TIME in df.columns:
+    df = df.set_index(TIME)
+  return df
+
+def matrixToDFWithoutTime(matrix, columns=None):
+  """
+  Converts an array to a dataframe, deleting time as a column.
+  :param np.arrayy matrix:
+         pd.DataFrame    : already converted
+  :return pd.DataFrame:
+  """
+  if isinstance(matrix, pd.DataFrame):
+    df = matrix.copy()
+  else:
+    df = matrixToDF(matrix, columns=columns)
+  if TIME != df.index.name:
+    df = df[df.columns.tolist()[1:]]
+  return df
+
 def reshapeData(matrix, indices=None):
   """
   Re-structures matrix as an array for just the rows
@@ -70,15 +110,29 @@ def arrayDifference(matrix1, matrix2, indices=None):
 def calcRsq(observations, estimates, indices=None):
   """
   Computes RSQ for simulation results.
-  :param 2d-np.array observations: non-time values
-  :param 2d-np.array estimates: non-time values
+  :param matrix observations: non-time values
+  :      pd.DataFrame       : no time column
+  :param matrix estimates: non-time values
+  :      pd.DataFrame       : no time column
   :param list-int indices:
   :return float:
   """
-  array_residuals = arrayDifference(observations, estimates,
-      indices=indices)
-  array_observations = reshapeData(observations, indices=indices)
-  return 1 - np.var(array_residuals)/np.var(array_observations)
+  df_obs = matrixToDF(observations)
+  df_est = matrixToDF(estimates)
+  if indices is None:
+    indices = range(len(df_obs))
+  #
+  def makeSub(df):
+    return df.loc[df.index[indices], :]
+  #
+  df_obs_sub = makeSub(df_obs)
+  df_est_sub = makeSub(df_est)
+  df_rsq = df_obs_sub - df_est_sub
+  df_rsq = df_rsq*df_rsq
+  arr_obs = np.reshape(df_obs_sub.values,
+      len(indices)*len(df_obs.columns))
+  rsq = 1 - df_rsq.sum().sum() / np.var(arr_obs)
+  return rsq
 
 def makeParameters(constants=CONSTANTS, values=1, mins=0, maxs=10):
   """
@@ -221,40 +275,55 @@ def makeObservations(sim_time=SIM_TIME, num_points=NUM_POINTS,
           + np.random.normal(0, noise_std, 1), 0)
   return data
 
-def calcSimulationResiduals(obs_data, parameters, indices=None, **kwargs):
+def calcSimulationResiduals(obs_data, parameters,
+    indices=None, columns=None, **kwargs):
   """
   Runs a simulation with the specified parameters and calculates residuals
   for the train_indices.
   :param array obs_data: matrix of data, first col is time.
+         pd.DataFrame  : index is time
   :param lmfit.Parameters parameters:
+  :param list-str columns: columns to use in residual calculations
   :param list-int indices: indices for which calculation is done
                            if None, then all.
   :param dict kwargs: optional parameters passed to simulation
+  :return array:
   """
+  df_obs = matrixToDFWithoutTime(obs_data)
   if not KWARGS_NUM_POINTS in kwargs.keys():
-    kwargs[KWARGS_NUM_POINTS] = np.shape(obs_data)[0]
-  sim_data = runSimulation(parameters=parameters,
+    kwargs[KWARGS_NUM_POINTS] = len(df_obs)
+  raw_data = runSimulation(parameters=parameters,
       **kwargs)
-  length = np.shape(sim_data)[0]
-  residuals = arrayDifference(obs_data[:, 1:], sim_data[:, 1:],
+  df_sim = matrixToDFWithoutTime(raw_data)
+  if columns is not None:
+    df_sim = df_sim[columns]
+  #
+  array_sim = df_sim.values
+  array_obs = df_obs.values
+  residuals = arrayDifference(array_obs, array_sim,
       indices=indices)
   return residuals
 
-def fit(obs_data, indices=None, parameters=PARAMETERS, method='leastsq',
+# TODO: Fix handling of obs_data columns. May not be
+#       a named array, as in bootstrap.
+def fit(obs_data, indices=None, parameters=PARAMETERS, 
+    method='leastsq', columns=None,
     **kwargs):
   """
   Does a fit of the model to the observations.
   :param ndarray obs_data: matrix of observed values with time
                            as the first column
+         pd.DataFrame    : time is index
   :param list-int indices: indices on which fit is performed
   :param lmfit.Parameters parameters: parameters fit
   :param str method: optimization method
+  :param list-str columns: columns to use in fit
   :param dict kwargs: optional parameters passed to runSimulation
   :return lmfit.Parameters:
   """
   def calcLmfitResiduals(parameters):
     return calcSimulationResiduals(obs_data, parameters,
-        indices, **kwargs)
+        indices, columns=columns, **kwargs)
   #
   # Estimate the parameters for this fold
   fitter = lmfit.Minimizer(calcLmfitResiduals, parameters)
@@ -263,6 +332,7 @@ def fit(obs_data, indices=None, parameters=PARAMETERS, method='leastsq',
 
 def crossValidate(obs_data, method=DF_METHOD,
     sim_time=SIM_TIME,
+    columns=None,
     num_points=None, parameters=PARAMETERS,
     num_folds=3, **kwargs):
   """
@@ -271,14 +341,16 @@ def crossValidate(obs_data, method=DF_METHOD,
                            columns are species; 
                            rows are time instances
                            first column is time
+        pd.DataFrame    : time is index
   :param int sim_time: length of simulation run
   :param int num_points: number of time points produced.
   :param lmfit.Parameters: parameters to be estimated
   :param dict kwargs: optional arguments used in simulation
   :return list-lmfit.Parameters, list-float: parameters and RSQ from folds
   """
+  df_obs = matrixToDF(obs_data)
   if num_points is None:
-    num_points = np.shape(obs_data)[0]
+    num_points = len(df_obs)
   # Iterate for for folds
   fold_generator = foldGenerator(num_points, num_folds)
   result_parameters = []
@@ -286,9 +358,10 @@ def crossValidate(obs_data, method=DF_METHOD,
   for train_indices, test_indices in fold_generator:
     # This function is defined inside the loop because it references a loop variable
     new_parameters = parameters.copy()
-    fitted_parameters = fit(obs_data, method=method,
+    fitted_parameters = fit(df_obs, method=method,
       indices=train_indices, parameters=new_parameters,
       sim_time=SIM_TIME, num_points=num_points,
+      columns=columns,
       **kwargs)
     result_parameters.append(fitted_parameters)
     # Run the simulation using
@@ -296,9 +369,9 @@ def crossValidate(obs_data, method=DF_METHOD,
     test_estimates = runSimulation(sim_time=sim_time,
         num_points=num_points,
         parameters=fitted_parameters, **kwargs)
+    df_est = matrixToDF(test_estimates)
     # Calculate RSQ
-    rsq = calcRsq(obs_data[:, 1:], test_estimates[:, 1:],
-        indices=test_indices)
+    rsq = calcRsq(df_obs, df_est, test_indices)
     result_rsqs.append(rsq)
   return result_parameters, result_rsqs
 
@@ -317,7 +390,8 @@ def makeResidualsMatrix(obs_data, model, parameters, **kwargs):
   rr = te.loada(model)
   num_species = rr.getNumFloatingSpecies()
   nrows = int(len(residuals) / num_species)
-  return np.reshape(residuals, (nrows, num_species))
+  result = np.reshape(residuals, (nrows, num_species))
+  return result
 
 def makeSyntheticObservations(residual_matrix, **kwargs):
   """
