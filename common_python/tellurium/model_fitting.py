@@ -107,6 +107,18 @@ def arrayDifference(matrix1, matrix2, indices=None):
   array2 = reshapeData(matrix2, indices=indices)
   return (array1 - array2)
 
+def makeArrayFromMatrix(df_mat, indices):
+  """
+  Returns an constructured from specified rows
+  organized in sequence by columns.
+  :param pd.DataFrame df_mat:
+  :param list-int indices:
+  :return np.array:
+  """
+  df = df_mat.loc[df_mat.index[indices], :]
+  array = df.T.values
+  return np.reshape(array, len(indices)*len(df.columns))
+
 def calcRsq(observations, estimates, indices=None):
   """
   Computes RSQ for simulation results.
@@ -122,16 +134,11 @@ def calcRsq(observations, estimates, indices=None):
   if indices is None:
     indices = range(len(df_obs))
   #
-  def makeSub(df):
-    return df.loc[df.index[indices], :]
-  #
-  df_obs_sub = makeSub(df_obs)
-  df_est_sub = makeSub(df_est)
-  df_rsq = df_obs_sub - df_est_sub
-  df_rsq = df_rsq*df_rsq
-  arr_obs = np.reshape(df_obs_sub.values,
-      len(indices)*len(df_obs.columns))
-  rsq = 1 - df_rsq.sum().sum() / np.var(arr_obs)
+  arr_obs = makeArrayFromMatrix(df_obs, indices)
+  arr_est = makeArrayFromMatrix(df_est, indices)
+  arr_rsq = arr_obs - arr_est
+  arr_rsq = arr_rsq*arr_rsq
+  rsq = 1 - sum(arr_rsq) / np.var(arr_obs)
   return rsq
 
 def makeParameters(constants=CONSTANTS, values=1, mins=0, maxs=10):
@@ -290,6 +297,8 @@ def calcSimulationResiduals(obs_data, parameters,
   :return array:
   """
   df_obs = matrixToDFWithoutTime(obs_data)
+  if indices is None:
+    indices = range(len(df_obs))
   if not KWARGS_NUM_POINTS in kwargs.keys():
     kwargs[KWARGS_NUM_POINTS] = len(df_obs)
   raw_data = runSimulation(parameters=parameters,
@@ -298,10 +307,9 @@ def calcSimulationResiduals(obs_data, parameters,
   if columns is not None:
     df_sim = df_sim[columns]
   #
-  array_sim = df_sim.values
-  array_obs = df_obs.values
-  residuals = arrayDifference(array_obs, array_sim,
-      indices=indices)
+  arr_obs = makeArrayFromMatrix(df_obs, indices)
+  arr_sim = makeArrayFromMatrix(df_sim, indices)
+  residuals = arr_obs - arr_sim
   return residuals
 
 # TODO: Fix handling of obs_data columns. May not be
