@@ -29,6 +29,7 @@ DF = pd.DataFrame({
     'B': np.repeat(1, 2*SIZE),
     })
 SER = pd.Series(values)
+TEST_FILE = "test_classifier_ensemble.pcl"
 
 
 ######## Helper Classes ######
@@ -38,6 +39,8 @@ class RandomClassifier(object):
   def __init__(self):
     self.class_probs = None
     self.coef_ = []
+    if os.path.exists(TEST_FILE):
+      os.remove(TEST_FILE)
 
   def fit(self, df_X, ser_y):
     """
@@ -209,6 +212,16 @@ class TestClassifierEnsemble(unittest.TestCase):
     score = self.random_classifier_ensemble.score(DF, SER)
     expected = 1/SIZE
     self.assertLess(abs(score- expected), 0.1)
+
+  def testSerializeAndDeserialize(self):
+    if IGNORE_TEST:
+      return
+    self.svm_ensemble.fit(self.df_X, self.ser_y)
+    self.svm_ensemble.serialize(TEST_FILE)
+    svm_ensemble = ClassifierEnsemble.deserialize(TEST_FILE)
+    diff = set(self.svm_ensemble.features).symmetric_difference(
+        svm_ensemble.features)
+    self.assertEqual(len(diff), 0)
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 '''Tests for is_null.'''
 
 import numpy as np
-from is_null import isNull, isNan
+from common_python.util.is_null import isNull, isNan
 import unittest
 
 
