@@ -212,7 +212,8 @@ def runSimulation(sim_time=SIM_TIME,
      road_runner = makeSimulation(**kwargs)
   else:
     road_runner.reset()
-  return road_runner.simulate (0, sim_time, num_points)
+  data = road_runner.simulate (0, sim_time, num_points)
+  return data
 
 def makeSimulation(parameters=None, model=MODEL):
   """
