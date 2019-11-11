@@ -5,6 +5,7 @@ kwargs: keyword arguments to runSimulation
 order of positional arguments: obs_data, model, parameters
 """
 
+from collections import namedtuple
 import lmfit   # Fitting lib
 import matplotlib.pyplot as plt
 import math
@@ -15,6 +16,12 @@ import tellurium as te
 
 TIME = "time"
 
+# data - named_array result
+# road_runner - road_runner instance created
+SimulationResult = namedtuple("SimulationResult",
+    "data road_runner")
+ResidualCalculation = namedtuple("ResidualCalculation",
+    "residuals road_runner")
 
 ############## CONSTANTS ######################
 # Default simulation model
@@ -186,44 +193,55 @@ def makeAverageParameters(list_parameters):
   """
   Averages the values of parameters in a list.
   :param list-lmfit.Parameters list_parameters:
-  :return lmfit.Parameters:
+  :return lmfit.Parameters: sets min, max to extremes of list
   """
   result_parameters = lmfit.Parameters()
   names = list_parameters[0].valuesdict().keys()
   for name in names:
     values = []
+    mins = []
+    maxs = []
     for parameters in list_parameters:
       values.append(parameters.valuesdict()[name])
-    result_parameters.add(name, value=np.mean(values))
+      mins.append(parameters.get(name).min)
+      maxs.append(parameters.get(name).max)
+    value = np.mean(values)
+    min_val = min(mins)
+    max_val = min(maxs)
+    result_parameters.add(name, value=value, 
+        min=min_val, max=max_val)
   return result_parameters
 
 def runSimulation(sim_time=SIM_TIME, 
-    num_points=NUM_POINTS, road_runner=ROAD_RUNNER,
+    num_points=NUM_POINTS, road_runner=ROAD_RUNNER, parameters=None,
     **kwargs):
   """
   Runs the simulation model rr for the parameters.
   :param int sim_time: time to run the simulation
   :param int num_points: number of timepoints simulated
   :param ExtendedRoadRunner road_runner:
+  :param lmfit.Parameters parameters:
   :param dict kwargs: parameters used in makeSimulation
-  :return named_array:
+  :return SimulationResult:
   """
   if road_runner is None:
-     road_runner = makeSimulation(**kwargs)
+    road_runner = makeSimulation(parameters=parameters, **kwargs)
   else:
     road_runner.reset()
+    setSimulationParameters(road_runner, parameters)
   data = road_runner.simulate (0, sim_time, num_points)
-  return data
+  simulation_result = SimulationResult(
+      data=data,
+      road_runner=road_runner,
+      )
+  return simulation_result
 
-def makeSimulation(parameters=None, model=MODEL):
+def setSimulationParameters(road_runner, parameters=None):
   """
-  Creates an road runner instance for the simulation.
+  Sets parameter values in a road runner instance.
+  :param ExtendedRoadRunner road_runner:
   :param lmfit.Parameters parameters:
-  :param str model:
-  :return ExtendedRoadRunner:
   """
-  road_runner = te.loada(model)
-  road_runner.reset()
   if parameters is not None:
     parameter_dict = parameters.valuesdict()
     # Set the simulation constants for all parameters
@@ -234,6 +252,16 @@ def makeSimulation(parameters=None, model=MODEL):
         exec(stmt)
       except:
         import pdb; pdb.set_trace()
+
+def makeSimulation(parameters=None, model=MODEL):
+  """
+  Creates an road runner instance for the simulation.
+  :param lmfit.Parameters parameters:
+  :param str model:
+  :return ExtendedRoadRunner:
+  """
+  road_runner = te.loada(model)
+  setSimulationParameters(road_runner, parameters)
   return road_runner
 
 def plotTimeSeries(data, is_scatter=False, title="", 
@@ -288,8 +316,10 @@ def makeObservations(sim_time=SIM_TIME, num_points=NUM_POINTS,
   :return namedarray: simulation results with randomness
   """
   # Create true values
-  data = runSimulation(sim_time=sim_time, num_points=num_points,
+  simulation_result = runSimulation(sim_time=sim_time,
+      num_points=num_points,
       **kwargs)
+  data = simulation_result.data
   num_cols = len(data.colnames)
   # Add randomness
   for i in range (num_points):
@@ -309,16 +339,16 @@ def calcSimulationResiduals(obs_data, parameters,
   :param list-int indices: indices for which calculation is done
                            if None, then all.
   :param dict kwargs: optional parameters passed to simulation
-  :return array:
+  :return ResidualCalculation:
   """
   df_obs = matrixToDFWithoutTime(obs_data)
   if indices is None:
     indices = range(len(df_obs))
   if not KWARGS_NUM_POINTS in kwargs.keys():
     kwargs[KWARGS_NUM_POINTS] = len(df_obs)
-  raw_data = runSimulation(parameters=parameters,
+  simulation_result = runSimulation(parameters=parameters,
       **kwargs)
-  df_sim = matrixToDFWithoutTime(raw_data)
+  df_sim = matrixToDFWithoutTime(simulation_result.data)
   # Compute differences
   df_obs, df_sim = makeDFWithCommonColumns(df_obs, df_sim)
   arr_obs = makeArrayFromMatrix(df_obs, indices)
@@ -327,7 +357,9 @@ def calcSimulationResiduals(obs_data, parameters,
     residuals = arr_obs - arr_sim
   except:
     import pdb; pdb.set_trace()
-  return residuals
+  residual_calculation = ResidualCalculation(residuals=residuals,
+      road_runner=simulation_result.road_runner)
+  return residual_calculation
 
 # TODO: Fix handling of obs_data columns. May not be
 #       a named array, as in bootstrap.
@@ -345,9 +377,14 @@ def fit(obs_data, indices=None, parameters=PARAMETERS,
   :param dict kwargs: optional parameters passed to runSimulation
   :return lmfit.Parameters:
   """
+  global road_runner
+  road_runner = ROAD_RUNNER
   def calcLmfitResiduals(parameters):
-    return calcSimulationResiduals(obs_data, parameters,
-        indices, **kwargs)
+    global road_runner
+    residual_calculation = calcSimulationResiduals(obs_data,
+        parameters, indices, road_runner=road_runner, **kwargs)
+    road_runner = residual_calculation.road_runner
+    return residual_calculation.residuals
   #
   # Estimate the parameters for this fold
   fitter = lmfit.Minimizer(calcLmfitResiduals, parameters)
@@ -378,6 +415,7 @@ def crossValidate(obs_data, method=DF_METHOD,
   fold_generator = foldGenerator(num_points, num_folds)
   result_parameters = []
   result_rsqs = []
+  road_runner = ROAD_RUNNER
   for train_indices, test_indices in fold_generator:
     # This function is defined inside the loop because it references a loop variable
     new_parameters = parameters.copy()
@@ -388,16 +426,19 @@ def crossValidate(obs_data, method=DF_METHOD,
     result_parameters.append(fitted_parameters)
     # Run the simulation using
     # the parameters estimated using the training data.
-    test_estimates = runSimulation(sim_time=sim_time,
-        num_points=num_points,
+    simulation_result = runSimulation(road_runner=road_runner,
+        sim_time=sim_time, num_points=num_points,
         parameters=fitted_parameters, **kwargs)
-    df_est = matrixToDF(test_estimates)
+    road_runner = simulation_result.road_runner
+    df_est = matrixToDF(simulation_result.data)
     # Calculate RSQ
     rsq = calcRsq(df_obs, df_est, test_indices)
     result_rsqs.append(rsq)
   return result_parameters, result_rsqs
 
-def makeResidualsMatrix(obs_data, model, parameters, **kwargs):
+def makeResidualsMatrix(obs_data, model, parameters,
+    road_runner=ROAD_RUNNER,
+    **kwargs):
   """
   Calculate residuals for each chemical species.
   :param np.array obs_data: matrix of observations; first column is time; number of rows is num_points
@@ -405,9 +446,10 @@ def makeResidualsMatrix(obs_data, model, parameters, **kwargs):
   :param dict kwargs: optional arguments to runSimulation
   :return np.array: matrix of residuals; columns are chemical species
   """
-  data = runSimulation(parameters=parameters, model=model, **kwargs)
-  residuals = calcSimulationResiduals(obs_data, parameters,
-      model=model, **kwargs)
+  residual_calculation = calcSimulationResiduals(obs_data, parameters,
+      model=model, road_runner=road_runner, **kwargs)
+  road_runnder = residual_calculation.road_runner
+  residuals = residual_calculation.residuals
   # Reshape the residuals by species
   rr = te.loada(model)
   num_species = rr.getNumFloatingSpecies()
@@ -422,8 +464,8 @@ def makeSyntheticObservations(residual_matrix, **kwargs):
   :param dict kwargs: optional arguments to runSimulation
   :return np.array: matrix; first column is time
   """
-  model_data = runSimulation(**kwargs)
-  data = model_data.copy()
+  simulation_result = runSimulation(**kwargs)
+  data = simulation_result.data.copy()
   nrows, ncols = np.shape(data)
   for icol in range(1, ncols):  # Avoid the time column
     indices = np.random.randint(0, nrows, nrows)

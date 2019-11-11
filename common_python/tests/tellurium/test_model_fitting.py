@@ -76,20 +76,21 @@ def testMakeAverageParameters():
     assert(test_dict[name] == result_dict[name])
 
 def testRunSimulation():
-  data1 = mf.runSimulation() 
-  assert(data1[-1, 0] == mf.SIM_TIME)
-  data2 = mf.runSimulation(
-      parameters=TEST_PARAMETERS) 
-  nrows, ncols = np.shape(data1)
+  simulation_result1 = mf.runSimulation() 
+  assert(simulation_result1.data[-1, 0] == mf.SIM_TIME)
+  simulation_result2 = mf.runSimulation(parameters=TEST_PARAMETERS) 
+  nrows, ncols = np.shape(simulation_result1.data)
   for i in range(nrows):
     for j in range(ncols):
-      assert(np.isclose(data1[i,j], data2[i,j]))
+      assert(np.isclose(simulation_result1.data[i,j],
+           simulation_result2.data[i,j]))
 
 def testPlotTimeSeries():
   # Smoke test only
-  data = mf.runSimulation() 
-  mf.plotTimeSeries(data, is_plot=IS_PLOT)
-  mf.plotTimeSeries(data, is_scatter=True, is_plot=IS_PLOT)
+  simulation_result = mf.runSimulation() 
+  mf.plotTimeSeries(simulation_result.data, is_plot=IS_PLOT)
+  mf.plotTimeSeries(simulation_result.data, 
+      is_scatter=True, is_plot=IS_PLOT)
   
 
 def testMakeObservations():
@@ -97,10 +98,10 @@ def testMakeObservations():
     obs_data = mf.makeObservations(
         num_points=num_points,
         road_runner=mf.ROAD_RUNNER)
-    data = mf.runSimulation(
+    simulation_result = mf.runSimulation(
         num_points=num_points,
         road_runner=mf.ROAD_RUNNER)
-    data = data[:, 1:]
+    data = simulation_result.data[:, 1:]
     nrows, _ = np.shape(data)
     assert(nrows == num_points)
     std = np.sqrt(np.var(mf.arrayDifference(
@@ -112,11 +113,13 @@ def testMakeObservations():
 
 def testCalcSimulationResiduals():
   def test(data):
-    residuals = mf.calcSimulationResiduals(data,
+    residual_calculation = mf.calcSimulationResiduals(data,
         TEST_PARAMETERS)
+    residuals = residual_calculation.residuals
     assert(sum(residuals*residuals) == 0)
   #
-  matrix = mf.runSimulation(parameters=TEST_PARAMETERS)
+  simulation_result = mf.runSimulation(parameters=TEST_PARAMETERS)
+  matrix = simulation_result.data
   test(matrix)
   df = mf.matrixToDF(matrix)
   test(df)
@@ -142,12 +145,10 @@ def testCrossValidate():
     for rsq in results_rsqs:
       assert(rsq >= min_rsq)
   #
-  obs_data = mf.makeObservations(parameters=TEST_PARAMETERS,
-      noise_std=0)
+  obs_data = mf.makeObservations(model=mf.MODEL, noise_std=0)
   test(obs_data, 1)
   test(mf.matrixToDF(obs_data), 1)
-  obs_data = mf.makeObservations(parameters=TEST_PARAMETERS,
-      noise_std=0.1)
+  obs_data = mf.makeObservations(model=mf.MODEL, noise_std=0.1)
   test(obs_data, 0.7)
 
 def testCrossValidate2():
@@ -289,7 +290,7 @@ def testMatrixToDFWithoutTime():
   
 if __name__ == '__main__':
   testCrossValidate()
-  if False:
+  if True:
     testReshapeData() 
     testArrayDifference() 
     testCalcRsq()
