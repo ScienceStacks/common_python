@@ -1,4 +1,4 @@
-"""Analysis Codes for the Modeling Game."""
+"""Analysis Codes for the Modeling Game for BIOE 498V."""
 
 import model_fitting as mf
 
