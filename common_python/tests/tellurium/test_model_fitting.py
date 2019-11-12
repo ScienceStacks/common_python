@@ -126,12 +126,16 @@ def testCalcSimulationResiduals():
 
 def testFit():
   obs_data = mf.makeObservations()
-  parameters = mf.fit(obs_data)
-  param_dict = dict(parameters.valuesdict())
-  expected_param_dict = dict(mf.PARAMETERS.valuesdict())
-  diff = set(param_dict.keys()).symmetric_difference(
-      expected_param_dict.keys())
-  assert(len(diff) == 0)
+  def test(method=mf.ME_LEASTSQ):
+    parameters = mf.fit(obs_data, method=method)
+    param_dict = dict(parameters.valuesdict())
+    expected_param_dict = dict(mf.PARAMETERS.valuesdict())
+    diff = set(param_dict.keys()).symmetric_difference(
+        expected_param_dict.keys())
+    assert(len(diff) == 0)
+  #
+  test()
+  test(mf.ME_BOTH)
 
 def testCrossValidate():
   def test(data, min_rsq):
@@ -289,7 +293,7 @@ def testMatrixToDFWithoutTime():
    
   
 if __name__ == '__main__':
-  testCrossValidate()
+  testFit()
   if True:
     testReshapeData() 
     testArrayDifference() 
