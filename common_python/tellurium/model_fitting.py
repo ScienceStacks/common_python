@@ -18,6 +18,8 @@ TIME = "time"
 ME_LEASTSQ = "leastsq"
 ME_DIFFERENTIAL_EVOLUTION = "differential_evolution"
 ME_BOTH = "both"
+PER05 = 0.05
+PER95 = 0.95
 
 # data - named_array result
 # road_runner - road_runner instance created
@@ -25,6 +27,7 @@ SimulationResult = namedtuple("SimulationResult",
     "data road_runner")
 ResidualCalculation = namedtuple("ResidualCalculation",
     "residuals road_runner")
+Statistic = namedtuple("Statistic", "mean std ci_low ci_high")
 
 ############## CONSTANTS ######################
 # Default simulation model
@@ -543,27 +546,35 @@ def doBootstrap(obs_data, model, parameters,
   return makeParameterStatistics(list_parameters,
       confidence_limits=confidence_limits)
 
+def calcStatistic(values, confidence_limits=[PER05, PER95]):
+  """
+  Calculates Statistic
+  :param list-float values:
+  :return Statistic:
+  """
+  quantiles = np.quantile(values, confidence_limits)
+  return Statistic(
+      mean  =np.mean(values),
+      std = np.std(values),
+      ci_low = quantiles[0],
+      ci_high = quantiles[1],
+      )
+
 def makeParameterStatistics(list_parameters,
     confidence_limits=DF_CONFIDENCE_INTERVAL):
   """
   Computes the mean and standard deviation of the parameters in a list of parameters.
   :param list-lmfit.Parameters
   :param (float, float) confidence_limits: if none, report mean and variance
-  :return dict: key is the parameter name; value is the tuple (mean, stddev) or confidence limits
+  :return dict: key is the parameter name; value is ParameterStatistic
   """
-  parameter_statistics = {}  # This is a dictionary that will have the parameter name as key, and mean, std as values
+  statistic_dict = {}
   parameter_names = list(list_parameters[0].valuesdict().keys())
   for name in parameter_names:
-    parameter_statistics[name] = []  # We will accumulate values in this list
+    statistic_dict[name] = []
     for parameters in list_parameters:
-      parameter_statistics[name].append(parameters.valuesdict()[name])
+      statistic_dict[name].append(parameters.valuesdict()[name])
   # Calculate the statistics
-  for name in parameter_statistics.keys():
-    if confidence_limits is not None:
-      parameter_statistics[name] = np.percentile(parameter_statistics[name], confidence_limits)
-    else:
-      mean = np.mean(parameter_statistics[name])
-      std = np.std(parameter_statistics[name])
-      std = std/np.sqrt(len(list_parameters))  # adjustments for the standard deviation of the mean
-      parameter_statistics[name] = (mean, std)
-  return parameter_statistics
+  for name in statistic_dict.keys():
+    statistic_dict[name] = calcStatistic(statistic_dict[name])
+  return statistic_dict

@@ -212,15 +212,13 @@ def testDoBootstrap():
   model = mf.MODEL
   obs_data = mf.makeObservations(model=model,
       parameters=TEST_PARAMETERS, num_points=num_points)
-  confidence_dict = mf.doBootstrap(obs_data, model,
+  statistic_dict = mf.doBootstrap(obs_data, model,
       TEST_PARAMETERS, count=count,
       num_points=num_points)
   params_dict = TEST_PARAMETERS.valuesdict()
   diff = set(params_dict.keys()).symmetric_difference(
-      confidence_dict.keys())
+      statistic_dict.keys())
   assert(len(diff) == 0)
-  for value in confidence_dict.values():
-    assert(len(value) == 2)
 
 def testDoBootstrap2():
   model0 = """
@@ -254,10 +252,10 @@ def testMakeParameterStatistics():
   list_parameters = _makeParameterList(count, num_points,
       model=mf.MODEL)
   def test(confidence_limits):
-    statistics = mf.makeParameterStatistics(list_parameters,
+    statistic_dict = mf.makeParameterStatistics(list_parameters,
         confidence_limits)
-    for key in statistics.keys():
-      assert(len(statistics[key]) == 2)
+    for key in statistic_dict.keys():
+      assert(isinstance(statistic_dict[key], mf.Statistic))
   #
   test((5, 95))
   test(None)
@@ -296,10 +294,15 @@ def testMatrixToDFWithoutTime():
   #
   test(columns=colnames)
   test()
+
+def testCalcStatistic():
+  values = range(100)
+  statistic = mf.calcStatistic(values)
+  assert((statistic.ci_low < statistic.mean)  
+      and (statistic.mean < statistic.ci_high))
    
   
 if __name__ == '__main__':
-  testMatrixToDFWithoutTime()
   if True:
     testReshapeData() 
     testArrayDifference() 
@@ -321,4 +324,5 @@ if __name__ == '__main__':
     testMakeParameterStatistics()
     testMatrixToDF()
     testMatrixToDFWithoutTime()
+    testCalcStatistic()
   print("OK")
