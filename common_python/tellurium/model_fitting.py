@@ -56,27 +56,41 @@ DF_METHOD = "least_squares"
 
 
 ############## FUNCTIONS ######################
-def matrixToDF(matrix, columns=None):
+def matrixToDF(matrix, columns=None, index=None):
   """
-  Converts an array to a dataframe.
+  Converts an array to a dataframe. If the index is
+  time, then rounds to a tenth.
   :param np.arrayy matrix:
          pd.DataFrame    : already converted
+  :param list index: index for dataframe
   :return pd.DataFrame: Columns are variables w/o [, ].
                         index is time.
   """
+  def setColumns(columns):
+    new_columns = [c.replace("[", "") for c in columns]
+    new_columns = [c.replace("]", "") for c in new_columns]
+    new_columns[0] = TIME
+    return new_columns
+  #
   if isinstance(matrix, pd.DataFrame):
     return matrix
   df = pd.DataFrame(matrix)
-  try:
-    # Assign column names if present
-    columns = [c[1:-1] for c in matrix.colnames]
-    columns[0] = TIME
-  except:
-    pass
+  if columns is not None:
+    columns = setColumns(columns)
+  else:
+    try:
+      columns = setColumns(matrix.colnames)
+    except:
+      pass
   if columns is not None:
     df.columns = columns
   if TIME in df.columns:
     df = df.set_index(TIME)
+  if index is not None:
+    df.index = index
+  if df.index.name == TIME:
+    df.index = [np.round(v, 1) for v in df.index]
+    df.index.name = TIME
   return df
 
 def matrixToDFWithoutTime(matrix, columns=None):
@@ -356,10 +370,7 @@ def calcSimulationResiduals(obs_data, parameters,
   df_obs, df_sim = makeDFWithCommonColumns(df_obs, df_sim)
   arr_obs = makeArrayFromMatrix(df_obs, indices)
   arr_sim = makeArrayFromMatrix(df_sim, indices)
-  try:
-    residuals = arr_obs - arr_sim
-  except:
-    import pdb; pdb.set_trace()
+  residuals = arr_obs - arr_sim
   residual_calculation = ResidualCalculation(residuals=residuals,
       road_runner=simulation_result.road_runner)
   return residual_calculation
@@ -475,16 +486,25 @@ def makeSyntheticObservations(residual_matrix, **kwargs):
   Constructs synthetic observations for the model.
   :param np.array residual_matrix: matrix of residuals; columns are species; number of rows is num_points
   :param dict kwargs: optional arguments to runSimulation
-  :return np.array: matrix; first column is time
+  :return pd.DataFrame: index is time
   """
   simulation_result = runSimulation(**kwargs)
-  data = simulation_result.data.copy()
-  nrows, ncols = np.shape(data)
-  for icol in range(1, ncols):  # Avoid the time column
-    indices = np.random.randint(0, nrows, nrows)
-    for irow in range(nrows):
-      data[irow, icol] = max(data[irow, icol] + residual_matrix[indices[irow], icol-1], 0)
-  return data
+  df_data = matrixToDF(simulation_result.data)
+  df_res = pd.DataFrame(residual_matrix)
+  df_res.columns = df_data.columns
+  try:
+    df_res.index = df_data.index
+  except:
+    import pdb; pdb.set_trace()
+  nrows = len(df_data)
+  ncols = len(df_data.columns)
+  for col in df_data.columns:
+    for idx in df_data.index:
+      random_index = df_res.index[np.random.randint(0, nrows)]
+      df_data.loc[idx, col] = df_data.loc[idx, col]  \
+          + df_res.loc[random_index, col]
+  df_data = df_data.applymap(lambda v: max(v, 0))
+  return df_data
 
 # FIXME: Getting divide by 0
 def doBootstrapWithResiduals(residuals_matrix, 

@@ -181,18 +181,20 @@ def testMakeSyntheticObservations():
             'num_points': num_points,
            }
   residual_matrix = _getResiduals(num_points, model=kwargs['model'])
-  syn_data = mf.makeSyntheticObservations(residual_matrix, **kwargs)
-  assert(np.shape(syn_data)[0] == num_points)
+  df_syn = mf.makeSyntheticObservations(residual_matrix, **kwargs)
+  assert(len(df_syn) == num_points)
+  assert(len(df_syn.columns) == np.shape(residual_matrix)[1])
 
-def _makeParameterList(num_points, count, **kwargs):
+def _makeParameterList(count, num_points=mf.NUM_POINTS, **kwargs):
   residual_matrix = _getResiduals(num_points, model=kwargs['model'])
   return mf.doBootstrapWithResiduals(residual_matrix, count=count,
+      num_points=num_points,
       **kwargs)
 
 def testDoBootstrapWithResiduals():
   num_points = 20
   count = 3
-  list_parameters = _makeParameterList(num_points, count,
+  list_parameters = _makeParameterList(count, num_points,
       model=mf.MODEL)
   assert(len(list_parameters) == count)
   for parameters in list_parameters:
@@ -249,7 +251,7 @@ def testDoBootstrap2():
 def testMakeParameterStatistics():
   num_points = 20
   count = 3
-  list_parameters = _makeParameterList(num_points, count,
+  list_parameters = _makeParameterList(count, num_points,
       model=mf.MODEL)
   def test(confidence_limits):
     statistics = mf.makeParameterStatistics(list_parameters,
@@ -263,14 +265,18 @@ def testMakeParameterStatistics():
 def testMatrixToDF():
   size = 10
   ncol = 2
-  colnames = ['Time', 'B']
+  colnames = [mf.TIME, 'B']
   def test(columns=None):
     matrix = np.reshape(list(range(size)), (int(size/ncol), ncol))
     df = mf.matrixToDF(matrix, columns=colnames)
     assert(len(df) == int(size/ncol))
     if columns is not None:
-      assert(len(
+      columns = list(set(columns).difference([mf.TIME]))
+      try:
+        assert(len(
           set(columns).symmetric_difference(df.columns)) == 0)
+      except:
+        import pdb; pdb.set_trace()
   #
   test()
   test(columns=colnames)
@@ -278,22 +284,22 @@ def testMatrixToDF():
 def testMatrixToDFWithoutTime():
   size = 10
   ncol = 2
-  colnames = ['Time', 'B']
+  colnames = [mf.TIME, 'B']
   def test(columns=None):
     matrix = np.reshape(list(range(size)), (int(size/ncol), ncol))
-    df = mf.matrixToDFWithoutTime(matrix, columns=colnames)
+    df = mf.matrixToDFWithoutTime(matrix, columns=columns)
     assert(len(df) == int(size/ncol))
     assert(len(df.columns) == ncol - 1)
     if columns is not None:
       assert(len(
           set(columns).symmetric_difference(df.columns)) == 1)
   #
-  test()
   test(columns=colnames)
+  test()
    
   
 if __name__ == '__main__':
-  testFit()
+  testMatrixToDFWithoutTime()
   if True:
     testReshapeData() 
     testArrayDifference() 
