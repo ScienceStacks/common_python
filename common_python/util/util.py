@@ -1,8 +1,9 @@
 '''Utility routines.'''
 
+import os
 import random
 import string
-import os
+import sys
 
 LETTERS = 'abcdefghijklmnopqrstuvwxyz'
 
@@ -139,3 +140,32 @@ def setList(value):
     return []
   else:
     return value
+
+def addPath(repo_name, sub_dirs=None):
+  """
+  Adds a path relative to the repository root.
+  :param str repo_name:
+  :param list-str sub_dirs:
+  """
+  if sub_dirs is None:
+    sub_dirs = []
+  path = os.path.dirname(os.path.abspath(__file__))
+  done = False
+  found_first_folder = False
+  while not done:
+    new_path, cur_folder  = os.path.split(path)
+    if len(path) == 0:
+      raise ValueError("Repo %s not found." % repo_name)
+    if cur_folder == repo_name:
+      if found_first_folder:
+        root_folder = path
+        done = True
+        break
+      else:
+        found_first_folder = True
+    path = new_path
+  if not done:
+    raise ValueError("Repository root of %s not found" % repo_name)
+  for folder in sub_dirs:
+    path = os.path.join(path, folder)
+  sys.path.insert(0, path)

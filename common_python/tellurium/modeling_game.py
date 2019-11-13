@@ -1,5 +1,7 @@
 """Analysis Codes for the Modeling Game for BIOE 498V."""
 
+import sys
+import os
 import model_fitting as mf
 
 import numpy as np
@@ -112,10 +114,11 @@ def plotData(df_data, starttime=0, endtime=1200, title=""):
   plt.title(title)
   plt.legend(df_data.columns, loc="upper right")
 
-def makeParameters(constants):
+def makeParameters(constants, values=None):
   """
   Creates parameters with the correct ranges based on their names.
   :param str constants: names of constant
+  :param list-float values: initial values to use.
   """
   if isinstance(constants, str):
       constants = [constants]
@@ -130,7 +133,7 @@ def makeParameters(constants):
       "d_mRNA": (0.5, 2)
       }
   parameters = lmfit.Parameters()
-  for constant in constants:
+  for idx, constant in enumerate(constants):
     pfxs = re.findall(r"^\D+", constant)
     if len(pfxs) != 1:
         raise ValueError("Cannot find match for %s" % constant)
@@ -143,6 +146,9 @@ def makeParameters(constants):
     if is_keyerror:
       raise ValueError("No value range defined for parameter type %s"
           % pfx)
-    initial_val = (min_val + max_val) / 2
+    if values is None:
+      initial_val = (min_val + max_val) / 2
+    else:
+      initial_val = values[idx]
     parameters.add(constant, value=initial_val, min=min_val, max=max_val)
   return parameters

@@ -16,6 +16,7 @@ INDICES = range(NROWS)
 TEST_PARAMETERS = lmfit.Parameters()
 TEST_PARAMETERS.add('k1', value=0.1, min=0, max=10)
 TEST_PARAMETERS.add('k2', value=0.2, min=0, max=10)
+CSV_FILE = "wild.csv"
 
 def makeData(nrows, ncols, valFunc=None):
   """
@@ -244,7 +245,6 @@ def testDoBootstrap2():
   result = mf.doBootstrap(full_obs_data, 
       model=model0, parameters=unfitted_parameters, 
       num_points=num_points, sim_time=sim_time, count=5)
-  
  
 def testMakeParameterStatistics():
   num_points = 20

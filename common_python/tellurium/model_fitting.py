@@ -509,7 +509,6 @@ def makeSyntheticObservations(residual_matrix, **kwargs):
   df_data = df_data.applymap(lambda v: max(v, 0))
   return df_data
 
-# FIXME: Getting divide by 0
 def doBootstrapWithResiduals(residuals_matrix, 
     method=DF_METHOD, count=DF_BOOTSTRAP_COUNT, **kwargs):
   """
