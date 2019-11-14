@@ -23,28 +23,6 @@ END_TIME = 1200
 
 
 ################### Functions ####################
-def cleanColumns(df_data, is_force_time=False):
-  """
-  Cleans the column names in the dataframe,
-  removing "[", "]". Makes time index.
-  :param pd.DataFrame df_data: Simulation data output.
-  :param bool is_force_time: force time to factors of 10
-  """
-  df = df_data.copy()
-  columns = []
-  for col in df_data.columns:
-    new_col = str(col)
-    new_col = new_col.replace("[", "")
-    new_col = new_col.replace("]", "")
-    columns.append(new_col)
-  df.columns = columns
-  if TIME in df.columns:
-    df = df.set_index(TIME)
-    if is_force_time:
-      times = [float(TIME_TO_POINT*(t//TIME_TO_POINT)) for t in df.index]
-      df.index = times
-  return df
-
 def makeDF(named_array, is_mrna=True, is_protein=True, is_input=False):
   """
   :param bool is_mrna: include mRNA in output
@@ -59,7 +37,7 @@ def makeDF(named_array, is_mrna=True, is_protein=True, is_input=False):
   #
   df = pd.DataFrame(named_array)
   df.columns = named_array.colnames
-  df = cleanColumns(df, is_force_time=True)
+  df = mf.cleanColumns(df)
   #
   if not is_mrna:
     delColumn(df, "mRNA")

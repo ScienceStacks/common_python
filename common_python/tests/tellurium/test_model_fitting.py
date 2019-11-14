@@ -96,19 +96,19 @@ def testPlotTimeSeries():
 
 def testMakeObservations():
   def test(num_points):
-    obs_data = mf.makeObservations(
+    df_obs = mf.makeObservations(
         num_points=num_points,
         road_runner=mf.ROAD_RUNNER)
-    simulation_result = mf.runSimulation(
+    simulation_result  = mf.runSimulation(
         num_points=num_points,
         road_runner=mf.ROAD_RUNNER)
-    data = simulation_result.data[:, 1:]
-    nrows, _ = np.shape(data)
-    assert(nrows == num_points)
-    std = np.sqrt(np.var(mf.arrayDifference(
-        obs_data[:, 1:], data)))
-    assert(std < 3*mf.NOISE_STD)
-    assert(std > mf.NOISE_STD/3.0)
+    df_sim = mf.matrixToDF(simulation_result.data)
+    assert(len(df_obs) == len(df_sim))
+    df_res = df_obs - df_sim
+    ser_std = df_res.std()
+    trues = [v < 3*mf.NOISE_STD for v in ser_std.values]
+    assert(all(trues))
+  #
   test(mf.NUM_POINTS)
   test(2*mf.NUM_POINTS)
 
@@ -169,22 +169,23 @@ def testCrossValidate2():
     assert(np.abs(params_dict[name]  \
     - TEST_PARAMETERS.valuesdict()[name]) < 2*params_dict[name])
 
-def testMakeResidualsBySpecies():
+def testMakeResidualDF():
   num_points = 20
   max_val = 10 
-  residual_matrix = _getResiduals(num_points)
-  assert(np.shape(residual_matrix)[0] == num_points)
-  assert(sum(sum(residual_matrix)) < max_val)
+  df_res = _getResiduals(num_points)
+  assert(len(df_res) == num_points)
+  assert(df_res.sum().sum() < max_val)
 
 def testMakeSyntheticObservations():
   num_points = 20
   kwargs = {'model': mf.MODEL,
             'num_points': num_points,
            }
-  residual_matrix = _getResiduals(num_points, model=kwargs['model'])
-  df_syn = mf.makeSyntheticObservations(residual_matrix, **kwargs)
+  df_res = _getResiduals(num_points, model=kwargs['model'])
+  df_syn = mf.makeSyntheticObservations(df_res, **kwargs)
   assert(len(df_syn) == num_points)
-  assert(len(df_syn.columns) == np.shape(residual_matrix)[1])
+  assert(len(set(df_syn.columns).symmetric_difference(
+       df_res.columns)) == 0)
 
 def _makeParameterList(count, num_points=mf.NUM_POINTS, **kwargs):
   residual_matrix = _getResiduals(num_points, model=kwargs['model'])
@@ -202,18 +203,18 @@ def testDoBootstrapWithResiduals():
     assert(isinstance(parameters, lmfit.Parameters))
 
 def _getResiduals(num_points, model=mf.MODEL):
-  obs_data = mf.makeObservations(model=model,
+  df_obs = mf.makeObservations(model=model,
       parameters=TEST_PARAMETERS, num_points=num_points)
-  return mf.makeResidualsMatrix(obs_data, model,
+  return mf.makeResidualDF(df_obs, model,
       TEST_PARAMETERS, num_points=num_points)
 
 def testDoBootstrap():
   num_points = 20
   count = 3
   model = mf.MODEL
-  obs_data = mf.makeObservations(model=model,
+  df_obs = mf.makeObservations(model=model,
       parameters=TEST_PARAMETERS, num_points=num_points)
-  statistic_dict = mf.doBootstrap(obs_data, model,
+  statistic_dict = mf.doBootstrap(df_obs, model,
       TEST_PARAMETERS, count=count,
       num_points=num_points)
   params_dict = TEST_PARAMETERS.valuesdict()
@@ -240,9 +241,9 @@ def testDoBootstrap2():
   sim_time = 20
   unfitted_parameters = mf.makeParameters(
       constants=['k1', 'k2', 'k3'])
-  full_obs_data = mf.makeObservations(model=model0, 
+  df_full_obs = mf.makeObservations(model=model0, 
       noise_std=0.3, num_points=num_points, sim_time=sim_time)
-  result = mf.doBootstrap(full_obs_data, 
+  result = mf.doBootstrap(df_full_obs, 
       model=model0, parameters=unfitted_parameters, 
       num_points=num_points, sim_time=sim_time, count=5)
  
@@ -303,6 +304,7 @@ def testCalcStatistic():
    
   
 if __name__ == '__main__':
+  testMakeResidualDF()
   if True:
     testReshapeData() 
     testArrayDifference() 
@@ -316,7 +318,7 @@ if __name__ == '__main__':
     testCrossValidate()
     testMakeObservations()
     testCrossValidate2()
-    testMakeResidualsBySpecies()
+    testMakeResidualDF()
     testMakeSyntheticObservations()
     testDoBootstrapWithResiduals()
     testDoBootstrap()
