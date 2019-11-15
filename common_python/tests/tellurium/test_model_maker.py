@@ -100,6 +100,13 @@ class TestGeneMaker(unittest.TestCase):
     spec = model_maker.GeneMaker.do(desc_stg)
     self.assertEqual(len(spec.constants),  NCONST_1_TF)
 
+  def testStr(self):
+    # Smoke test
+    self._addProteins(self.maker, NPROTS, IS_ACTIVATES)
+    _ = str(self.maker)
+    
+    
+
 
 if __name__ == '__main__':
   unittest.main()

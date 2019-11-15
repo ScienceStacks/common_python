@@ -153,7 +153,7 @@ class GeneMaker(object):
   
   def _makeKinetics(self):
     if len(self._nprots) == 0:
-      stg = self._makeBasicKinetics
+      stg = self._makeBasicKinetics()
     else:
       stg = "%s + %s" % (self._makeBasicKinetics(),
           self._makeTFKinetics())
@@ -212,8 +212,9 @@ class GeneMaker(object):
     for nprot, is_activate in  \
         zip(descriptor.nprots, descriptor.is_activates):
       maker.addProtein(nprot, is_activate)
-    stg = maker.makeReaction()
-    return GeneSpecification(reaction=stg, constants=maker.constants)
+    maker.makeReaction()
+    return GeneSpecification(reaction=maker.reaction,
+        constants=maker.constants)
       
 
 class ModelMaker(object):
