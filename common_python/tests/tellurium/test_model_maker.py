@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 NGENE = 1
 NPROTS = [2, 3]
 IS_ACTIVATES = [True, False]
@@ -25,14 +25,20 @@ class TestGeneMaker(unittest.TestCase):
     self.maker = model_maker.GeneMaker(NGENE)
 
   def testConstructor(self):
+    if IGNORE_TEST:
+      return
     self.assertEqual(len(self.maker._nprots), 0)
 
   def _addProteins(self, maker, nprots, is_activates):
+    if IGNORE_TEST:
+      return
     is_activates = [True, False]
     [maker.addProtein(n, is_activate=b)
         for b, n in zip(is_activates, NPROTS)]
 
   def testAddProtein(self):
+    if IGNORE_TEST:
+      return
     self._addProteins(self.maker, NPROTS, IS_ACTIVATES)
     self.assertFalse(all(self.maker._is_activates))
     self.assertEqual(len(self.maker._is_activates),
@@ -41,16 +47,22 @@ class TestGeneMaker(unittest.TestCase):
       len(NPROTS))
    
   def testMakePVar(self):
+    if IGNORE_TEST:
+      return
     nprot = 24
     self.assertEqual("P%d" % nprot, self.maker._makePVar(nprot))
 
   def testMakeBasicKinetics(self):
+    if IGNORE_TEST:
+      return
     stg = self.maker._makeBasicKinetics()
     self.assertTrue("L" in stg)
     self.assertTrue("d_mRNA" in stg)
     self.assertTrue("*mRNA" in stg)
 
   def testMakeTerm(self):
+    if IGNORE_TEST:
+      return
     stg = self.maker._makeTerm(NPROTS)
     self.assertTrue("K1" in stg)
     self.assertEqual(stg.count("P"), 2)
@@ -58,6 +70,8 @@ class TestGeneMaker(unittest.TestCase):
     self.assertTrue("K2" in stg)
 
   def testMakeTFKinetics(self):
+    if IGNORE_TEST:
+      return
     def test(is_or_integration):
       maker = model_maker.GeneMaker(NGENE,
           is_or_integration=is_or_integration)
@@ -74,6 +88,8 @@ class TestGeneMaker(unittest.TestCase):
     test(False)
 
   def testMakeReaction(self):
+    if IGNORE_TEST:
+      return
     self._addProteins(self.maker, NPROTS, IS_ACTIVATES)
     self.maker.makeReaction()
     self.assertEqual(len(self.maker.constants), NCONST_2_TF)
@@ -82,6 +98,8 @@ class TestGeneMaker(unittest.TestCase):
       self.assertTrue(constant in self.maker.reaction)
 
   def testMakeGeneDescriptor(self):
+    if IGNORE_TEST:
+      return
     desc = model_maker.GeneMaker._makeGeneDescriptor("2A+3")
     self.assertEqual(desc.ngene, 2)
     self.assertEqual(desc.is_or_integration, False)
@@ -92,7 +110,8 @@ class TestGeneMaker(unittest.TestCase):
     self.assertEqual(len(desc.is_activates), 2)
  
   def testDo(self):
-    # Descriptor for Gene 1
+    desc_stg = "8X-1"
+    spec = model_maker.GeneMaker.do(desc_stg)
     desc_stg = "1O+0,+4"
     spec = model_maker.GeneMaker.do(desc_stg)
     self.assertEqual(len(spec.constants),  NCONST_2_TF)
@@ -101,6 +120,8 @@ class TestGeneMaker(unittest.TestCase):
     self.assertEqual(len(spec.constants),  NCONST_1_TF)
 
   def testStr(self):
+    if IGNORE_TEST:
+      return
     # Smoke test
     self._addProteins(self.maker, NPROTS, IS_ACTIVATES)
     _ = str(self.maker)

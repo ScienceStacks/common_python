@@ -1,4 +1,19 @@
-"""Construct a Model for the Modeling Game."""
+"""
+Construct a Model for the Modeling Game.
+
+GeneMaker creates the reaction string for an mRNA and
+identifies the constants that must be estimated.
+
+A gene is described in terms of a descriptor string
+structured as follows: GISP,SP
+
+where: 
+  G is the gene number
+  I indicates the kind of integration: A for and O for or
+  S is either "+" or "-" to indicate that the protein activates
+    or inhibits the gene product
+  P is a protein number
+"""
 
 import model_fitting as mf
 import modeling_game as mg
@@ -141,13 +156,15 @@ class GeneMaker(object):
       if len(numerator) == 0:
         numerator = "1"  # Ensure has at least one term
     else:  # AND integration
-      numerator = self._makeTerm(self._nprots)
+      numerator = "1"
       if all(self._is_activates):
         numerator = terms[-1]
       elif self._is_activates[0]:
         numerator = terms[0]
-      elif self._is_activates[1]:
-        numerator = terms[1]
+      else:
+        if len(self._is_activates) > 1:
+          if self._is_activates[1]:
+            numerator = terms[1]
     return "%s * ( %s ) / ( %s )" % (
         self._Vm, numerator, denominator)
   
@@ -217,7 +234,9 @@ class GeneMaker(object):
         constants=maker.constants)
       
 
+#TODO: Implement the code
 class ModelMaker(object):
+  # Create a full model.
 
   def __init__(self, num_mrna=8):
     self._rna_productions = []
@@ -229,4 +248,3 @@ class ModelMaker(object):
 
   def __str__(self):
     return self._model
-
