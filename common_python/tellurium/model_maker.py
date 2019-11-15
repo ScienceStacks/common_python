@@ -7,7 +7,10 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 
-TranscriptionFactor = namedtuple("TranscriptionFactor", "nprot activate")
+GeneDescriptor = namedtuple("GeneDescriptor",
+    "ngene is_or_integration nprots is_activates")
+GeneSpecification = namedtuple("GeneSpecification",
+    "reaction constants")
 
 # Initial arcs in reaction network
 INITIAL_NETWORK = [
@@ -45,7 +48,7 @@ model *pathway()
   '''
 
 
-class ReactionMaker(object):
+class GeneMaker(object):
   """Creates the reaction for gene production of mRNA."""
     
   def __init__(self, ngene, is_or_integration=True):
@@ -57,15 +60,16 @@ class ReactionMaker(object):
     self._is_or_integration = is_or_integration
     self._nprots = []
     self._is_activates = []
-    self._constants = [
-        self._makeVar("L"),       # IDX_L
-        self._makeVar("d_mRNA"),  # IDX_DMRNA
-        ]
     self._k_index = 0  # Index of the K constants
     self._H = self._makeVar("H")  # H constant
     self._Vm = self._makeVar("Vm")  # H constant
     self._mrna = self._makeVar("mRNA")
-    self._reaction = None
+    # The following are produced when a reaction is constructed
+    self.constants = [
+        self._makeVar("L"),       # IDX_L
+        self._makeVar("d_mRNA"),  # IDX_DMRNA
+        ]
+    self.reaction = None
       
   def addProtein(self, nprot, is_activate=True):
     """
@@ -80,17 +84,21 @@ class ReactionMaker(object):
 
   def _makeKVar(self):
     self._k_index += 1
-    var = "K%d_%d" % (self._ngene, self._k_index)
-    self._constants.append(var)
+    var = "K%d_%d" % (self._k_index, self._ngene)
+    self.constants.append(var)
     return var
 
   def _makePVar(self, nprot):
-    return "P%d" % nprot
+    if nprot == 0:
+      stg = "INPUT"
+    else:
+      stg = "P%d" % nprot
+    return stg
 
   def _makeBasicKinetics(self):
     return "%s - %s*%s" % (
-        self._constants[IDX_L], 
-        self._constants[IDX_DMRNA],
+        self.constants[IDX_L], 
+        self.constants[IDX_DMRNA],
         self._mrna)
 
   def _makeTerm(self, nprots):
@@ -114,16 +122,22 @@ class ReactionMaker(object):
     for term in terms:
       denominator += " + %s" % term
     numerator = ""
+    sep = ""
     if self._is_or_integration:
       is_first = True
       for is_activate, term  in zip(self._is_activates, terms[:-1]):
         if is_first:
-          sep = ""
           is_first = False
         else:
           sep = " + "
         if is_activate:
           numerator += "%s %s" %  (sep, term)
+      # Include the joint occurrence of the TFs
+      if all(self._is_activates):
+        numerator += "%s %s" %  (sep, terms[-1])
+      # If one is a repressor, then include state of both missing
+      else:
+        numerator += "%s 1" %  sep
       if len(numerator) == 0:
         numerator = "1"  # Ensure has at least one term
     else:  # AND integration
@@ -143,21 +157,63 @@ class ReactionMaker(object):
     else:
       stg = "%s + %s" % (self._makeBasicKinetics(),
           self._makeTFKinetics())
-      self._constants.extend([
+      self.constants.extend([
           self._Vm,
           self._H,
           ])
     return stg
 
   def makeReaction(self):
-    if self._reaction is None:
-      label = self._makeVar("J")
-      self._reaction = "%s: => %s; %s" % (label, 
-          self._mrna, self._makeKinetics())
-    return self._reaction
+    """
+    Updates the reaction string, self.reaction.
+    """
+    label = self._makeVar("J")
+    self.reaction = "%s: => %s; %s" % (label, 
+        self._mrna, self._makeKinetics())
+
+  @staticmethod
+  def _makeGeneDescriptor(string):
+    ngene = int(string[0])
+    if string[1] == "O":
+      is_or_integration = True
+    else:
+      is_or_integration = False
+    stgs = string[2:].split(",")
+    nprots = []
+    is_activates = []
+    for stg in stgs:
+      if stg[0] == "+":
+        is_activate = True
+      else:
+        is_activate = False
+      nprot = int(stg[1])
+      nprots.append(nprot)
+      is_activates.append(is_activate)
+    return GeneDescriptor(
+        ngene=ngene,
+        is_or_integration=is_or_integration,
+        nprots=nprots,
+        is_activates=is_activates)
     
   def __str__(self):
-    return self._reaction
+    if self.reaction is None:
+      self.makeReaction()
+    return self.reaction
+
+  @classmethod
+  def do(cls, string):
+    """
+    Constructs the reaction for the gene.
+    :param str string: String representation of a gene description
+    :return GeneSpecification:
+    """
+    descriptor = cls._makeGeneDescriptor(string)
+    maker = GeneMaker(descriptor.ngene, descriptor.is_or_integration)
+    for nprot, is_activate in  \
+        zip(descriptor.nprots, descriptor.is_activates):
+      maker.addProtein(nprot, is_activate)
+    stg = maker.makeReaction()
+    return GeneSpecification(reaction=stg, constants=maker.constants)
       
 
 class ModelMaker(object):
@@ -165,9 +221,9 @@ class ModelMaker(object):
   def __init__(self, num_mrna=8):
     self._rna_productions = []
     self._parameters = None
-    self._model = ""
+    self._model = None
 
-  def addGene(ngene, nprots, is_or_integration=True):
+  def addGene(self, gene_descriptor):
     pass
 
   def __str__(self):
