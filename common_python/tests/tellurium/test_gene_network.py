@@ -1,4 +1,4 @@
-"""Tests for classifier_ensemble.ClassifierEnsemble."""
+""" Tests for classifier_ensemble.ClassifierEnsemble."""
 
 from common_python.util import util
 util.addPath("common_python", 
