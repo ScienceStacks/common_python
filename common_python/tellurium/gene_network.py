@@ -1,7 +1,7 @@
 """
 Construct a Model for the Modeling Game.
 
-GeneMaker creates the reaction string for an mRNA and
+GeneReaction creates the reaction string for an mRNA and
 identifies the constants that must be estimated.
 
 A gene is described by a descriptor string. There are
@@ -33,15 +33,12 @@ CUR_DIR = os.path.dirname(os.path.abspath(__file__))
 PATH_HEAD = os.path.join(FILE_HEAD, CUR_DIR)
 PATH_TAIL = os.path.join(FILE_TAIL, CUR_DIR)
 NGENE = 8  # Number of genes
-# Structure of gene string description
+# Initial network from the modeling game
+INITIAL_NETWORK = ["1+0O+4", "2+4", "3+6", "4-2", "6+7A-1", "8-1"]
+# Structure of gene string descriptor
 POS_GENE = 0
 POS_SIGN_1 = 1
 POS_PROTEIN_1 = 2
-
-GeneDescriptor = namedtuple("GeneDescriptor",
-    "ngene is_or_integration nprots is_activates")
-GeneSpecification = namedtuple("GeneSpecification",
-    "reaction constants")
 
 # Initial arcs in reaction network
 INITIAL_NETWORK = [
@@ -51,7 +48,109 @@ IDX_L = 0
 IDX_DMRNA = 1
 
 
-class GeneMaker(object):
+################ Helper Functions ###################
+def _setList(values):
+  if values is None:
+    return []
+  else:
+    return values
+
+def _equals(list1, list2):
+  diff = set(list1).symmetric_difference(list2)
+  return len(diff) == 0
+
+
+################ Classes ###################
+class GeneDescriptor(object):
+  # Describes the transcription factors (protein) for a gene
+  # and how they affect the gene's activation
+
+  def __init__(self, ngene, nprots=None, 
+      is_activates=None, is_or_integration=True):
+    """
+    :param int ngene: number of the gene
+    :param list-int nprots: list of protein TFs
+    :param list-bool is_activates: list of how corresponding prot impacts gene
+    :param bool is_or_integration: logic used to combine terms
+    """
+    self.ngene = int(ngene)
+    self.nprots = [int(p) for p in _setList(nprots)]
+    self.is_activates = _setList(is_activates)
+    self.is_or_integration = is_or_integration
+
+  def equals(self, other):
+    result = True
+    result = result and (self.ngene == other.ngene)
+    result = result and _equals(self.nprots, other.nprots)
+    result = result and _equals(self.is_activates, other.is_activates)
+    result = result and (
+        self.is_or_integration == other.is_or_integration)
+    return result
+
+  def __str__(self):
+    def makeTerm(is_activate, nprot):
+      if is_activate:
+        sign = "+"
+      else:
+        sign = "-"
+      stg = "%s%d" % (sign, nprot)
+      return stg
+    #
+    stg = str(self.ngene)
+    if len(self.nprots) > 0:
+      stg += makeTerm(self.is_activates[0], self.nprots[0])
+    if len(self.nprots) == 2:
+      if self.is_or_integration:
+        conjunction = "O"
+      else:
+        conjunction = "A"
+      stg += conjunction
+      stg += makeTerm(self.is_activates[1], self.nprots[1])
+    return stg
+      
+
+  @classmethod
+  def parse(cls, string):
+    """
+    Parses a descriptor string (as described in the module
+    comments).
+    :param str string: gene descriptor string
+    :return GeneDescriptor:
+    """
+    # Initializations
+    string = str(string)  # With 0 TFs, may have an int
+    nprots = []
+    is_activates = []
+    is_or_integration = True
+    #
+    def extractTF(stg):
+      if stg[0] == "+":
+        is_activate = True
+      else:
+        is_activate = False
+      nprots.append(int(stg[1]))
+      is_activates.append(is_activate)     
+    # Extract gene
+    ngene = int(string[0])
+    #
+    if len(string) >= 3:
+      extractTF(string[1:3])
+    if len(string) == 6:
+      if string[4] == "O":
+        is_or_integration = True
+      else:
+        is_or_integration = False
+      extractTF(string[4:6])
+    #
+    return GeneDescriptor(
+        ngene,
+        is_or_integration=is_or_integration,
+        nprots=nprots,
+        is_activates=is_activates)
+
+
+######################################################
+class GeneReaction(object):
   """Creates the reaction for gene production of mRNA."""
     
   def __init__(self, ngene, is_or_integration=True):
@@ -175,45 +274,6 @@ class GeneMaker(object):
     label = self._makeVar("J")
     self.reaction = "%s: => %s; %s" % (label, 
         self._mrna, self._makeKinetics())
-
-  @staticmethod
-  def _parseDescriptorString(string):
-    """
-    Parses a descriptor string (as described in the module
-    comments).
-    :param str string: descriptor string
-    :return GeneDescriptor:
-    """
-    # Initializations
-    string = str(string)  # With 0 TFs, may have an int
-    nprots = []
-    is_activates = []
-    is_or_integration = True
-    #
-    def extractTF(stg):
-      if stg[0] == "+":
-        is_activate = True
-      else:
-        is_activate = False
-      nprots.append(int(stg[1]))
-      is_activates.append(is_activate)     
-    # Extract gene
-    ngene = int(string[0])
-    #
-    if len(string) >= 3:
-      extractTF(string[1:3])
-    if len(string) == 6:
-      if string[4] == "O":
-        is_or_integration = True
-      else:
-        is_or_integration = False
-      extractTF(string[4:6])
-    #
-    return GeneDescriptor(
-        ngene=ngene,
-        is_or_integration=is_or_integration,
-        nprots=nprots,
-        is_activates=is_activates)
     
   def __str__(self):
     if self.reaction is None:
@@ -224,11 +284,11 @@ class GeneMaker(object):
   def do(cls, string):
     """
     Constructs the reaction for the gene.
-    :param str string: String representation of a gene description
-    :return GeneMaker:
+    :param str string: String representation of a gene descriptor
+    :return GeneReaction:
     """
-    descriptor = cls._parseDescriptorString(string)
-    maker = GeneMaker(descriptor.ngene, descriptor.is_or_integration)
+    descriptor = GeneDescriptor.parse(string)
+    maker = GeneReaction(descriptor.ngene, descriptor.is_or_integration)
     for nprot, is_activate in  \
         zip(descriptor.nprots, descriptor.is_activates):
       maker.addProtein(nprot, is_activate)
@@ -236,33 +296,60 @@ class GeneMaker(object):
     return maker
       
 
+######################################################
 #TODO: Implement the code
-class ModelMaker(object):
+class GeneNetwork(object):
   # Create a full model.
 
-  def __init__(self):
+  def __init__(self, initial_network=INITIAL_NETWORK):
     """
-    :param list-str gene_descriptions: TF descriptions for genes
+    :param list-str gene_descriptors: gene descriptor strings
     """
     self._ngene = NGENE
     self._constants = []  # Constants in the model
     self.parameters = None  # lmfit.Parameters for model
     self.model = None  # Model string
-    self._description_dict = {n: 
-        ModelMaker._makeDefaultDescription(n)
-        for n in self._getGeneNumbers()}
+    self._network = {}  # Key is gene; value is GeneDescriptor
+    self._constants = []  # All constants in model
+    self._initialize_constants = []  # Constants to initialize to 0
+    self.updateDescriptions(initial_network, is_initialize=False)
 
-  def _getGeneNumbers(self):
-    return [n for n in range(1, self._ngene+1)] 
+  def updateNetwork(self, strings, is_initialize=True):
+    """
+    Updates the entries for descriptors.
+    :param list-str strings: list of gene descriptor strings
+    :param bool is_intialize: constants should be initialized
+    Updates
+      self._constants
+      self._initialize_constants
+      self._network
+    """
+    for string in strings:
+      new_desc = GeneDescriptor.parse(string)
+      # Remove constants from the old descriptor
+      if desc.ngene in self.network.keys():
+        old_desc = self.network[desc.ngene]
+        self._constants = list(set(self._constants).difference(old_desc))
+        self._initialize_constants = list(set(self._constants).difference(old_desc))
+      # Add constants for the new descriptor
+      self.network[desc.ngene] = desc
+      self._constants = self._constants.extend(desc.constants)
+      if is_initialize:
+        self._initialize_constants =  \
+            self._initialize_constants.extend(desc.initialize_constants)
+    # Verify that this is a complete network
+    if len(self._network.keys()) != self._ngene:
+      raise ValueError("Some key is not initialized: %s:"
+          % str(self._network.keys()))
 
   @staticmethod
   def _makeDefaultDescription(ngene):
     return "%dX" % ngene
 
-  def addDescriptions(self, descriptions, is_set_constants=True):
+  def updateNetwork(self, descriptors, is_set_constants=True):
     """
     Cumulative adds to the model and the parameters.
-    self._descriptions = gene_descriptions
+    self._descriptors = gene_descriptors
     :param bool is_set_constants: initialize constants to 0
     """
     pass
@@ -283,15 +370,15 @@ class ModelMaker(object):
 
   def _addGene(self, ngene):
     """
-    Uses the gene descriptions. If none present, generates
+    Uses the gene descriptors. If none present, generates
     a "null model"
     """
     pass
 
   def copy(self):
     """
-    Copies the GeneMaker.
-    :return GeneMaker:
+    Copies the GeneReaction.
+    :return GeneReaction:
     """
     return copy.deepcopy(self)
 
