@@ -1,8 +1,5 @@
 """
-Construct a Model for the Modeling Game.
-
-GeneReaction creates the reaction string for an mRNA and
-identifies the constants that must be estimated.
+Constructs a gene network for the modeling game.
 
 A gene is described by a descriptor string. There are
 three cases.
@@ -16,6 +13,16 @@ where:
   s is either "+" or "-" to indicate that the protein activates
     or inhibits the gene product
   p is a protein number
+
+The module is implemented as follows:
+
+  GeneDescriptor implements a representation of the
+  transcription factors (proteins) that activate/inhibit a gene.
+
+  GeneReaction constructions the mRNA reaction for a gene,
+  along with providing the constants in the reaction.
+
+  GeneNetwork generates the entire gene network for the game.
 """
 
 import model_fitting as mf
@@ -281,13 +288,14 @@ class GeneReaction(object):
     return self.reaction
 
   @classmethod
-  def do(cls, string):
+  def do(cls, descriptor):
     """
-    Constructs the reaction for the gene.
-    :param str string: String representation of a gene descriptor
+    Constructs the reaction and constants for the gene.
+    :param str/GeneDescriptor descriptor: gene descriptor
     :return GeneReaction:
     """
-    descriptor = GeneDescriptor.parse(string)
+    if isinstance(desc, str):
+      descriptor = GeneDescriptor.parse(string)
     maker = GeneReaction(descriptor.ngene, descriptor.is_or_integration)
     for nprot, is_activate in  \
         zip(descriptor.nprots, descriptor.is_activates):
@@ -297,9 +305,16 @@ class GeneReaction(object):
       
 
 ######################################################
-#TODO: Implement the code
 class GeneNetwork(object):
-  # Create a full model.
+  """
+  Create a full model.
+  Usage:
+    network = GeneNetwork()
+    network.update(<list-gene-descriptions>)
+    network.update(<list-gene-descriptions>)
+    network.do()
+  Can then use network.model and network.parameters
+  """
 
   def __init__(self, initial_network=INITIAL_NETWORK):
     """
@@ -314,7 +329,7 @@ class GeneNetwork(object):
     self._initialize_constants = []  # Constants to initialize to 0
     self.updateDescriptions(initial_network, is_initialize=False)
 
-  def updateNetwork(self, strings, is_initialize=True):
+  def update(self, strings, is_initialize=True):
     """
     Updates the entries for descriptors.
     :param list-str strings: list of gene descriptor strings
@@ -342,38 +357,21 @@ class GeneNetwork(object):
       raise ValueError("Some key is not initialized: %s:"
           % str(self._network.keys()))
 
-  @staticmethod
-  def _makeDefaultDescription(ngene):
-    return "%dX" % ngene
-
-  def updateNetwork(self, descriptors, is_set_constants=True):
+  def do(self):
     """
-    Cumulative adds to the model and the parameters.
-    self._descriptors = gene_descriptors
-    :param bool is_set_constants: initialize constants to 0
-    """
-    pass
-
-  def make(self):
-    """
-    Generates a model
+    Generates an antimony model for the gene network.
     Updates
-      self.parameters
       self.model
+      self.parameters
     """
-    model_str = ""
-    # 1: Append head
-    # 2: Construct gene reactions and append
-    # 3: Append tail
-    # 4: Construct list of constants and parameters
-    pass
-
-  def _addGene(self, ngene):
-    """
-    Uses the gene descriptors. If none present, generates
-    a "null model"
-    """
-    pass
+    # 1: Append the head of the file
+    self.model = GeneNetwork._readFile(FILE_HEAD)
+    # 2: Append gene reactions
+    # 3: Append constant initializations
+    # 4: Append the tail of the file
+    self.model += "\n" + GeneNetwork._readFile(FILE_HEAD)
+    # 5: Construct the lmfit.parameters for constants in the model
+    self.parameters = mg.makeParameters(self.constants)
 
   def copy(self):
     """
@@ -381,12 +379,6 @@ class GeneNetwork(object):
     :return GeneReaction:
     """
     return copy.deepcopy(self)
-
-  def makeProteinConstants(self):
-    """
-    :return list-str: list of constants for protein reactions
-    """
-    pass
 
   @staticmethod
   def _readFile(path):
