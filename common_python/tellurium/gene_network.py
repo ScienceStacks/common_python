@@ -294,14 +294,15 @@ class GeneReaction(object):
     :param str/GeneDescriptor descriptor: gene descriptor
     :return GeneReaction:
     """
-    if isinstance(desc, str):
-      descriptor = GeneDescriptor.parse(string)
-    maker = GeneReaction(descriptor.ngene, descriptor.is_or_integration)
+    if isinstance(descriptor, str):
+      descriptor = GeneDescriptor.parse(descriptor)
+    gene = GeneReaction(descriptor.ngene,
+        descriptor.is_or_integration)
     for nprot, is_activate in  \
         zip(descriptor.nprots, descriptor.is_activates):
-      maker.addProtein(nprot, is_activate)
-    maker.makeReaction()
-    return maker
+      gene.addProtein(nprot, is_activate)
+    gene.makeReaction()
+    return gene
       
 
 ######################################################

@@ -160,6 +160,13 @@ class TestGeneReaction(unittest.TestCase):
     self._addProteins(self.maker, NPROTS, IS_ACTIVATES)
     _ = str(self.maker)
     
+
+###########################################################
+class TestGeneNetwork(unittest.TestCase):
+
+  def setUp(self):
+    self.network = gene_network.GeneNetwork()
+    
     
 
 
