@@ -294,7 +294,7 @@ class GeneReaction(object):
     :param str/GeneDescriptor descriptor: gene descriptor
     :return GeneReaction:
     """
-    if isinstance(descriptor, str):
+    if not isinstance(descriptor, GeneDescriptor):
       descriptor = GeneDescriptor.parse(descriptor)
     gene = GeneReaction(descriptor.ngene,
         descriptor.is_or_integration)
