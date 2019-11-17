@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 NGENE = 1
 NPROTS = [2, 3]
 IS_ACTIVATES = [True, False]
@@ -97,27 +97,38 @@ class TestGeneMaker(unittest.TestCase):
     for constant in self.maker.constants:
       self.assertTrue(constant in self.maker.reaction)
 
-  def testMakeGeneDescriptor(self):
+  def testParseDescriptorString(self):
     if IGNORE_TEST:
       return
-    desc = model_maker.GeneMaker._makeGeneDescriptor("2A+3")
+    desc = model_maker.GeneMaker._parseDescriptorString("2")
     self.assertEqual(desc.ngene, 2)
-    self.assertEqual(desc.is_or_integration, False)
+    desc = model_maker.GeneMaker._parseDescriptorString(2)
+    self.assertEqual(desc.ngene, 2)
+    desc = model_maker.GeneMaker._parseDescriptorString("2+3")
+    self.assertEqual(desc.ngene, 2)
     self.assertEqual(desc.is_activates[0], True)
     self.assertEqual(desc.nprots[0], 3)
-    desc = model_maker.GeneMaker._makeGeneDescriptor("2O-3")
-    desc = model_maker.GeneMaker._makeGeneDescriptor("2O-3,+4")
+    desc = model_maker.GeneMaker._parseDescriptorString("2-3")
+    self.assertEqual(desc.is_activates[0], False)
+    self.assertEqual(desc.nprots[0], 3)
+    desc = model_maker.GeneMaker._parseDescriptorString("2-3O+4")
     self.assertEqual(len(desc.is_activates), 2)
+    self.assertEqual(desc.is_activates[0], False)
+    self.assertEqual(desc.nprots[0], 3)
+    self.assertEqual(desc.is_activates[1], True)
+    self.assertEqual(desc.nprots[1], 4)
  
   def testDo(self):
-    desc_stg = "8X-1"
+    if IGNORE_TEST:
+      return
+    desc_stg = "8-1"
     spec = model_maker.GeneMaker.do(desc_stg)
-    desc_stg = "1O+0,+4"
-    spec = model_maker.GeneMaker.do(desc_stg)
-    self.assertEqual(len(spec.constants),  NCONST_2_TF)
-    desc_stg = "4O-2"
-    spec = model_maker.GeneMaker.do(desc_stg)
-    self.assertEqual(len(spec.constants),  NCONST_1_TF)
+    desc_stg = "1+0O+4"
+    maker = model_maker.GeneMaker.do(desc_stg)
+    self.assertEqual(len(maker.constants),  NCONST_2_TF)
+    desc_stg = "4-2"
+    maker = model_maker.GeneMaker.do(desc_stg)
+    self.assertEqual(len(maker.constants),  NCONST_1_TF)
 
   def testStr(self):
     if IGNORE_TEST:

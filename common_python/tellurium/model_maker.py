@@ -4,23 +4,39 @@ Construct a Model for the Modeling Game.
 GeneMaker creates the reaction string for an mRNA and
 identifies the constants that must be estimated.
 
-A gene is described in terms of a descriptor string
-structured as follows: GISP,SP
+A gene is described by a descriptor string. There are
+three cases.
+1. 0 TF: g
+2. 1 TF: gsp
+3. 2 TF: gspisp
 
 where: 
-  G is the gene number
-  I indicates the kind of integration: A for and O for or
-  S is either "+" or "-" to indicate that the protein activates
+  g is the gene number
+  i indicates the kind of integration: A for and O for or
+  s is either "+" or "-" to indicate that the protein activates
     or inhibits the gene product
-  P is a protein number
+  p is a protein number
 """
 
 import model_fitting as mf
 import modeling_game as mg
 
 from collections import namedtuple
+import copy
 import numpy as np
+import os
 import pandas as pd
+
+FILE_HEAD = "model_head.txt"
+FILE_TAIL = "model_tail.txt"
+CUR_DIR = os.path.dirname(os.path.abspath(__file__))
+PATH_HEAD = os.path.join(FILE_HEAD, CUR_DIR)
+PATH_TAIL = os.path.join(FILE_TAIL, CUR_DIR)
+NGENE = 8  # Number of genes
+# Structure of gene string description
+POS_GENE = 0
+POS_SIGN_1 = 1
+POS_PROTEIN_1 = 2
 
 GeneDescriptor = namedtuple("GeneDescriptor",
     "ngene is_or_integration nprots is_activates")
@@ -33,34 +49,6 @@ INITIAL_NETWORK = [
 P0 = "INPUT"  # Protein 0 is the input
 IDX_L = 0
 IDX_DMRNA = 1
-
-# Modified model
-RNA1 = '''
-  J1:  => mRNA1; L1 + Vm1*((K1_1*INPUT^H1 + K2_1*P4^H1 + K1_1*K3_1*INPUT^H1*P4^H1)/(1 + K1_1*INPUT^H1 + K2_1*P4^H1 + K1_1*K3_1*INPUT^H1*P4^H1)) - d_mRNA1*mRNA1;
-// Created by libAntimony v3.9.4
-model *pathway()
-
-  // Compartments and Species:
-  species INPUT, P1, mRNA1, P2, mRNA2, P3, mRNA3, P4, mRNA4, P5, mRNA5, P6;
-  species mRNA6, P7, mRNA7, P8, mRNA8;
-  
-  J1:  => mRNA1; L1 + Vm1*((K1_1*INPUT^H1 + K2_1*P4^H1 + K1_1*K3_1*INPUT^H1*P4^H1)/(1 + K1_1*INPUT^H1 + K2_1*P4^H1 + K1_1*K3_1*INPUT^H1*P4^H1)) - d_mRNA1*mRNA1;
-  F1:  => P1; a_protein1*mRNA1 - d_protein1*P1;
-  J2:  => mRNA2; L2 + Vm2*(K1_2*P4^H2/(1 + K1_2*P4^H2)) - d_mRNA2*mRNA2;
-  F2:  => P2; a_protein2*mRNA2 - d_protein2*P2;
-  J3:  => mRNA3; L3 + Vm3*(K1_3*P6^H3/(1 + K1_3*P6^H3)) - d_mRNA3*mRNA3;
-  F3:  => P3; a_protein3*mRNA3 - d_protein3*P3;
-  J4:  => mRNA4; L4 + Vm4*(1/(1 + K1_4*P2^H4)) - d_mRNA4*mRNA4;
-  F4:  => P4; a_protein4*mRNA4 - d_protein4*P4;
-  J5:  => mRNA5; L5 - d_mRNA5*mRNA5;
-  F5:  => P5; a_protein5*mRNA5 - d_protein5*P5;
-  J6:  => mRNA6; L6 + Vm6*(K1_6*P7^H6/(1 + K1_6*P7^H6 + K2_6*P1^H6 + K1_6*K2_6*P7^H6*P1^H6)) - d_mRNA6*mRNA6;
-  F6:  => P6; a_protein6*mRNA6 - d_protein6*P6;
-  J7:  => mRNA7; L7 +  Vm7*( K1_7*P1^H7/(1 + K1_7*P1^H7) + 1/(1 + K2_7*P7^H7)) - d_mRNA7*mRNA7;
-  F7:  => P7; a_protein7*mRNA7  - d_protein7*P7;
-  J8:  => mRNA8; L8 + Vm8*(1/(1 + K1_8*P1^H8)) - d_mRNA8*mRNA8;
-  F8:  => P8; a_protein8*mRNA8 - d_protein8*P8;
-  '''
 
 
 class GeneMaker(object):
@@ -189,23 +177,38 @@ class GeneMaker(object):
         self._mrna, self._makeKinetics())
 
   @staticmethod
-  def _makeGeneDescriptor(string):
-    ngene = int(string[0])
-    if string[1] == "O":
-      is_or_integration = True
-    else:
-      is_or_integration = False
-    stgs = string[2:].split(",")
+  def _parseDescriptorString(string):
+    """
+    Parses a descriptor string (as described in the module
+    comments).
+    :param str string: descriptor string
+    :return GeneDescriptor:
+    """
+    # Initializations
+    string = str(string)  # With 0 TFs, may have an int
     nprots = []
     is_activates = []
-    for stg in stgs:
+    is_or_integration = True
+    #
+    def extractTF(stg):
       if stg[0] == "+":
         is_activate = True
       else:
         is_activate = False
-      nprot = int(stg[1])
-      nprots.append(nprot)
-      is_activates.append(is_activate)
+      nprots.append(int(stg[1]))
+      is_activates.append(is_activate)     
+    # Extract gene
+    ngene = int(string[0])
+    #
+    if len(string) >= 3:
+      extractTF(string[1:3])
+    if len(string) == 6:
+      if string[4] == "O":
+        is_or_integration = True
+      else:
+        is_or_integration = False
+      extractTF(string[4:6])
+    #
     return GeneDescriptor(
         ngene=ngene,
         is_or_integration=is_or_integration,
@@ -222,29 +225,87 @@ class GeneMaker(object):
     """
     Constructs the reaction for the gene.
     :param str string: String representation of a gene description
-    :return GeneSpecification:
+    :return GeneMaker:
     """
-    descriptor = cls._makeGeneDescriptor(string)
+    descriptor = cls._parseDescriptorString(string)
     maker = GeneMaker(descriptor.ngene, descriptor.is_or_integration)
     for nprot, is_activate in  \
         zip(descriptor.nprots, descriptor.is_activates):
       maker.addProtein(nprot, is_activate)
     maker.makeReaction()
-    return GeneSpecification(reaction=maker.reaction,
-        constants=maker.constants)
+    return maker
       
 
 #TODO: Implement the code
 class ModelMaker(object):
   # Create a full model.
 
-  def __init__(self, num_mrna=8):
-    self._rna_productions = []
-    self._parameters = None
-    self._model = None
+  def __init__(self):
+    """
+    :param list-str gene_descriptions: TF descriptions for genes
+    """
+    self._ngene = NGENE
+    self._constants = []  # Constants in the model
+    self.parameters = None  # lmfit.Parameters for model
+    self.model = None  # Model string
+    self._description_dict = {n: 
+        ModelMaker._makeDefaultDescription(n)
+        for n in self._getGeneNumbers()}
 
-  def addGene(self, gene_descriptor):
+  def _getGeneNumbers(self):
+    return [n for n in range(1, self._ngene+1)] 
+
+  @staticmethod
+  def _makeDefaultDescription(ngene):
+    return "%dX" % ngene
+
+  def addDescriptions(self, descriptions, is_set_constants=True):
+    """
+    Cumulative adds to the model and the parameters.
+    self._descriptions = gene_descriptions
+    :param bool is_set_constants: initialize constants to 0
+    """
     pass
+
+  def make(self):
+    """
+    Generates a model
+    Updates
+      self.parameters
+      self.model
+    """
+    model_str = ""
+    # 1: Append head
+    # 2: Construct gene reactions and append
+    # 3: Append tail
+    # 4: Construct list of constants and parameters
+    pass
+
+  def _addGene(self, ngene):
+    """
+    Uses the gene descriptions. If none present, generates
+    a "null model"
+    """
+    pass
+
+  def copy(self):
+    """
+    Copies the GeneMaker.
+    :return GeneMaker:
+    """
+    return copy.deepcopy(self)
+
+  def makeProteinConstants(self):
+    """
+    :return list-str: list of constants for protein reactions
+    """
+    pass
+
+  @staticmethod
+  def _readFile(path):
+    with open(path) as fd:
+      result = fd.readlines(path)
+    return "\n".join(result)
 
   def __str__(self):
     return self._model
