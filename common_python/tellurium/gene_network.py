@@ -333,11 +333,7 @@ class GeneReaction(object):
     """
     if not isinstance(descriptor, GeneDescriptor):
       descriptor = GeneDescriptor.parse(descriptor)
-    reaction = GeneReaction(descriptor.ngene,
-        descriptor.is_or_integration)
-    for nprot, is_activate in  \
-        zip(descriptor.nprots, descriptor.is_activates):
-      reaction.add(nprot, is_activate)
+    reaction = GeneReaction(descriptor)
     reaction.generate()
     return reaction
       
