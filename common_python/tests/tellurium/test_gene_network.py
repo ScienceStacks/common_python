@@ -4,7 +4,8 @@ from common_python.util import util
 util.addPath("common_python", 
     sub_dirs=["common_python", "tellurium"])
 
-from common_python.tellurium import gene_network
+from common_python.tellurium import modeling_game as mg
+from common_python.tellurium import gene_network as gn
 from common_python.tellurium.gene_network import  \
     GeneDescriptor, GeneReaction, GeneNetwork
 
@@ -30,8 +31,8 @@ GENE_1_TF = "%d%s%s" % (NGENE, ACTIVATE_1, PROTEIN_1)
 GENE_2_TF = "%d%s%s%s%s%s" % (
     NGENE, ACTIVATE_1, PROTEIN_1, INTEGRATE, ACTIVATE_2, PROTEIN_2)
 NEW_NETWORK = [s.replace(str(1), str(v)) for s,v 
-    in zip(np.repeat(gene_network.INITIAL_NETWORK[0], 8),
-    range(1, gene_network.NUM_GENE+1))]
+    in zip(np.repeat(gn.INITIAL_NETWORK[0], 8),
+    range(1, gn.NUM_GENE+1))]
 
 
 ###########################################################
@@ -219,7 +220,7 @@ class TestGeneReaction(unittest.TestCase):
       for idx in range(1, 4):
         statements += makeInit("K%d_%d" % (idx, ngene))
       # Initialize proteins
-      for protein in range(1, gene_network.NUM_GENE + 1):
+      for protein in range(1, gn.NUM_GENE + 1):
         statements += "P%d = 0\n" % protein
       # Add the kinetics expression
       self._init(desc_stg)
@@ -284,7 +285,7 @@ class TestGeneNetwork(unittest.TestCase):
     if IGNORE_TEST:
       return
     self.assertEqual(len(self.network._network.keys()),
-        gene_network.NUM_GENE)
+        gn.NUM_GENE)
 
   def testUpdate(self):
     if IGNORE_TEST:
@@ -303,8 +304,8 @@ class TestGeneNetwork(unittest.TestCase):
       return
     # Tests for constant initialization
     network = GeneNetwork(range(1,
-        gene_network.NUM_GENE + 1))
-    network.update(gene_network.INITIAL_NETWORK)
+        gn.NUM_GENE + 1))
+    network.update(gn.INITIAL_NETWORK)
     difference = set(self.network._constants).difference(
         network._constants)
     self.assertEqual(len(difference), 0)
@@ -314,9 +315,35 @@ class TestGeneNetwork(unittest.TestCase):
     for constant_type in ["L", "d_mRNA"]:
       self.assertFalse(constant_type in difference)
 
-  def testGenerate(self):
+  def testGenerate1(self):
+    # Check parameters
+    # TESTING
+    self._init()
+    network = self.network.copy()
+    network.generate()
+    constants = list(network.parameters.valuesdict().keys())
+    #
+    def test(prefix, suffixes):
+      for sfx in suffixes:
+        stg = "%s%s" %  (prefix, str(sfx))
+        self.assertTrue(stg in constants, "%s not in constants" % stg)
+    #
+    for pfx in ["L", "d_mRNA"]:
+      test(pfx, range(1, gn.NUM_GENE + 1))
+    for pfx in ["Vm", "H", "K1_"]:
+      test(pfx, [1, 2, 3, 4, 6, 8])
+    for pfx in ["K2_", "K3_"]:
+      test(pfx, [1, 6])
+
+  def testGenerate2(self):
+    # Checks model
     if IGNORE_TEST:
       return
+    # Check parameters
+    network = self.network.copy()
+    network.generate()
+    constants = network.parameters.valuesdict().keys()
+    # Other checks
     self.network.update(NEW_NETWORK)
     self.network.generate()
     self.assertGreater(len(self.network.model), 4000)
