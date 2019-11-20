@@ -130,3 +130,56 @@ def makeParameters(constants, values=None):
       initial_val = values[idx]
     parameters.add(constant, value=initial_val, min=min_val, max=max_val)
   return parameters
+
+def _selectRNA(df):
+  if not isinstance(df, pd.DataFrame):
+    df = makeDF(df, is_protein=False)
+  columns = [ c for c in df.columns if "mRNA" in c]
+  df_result = df.copy()
+  return df_result[columns]
+
+def plotSimulation(df_data, model, parameters=None, sim_time=1200):
+  """
+  Plots mRNA actual, predicted, and residuals.
+  :param pd.DataFrame df_data: dataframe of observed data.
+  :param str model: antimony model
+  :param lmfit.Parameters parameters:
+  :param int sim_time: length of time to simulate
+  """
+  num_points = int(sim_time/10)
+  df_mrna = _selectRNA(df_data)
+  sim_result = mf.runSimulation(model=model,sim_time=sim_time, 
+      num_points=num_points, parameters=parameters)
+  df_model = makeDF(sim_result.data, is_protein=False)
+  df_res = df_mrna - df_model
+  df_res = _selectRNA(df_res)
+  for args in [(df_mrna, "Observations"), 
+      (df_model, "Model"), (df_res, "Residuals")]:
+    plt.figure()
+    plotData(args[0], endtime=sim_time, title=args[1])
+
+def runExperiment(df_data, model, parameters, sim_time=1200):
+  """
+  Runs an experiment in which the the Antimony model is fitted to
+  mRNA data and plots are produced to evaluate the result.
+  :param pd.DataFrame df_data: dataframe of observed data.
+      time is index
+  :param str model: antimony model
+  :param lmfit.parameters/list-str parameters:
+       Constants for which parameters are estimated
+  :param int sim_time: length of the simulation 
+  :return lmfit.Parameters:
+  """
+  num_points = int(sim_time/10)
+  if not isinstance(parameters, lmfit.Parameters):
+    parameters = makeParameters(parameters)
+  df_mrna = _selectRNA(df_data)
+  df_obs = df_mrna.loc[df_mrna.index[range(num_points)], :]
+  df_obs = _selectRNA(df_obs)
+  list_parameters, rsqs = mf.crossValidate(df_obs, model=model,
+    parameters=parameters, num_points=num_points, method=mf.ME_BOTH,
+    sim_time=sim_time, num_folds=3)
+  parameters = mf.makeAverageParameters(list_parameters)
+  plotSimulation(df_obs, model, parameters=parameters,
+      sim_time=sim_time)
+  return parameters

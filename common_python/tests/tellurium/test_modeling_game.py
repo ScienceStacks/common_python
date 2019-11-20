@@ -141,7 +141,6 @@ end
 '''
 MODEL = MODEL1 + MODEL2
 
-
 def testMakeParameters():
   def test(constants, values=None):
     parameters = mg.makeParameters(constants, values=values)
@@ -166,10 +165,23 @@ def testDoBootstrap3():
                                              num_points=num_points, 
                                              method=mf.ME_BOTH,
                                              sim_time=sim_time)
-   
+
+def _generateData():
+  result = mf.runSimulation(model=MODEL, sim_time=1200,
+      num_points=120)
+  return result.data
+
+def testPlotSimulation():
+  # Only smoke tests
+  data = _generateData()
+  mg.plotSimulation(data, MODEL)
+
+def testRunExperiment():
+  # Only smoke tests
+  df_data = mf.cleanColumns(pd.read_csv("wild.csv"))
+  parameters = mg.runExperiment(df_data, MODEL, parameters=["Vm1"])
+  assert(len(parameters.valuesdict().keys()) == 1)
   
 if __name__ == '__main__':
-  testDoBootstrap3()
-  if True:
-    testMakeParameters()
+  testRunExperiment()
   print("OK.")
