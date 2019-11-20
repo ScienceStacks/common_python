@@ -152,6 +152,23 @@ class TestGeneReaction(unittest.TestCase):
     stg = self.reaction._makeTerm(NPROTS)
     self.assertTrue("K2" in stg)
 
+  def testMakeNumerator(self):
+    if IGNORE_TEST:
+      return
+    def test(stg, is_term0):
+      descriptor = GeneDescriptor.parse(stg)
+      reaction = GeneReaction(descriptor)
+      terms = reaction._makeTerms()
+      numerator = reaction._makeNumerator(terms)
+      if is_term0:
+        expected = terms[0]
+      else:
+        expected = "1"
+      self.assertEqual(str(numerator), expected)
+    #
+    test("4+2", True)
+    test("4-2", False)
+
   def testMakeTFKinetics(self):
     if IGNORE_TEST:
       return

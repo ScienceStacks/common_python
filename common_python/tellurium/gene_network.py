@@ -46,7 +46,7 @@ NUM_GENE = 8  # Number of genes
 PLUS = "+"
 # Initial network from the modeling game
 INITIAL_NETWORK = [
-    "1+0O+4", "2+4", "3+6", "4-2", 5, "6+7P-1", 7, "8-1"]
+    "1+0O+4", "2+4", "3+6", "4-2", 5, "6+7O-1", 7, "8-1"]
 # Structure of gene string descriptor
 POS_GENE = 0
 POS_SIGN_1 = 1
@@ -256,39 +256,69 @@ class GeneReaction(object):
           self._H)
     return term
 
+  def _makeNumerator(self, terms):
+    """
+    Constructs the numerator of a kinetics expression.
+    :param list-str terms:
+    :return str: numerator
+    """
+    # No terms
+    if len(terms) == 0:
+      raise RuntimeError("No terms present.")
+    # 1 term
+    elif len(terms) == 1:
+      if self.descriptor.is_activates[0]:
+        numerator = terms[0]
+      else:
+        numerator = "1"
+    # 2 or 3 terms
+    elif len(terms) <= 3:
+      numerator = ""
+      if self.descriptor.is_or_integration:
+        for is_activate, term  in zip(
+            self.descriptor.is_activates, terms[:-1]):
+          if is_activate:
+            numerator += "%s %s" %  (PLUS, term)
+        if all(self.descriptor.is_activates) and (
+            not self.descriptor.is_competitive):
+          numerator += "%s %s" %  (PLUS, terms[-1])
+        # Ensure that the numerator has at least on term
+        if len(numerator) == 0:
+          numerator = "1"  # Ensure has at least one term
+      else:  # AND integration
+        numerator = "1"
+        if all(self.descriptor.is_activates):
+          numerator = terms[-1]
+        elif self.descriptor.is_activates[0]:
+          numerator = terms[0]
+        else:
+          if len(self.descriptor.is_activates) > 1:
+            if self.descriptor.is_activates[1]:
+              numerator = terms[1]
+    else:
+      raise RuntimeError("More than two terms!")
+    return numerator
+
+  def _makeTerms(self):
+    terms = [self._makeTerm([p]) for p in self.descriptor.nprots]
+    if (len(self.descriptor.nprots) > 1) and (
+        not self.descriptor.is_competitive):
+      new_term = self._makeTerm(self.descriptor.nprots)
+      terms.append(new_term)
+    return terms
+
   def _makeTFKinetics(self):
     """
     Creates the kinetics for the transcription factors
     """
-    terms = [self._makeTerm([p]) for p in self.descriptor.nprots]
-    if (len(self.descriptor.nprots) > 1) and (
-        not self.descriptor.is_competitive):
-      terms.append(self._makeTerm(self.descriptor.nprots))
+    if len(self.descriptor.nprots) == 0:
+      return ""
+    terms = self._makeTerms()
+    # Make the denominator
     denominator = "1"
     for term in terms:
       denominator += " + %s" % term
-    numerator = ""
-    if self.descriptor.is_or_integration:
-      for is_activate, term  in zip(
-          self.descriptor.is_activates, terms[:-1]):
-        if is_activate:
-          numerator += "%s %s" %  (PLUS, term)
-      if all(self.descriptor.is_activates) and (
-          not self.descriptor.is_competitive):
-        numerator += "%s %s" %  (PLUS, terms[-1])
-      # Ensure that the numerator has at least on term
-      if len(numerator) == 0:
-        numerator = "1"  # Ensure has at least one term
-    else:  # AND integration
-      numerator = "1"
-      if all(self.descriptor.is_activates):
-        numerator = terms[-1]
-      elif self.descriptor.is_activates[0]:
-        numerator = terms[0]
-      else:
-        if len(self.descriptor.is_activates) > 1:
-          if self.descriptor.is_activates[1]:
-            numerator = terms[1]
+    numerator = self._makeNumerator(terms)
     # Clean up the numerator by removing leading "+"
     splits = numerator.split(" ")
     if splits[0] == PLUS:
