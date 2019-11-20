@@ -290,7 +290,7 @@ class GeneReaction(object):
         if all(self.descriptor.is_activates):
           numerator = terms[-1]
         elif self.descriptor.is_activates[0]:
-          numerator = terms[0]
+          numerator = "%s %s %s" % (numerator, PLUS, terms[0])
         else:
           if len(self.descriptor.is_activates) > 1:
             if self.descriptor.is_activates[1]:

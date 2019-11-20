@@ -162,11 +162,13 @@ class TestGeneReaction(unittest.TestCase):
       terms = reaction._makeTerms()
       numerator = reaction._makeNumerator(terms)
       if is_term0:
-        expected = terms[0]
+        expecteds = ["H", "1", "K"]
       else:
-        expected = "1"
-      self.assertEqual(str(numerator), expected)
+        expecteds = "1"
+      for expected in expecteds:
+        self.assertTrue(expected in numerator)
     #
+    test("4+2A-1", True)
     test("4+2", True)
     test("4-2", False)
 
