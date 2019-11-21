@@ -391,6 +391,7 @@ class GeneNetwork(object):
     self.update(initial_network, is_initialize=False)
     # Generated outputs
     self.parameters = None  # lmfit.Parameters for model
+    self.new_parameters = None  # Parameters initally set to 0
     self.model = None  # Model string
 
   def update(self, strings, is_initialize=True):
@@ -429,6 +430,7 @@ class GeneNetwork(object):
     Updates
       self.model
       self.parameters
+      self.new_parameters
     """
     # 1: Append the head of the file
     self.model = GeneNetwork._readFile(PATH_HEAD)
@@ -445,6 +447,9 @@ class GeneNetwork(object):
     self.model += "\n" + GeneNetwork._readFile(PATH_TAIL)
     # 5: Construct the lmfit.parameters for constants in the model
     self.parameters = mg.makeParameters(self._constants)
+    new_constants = set(self._constants).difference(
+        self._uninitialize_constants)
+    self.new_parameters = mg.makeParameters(new_constants)
 
   def copy(self):
     """

@@ -319,11 +319,14 @@ class TestGeneNetwork(unittest.TestCase):
 
   def testGenerate1(self):
     # Check parameters
-    # TESTING
+    if IGNORE_TEST:
+      return
     self._init()
     network = self.network.copy()
     network.generate()
     constants = list(network.parameters.valuesdict().keys())
+    new_constants = list(network.new_parameters.valuesdict().keys())
+    self.assertEqual(len(set(new_constants).difference(constants)), 0)
     #
     def test(prefix, suffixes):
       for sfx in suffixes:
