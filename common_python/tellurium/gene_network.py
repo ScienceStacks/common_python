@@ -262,6 +262,31 @@ class GeneReaction(object):
     :param list-str terms:
     :return str: numerator
     """
+    # Numerator patters. The key is is_activate values for
+    # terms and the corresponding numerator
+    # The dictionaries are keyed by the tuple of values
+    # of is_activate[0] for T0 and is_activates[1] for T1.
+    # [T0, T1, T2] = terms
+    AND_INTEGRATION = {
+        (True, True): "T2",
+        (True, False): "T0",
+        (False, True): "T1",
+        (False, False): "1",
+        }
+    # OR integration for competitive binding
+    OR_INTEGRATION_COMPETE = {
+        (True, True): "T0 + T1",
+        (True, False): "1 + T0",
+        (False, True): "1 + T1",
+        (False, False): "1 + T0 + T1",  # Note - always True
+        }
+    # OR integration for non-competitive binding
+    OR_INTEGRATION_NOCOMPETE = {
+        (True, True): "T0 + T1 + T2",
+        (True, False): "1 + T0 + T2",
+        (False, True): "1 + T1 + T2",
+        (False, False): "1 + T0 + T1",
+        }
     # No terms
     if len(terms) == 0:
       raise RuntimeError("No terms present.")
@@ -273,33 +298,26 @@ class GeneReaction(object):
         numerator = "1"
     # 2 or 3 terms
     elif len(terms) <= 3:
-      numerator = ""
+      # Initialize values
+      key = (self.descriptor.is_activates[0],
+          self.descriptor.is_activates[1])
+      if len(terms) == 2:
+        T0, T1 = terms
+      else:
+        T0, T1, T2 = terms
+      # Obtain the numerator pattern
       if self.descriptor.is_or_integration:
-        for is_activate, term  in zip(
-            self.descriptor.is_activates, terms[:-1]):
-          if is_activate:
-            numerator += "%s %s" %  (PLUS, term)
-        if not self.descriptor.is_competitive:
-          # Add the interaction term
-          if all(self.descriptor.is_activates):
-            numerator += "%s %s" %  (PLUS, terms[-1])
-        if not all(self.descriptor.is_activates):
-          # Ensure that a "1" is present if terms are absent
-          numerator += " %s 1" %  PLUS
-        # Ensure that the numerator has at least on term
-        if len(numerator) == 0:
-          numerator = "1"  # Ensure has at least one term
-      else:  # AND integration
-        if all(self.descriptor.is_activates):
-          numerator = terms[-1]
-        elif self.descriptor.is_activates[0]:
-          numerator = "1 %s %s" % (PLUS, terms[0])
-        elif self.descriptor.is_activates[1]:
-          numerator = "1 %s %s" % (PLUS, terms[1])
+        if self.descriptor.is_competitive:
+          pattern = OR_INTEGRATION_COMPETE[key]
         else:
-          numerator = "1"
-    else:
-      raise RuntimeError("More than two terms!")
+          pattern = OR_INTEGRATION_NOCOMPETE[key]
+      else:
+        pattern = AND_INTEGRATION[key]
+      # Create the numerator
+      numerator = pattern.replace("T0", T0)
+      numerator = numerator.replace("T1", T1)
+      if len(terms) == 3:
+        numerator = numerator.replace("T2", T2)
     return numerator
 
   def _makeTerms(self):
