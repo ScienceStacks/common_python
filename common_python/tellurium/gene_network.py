@@ -389,9 +389,13 @@ class GeneNetwork(object):
     self._constants = []  # All constants in model
     self._uninitialize_constants = []  # Constants not initialized to 0
     self.update(initial_network, is_initialize=False)
+    # Parameters for which initializations are constructed
+    self._parameter_initializations = []
     # Generated outputs
-    self.parameters = None  # lmfit.Parameters for model
-    self.new_parameters = None  # Parameters initally set to 0
+    # All parameters in the model
+    self.parameters = None
+    # Parameters initally set to 0
+    self.new_parameters = None
     self.model = None  # Model string
 
   def update(self, strings, is_initialize=True):
@@ -424,6 +428,15 @@ class GeneNetwork(object):
       raise RuntimeError("Some key is not initialized: %s:"
           % str(self._network.keys()))
 
+  def addInitialization(self, parameters):
+    """
+    Adds a constant to initialize.
+    :param lmfit.Parameters parameters:
+    Updates:
+      self._parameter_initializations
+    """
+    self._parameter_initializations.append(parameters)
+
   def generate(self):
     """
     Generates an antimony model for the gene network.
@@ -436,20 +449,42 @@ class GeneNetwork(object):
     self.model = GeneNetwork._readFile(PATH_HEAD)
     # 2: Append gene reactions
     self.model += str(self)
-    # 3: Append constant initializations
+    # 3a: Append constant initializations
     comment = "\n\n// Initializations for new constants\n"
     self.model += comment
     constants = [v for v in self._constants
         if not v in self._uninitialize_constants]
-    statements = "\n".join(["%s = 0;" % v for v in constants])
-    self.model += statements
+    self.model += self._makeInitializationStatements(constants,
+        np.repeat(0, len(constants)))
+    # 3b: Append initializations from parameters
+    initialized_constants = []
+    for parameters in self._parameter_initializations:
+      constants = parameters.valuesdict().keys()
+      values = parameters.valuesdict().values()
+      self.model += self._makeInitializationStatements(
+          constants, values)
+      self.model += "\n"
+      initialized_constants.extend(constants)
     # 4: Append the tail of the file
     self.model += "\n" + GeneNetwork._readFile(PATH_TAIL)
     # 5: Construct the lmfit.parameters for constants in the model
     self.parameters = mg.makeParameters(self._constants)
     new_constants = set(self._constants).difference(
         self._uninitialize_constants)
-    self.new_parameters = mg.makeParameters(new_constants)
+    new_constants = new_constants.difference(initialized_constants)
+    self.new_parameters = mg.makeParameters(
+        list(set(new_constants)))
+
+  def _makeInitializationStatements(self, constants, values):
+    """
+    Creates statements that initialize constants.
+    :param list-str constants:
+    :param list-float values:
+    :return str:
+    """
+    statements = "\n".join(["%s = %f;" % (n, v)
+        for n, v in zip(constants, values)])
+    return statements
 
   def copy(self):
     """

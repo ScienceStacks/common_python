@@ -354,6 +354,20 @@ class TestGeneNetwork(unittest.TestCase):
     self.assertGreater(len(self.network.model), 4000)
     self.assertGreater(len(self.network.parameters.valuesdict()), 10)
 
+  def testAddInitialization(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    VALUES = [1.5, 4.8]
+    CONSTANTS = ["Vm6", "H6"]
+    for value, constant in zip(VALUES, CONSTANTS):
+      parameters = mg.makeParameters([constant], [value])
+      self.network.addInitialization(parameters)
+    self.network.generate()
+    for value, constant in zip(VALUES, CONSTANTS):
+      statement = "%s = %f" % (constant, value)
+      self.assertTrue(statement in self.network.model)
+
 
 if __name__ == '__main__':
   unittest.main()
