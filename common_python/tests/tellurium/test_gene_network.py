@@ -354,7 +354,6 @@ class TestGeneNetwork(unittest.TestCase):
     self.network.generate()
     self.assertGreater(len(self.network.model), 4000)
     self.assertGreater(len(self.network.parameters.valuesdict()), 10)
-    import pdb; pdb.set_trace()
 
   def testAddInitialization(self):
     if IGNORE_TEST:

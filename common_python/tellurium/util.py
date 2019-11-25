@@ -13,3 +13,8 @@ def dfToSer(df):
 
 def isEqualList(list1, list2):
   return len(set(list1).symmetric_difference(list2)) == 0
+
+def readFile(path):
+  with open(path, "r") as fd:
+    result = fd.readlines()
+  return "\n".join(result)

@@ -28,8 +28,10 @@ The module is implemented as follows:
   GeneNetwork generates the entire gene network for the game.
 """
 
+import constants as cn
 import model_fitting as mf
 import modeling_game as mg
+import util
 
 from collections import namedtuple
 import copy
@@ -37,16 +39,6 @@ import numpy as np
 import os
 import pandas as pd
 
-HEAD = "head"
-PROTEIN = "protein"
-INITIALIZATIONS = "initializations"
-CONSTANTS = "constants"
-PARTS = [HEAD, PROTEIN, INITIALIZATIONS, CONSTANTS]
-CUR_DIR = os.path.dirname(os.path.abspath(__file__))
-PATH_DICT = {}
-for part in PARTS:
-  filename = "model_%s.txt" % part
-  PATH_DICT[part] = os.path.join(CUR_DIR, filename)
 NUM_GENE = 8  # Number of genes
 PLUS = "+"
 # Initial network from the modeling game
@@ -492,10 +484,10 @@ class GeneNetwork(object):
       self.new_parameters
     """
     # 1: Append the head of the file
-    self.model = GeneNetwork._readFile(PATH_DICT[HEAD])
+    self.model = util.readFile(cn.PATH_DICT[cn.HEAD])
     # 2: Append gene and protein reactions
     self.model += str(self)
-    self.model += GeneNetwork._readFile(PATH_DICT[PROTEIN])
+    self.model += util.readFile(cn.PATH_DICT[cn.PROTEIN])
     # 3a: Append constant initializations
     comment = "\n\n// Initializations for new constants\n"
     self.model += comment
@@ -514,10 +506,9 @@ class GeneNetwork(object):
       self.model += "\n"
       initialized_constants.extend(constants)
     # 4: Append the tail of the file
-    self.model += "\n" + GeneNetwork._readFile(
-        PATH_DICT[INITIALIZATIONS])
-    self.model += "\n" + GeneNetwork._readFile(
-        PATH_DICT[CONSTANTS])
+    self.model += "\n" + util.readFile(
+        cn.PATH_DICT[cn.INITIALIZATIONS])
+    self.model += "\n" + util.readFile(cn.PATH_DICT[cn.CONSTANTS])
     # 5: Construct the lmfit.parameters for constants in the model
     self.parameters = mg.makeParameters(self._constants)
     new_constants = set(self._constants).difference(
@@ -543,12 +534,6 @@ class GeneNetwork(object):
     :return GeneReaction:
     """
     return copy.deepcopy(self)
-
-  @staticmethod
-  def _readFile(path):
-    with open(path, "r") as fd:
-      result = fd.readlines()
-    return "\n".join(result)
 
   def __repr__(self):
     return "\n".join([str(r) for r in self._network.values()])
