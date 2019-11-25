@@ -302,10 +302,16 @@ def plotTimeSeries(data, is_scatter=False, title="",
   :param bool is_scatter: do a scatter plot
   :param str title: plot title
   """
-  if is_scatter:
-    plt.plot (data[:, 0], data[:, 1:], marker='*', linestyle='None')
+  if not isinstance(data, pd.DataFrame):
+    df = pd.DataFrame(data)
   else:
-    plt.plot (data[:, 0], data[:, 1:])
+    df = data
+  columns = df.columns.tolist()
+  xv = df[columns[0]]
+  if is_scatter:
+    plt.plot (xv, df[columns[1:]], marker='*', linestyle='None')
+  else:
+    plt.plot (xv, df[columns[1:]])
   plt.title(title)
   plt.xlabel("Time")
   plt.ylabel("Concentration")
@@ -425,8 +431,6 @@ def fit(obs_data, indices=None, parameters=PARAMETERS,
     return estimateParameters(ME_LEASTSQ, parameters)
   else:
     return estimateParameters(method, parameters)
-
-  
 
 def crossValidate(obs_data, method=DF_METHOD,
     sim_time=SIM_TIME,

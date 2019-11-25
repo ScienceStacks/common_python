@@ -84,12 +84,15 @@ def makeResiduals(model, df, **kwargs):
   columns = set(df_sim.columns).intersection(df.columns)
   return df[columns] - df_sim[columns]
 
-def plotData(df_data, starttime=0, endtime=1200, title=""):
+def plotData(df_data, starttime=0, endtime=1200, title="",
+    ylim=None):
   last = int(endtime/TIME_TO_POINT)
   indices = df_data.index[0:last]
   plt.plot(indices, df_data.loc[indices,:])
   plt.xlabel("Time")
   plt.title(title)
+  if ylim is not None:
+    plt.ylim(ylim)
   plt.legend(df_data.columns, loc="upper right")
 
 def makeParameters(constants, values=None):
@@ -138,7 +141,9 @@ def _selectRNA(df):
   df_result = df.copy()
   return df_result[columns]
 
-def plotSimulation(df_data, model, parameters=None, sim_time=1200):
+def plotSimulation(df_data, model, parameters=None, sim_time=1200,
+    is_plot_observations=True, is_plot_model=True,
+    is_plot_residuals=True, title=None):
   """
   Plots mRNA actual, predicted, and residuals.
   :param pd.DataFrame df_data: dataframe of observed data.
@@ -153,12 +158,25 @@ def plotSimulation(df_data, model, parameters=None, sim_time=1200):
   df_model = makeDF(sim_result.data, is_protein=False)
   df_res = df_mrna - df_model
   df_res = _selectRNA(df_res)
-  for args in [(df_mrna, "Observations"), 
-      (df_model, "Model"), (df_res, "Residuals")]:
-    plt.figure()
-    plotData(args[0], endtime=sim_time, title=args[1])
+  for values in [(df_mrna, "Observations", is_plot_observations), 
+      (df_model, "Model", is_plot_model),
+      (df_res, "Residuals", is_plot_residuals)]:
+    if values[2]:
+      this_title = ""
+      plt.figure()
+      if (title is None) or (values[1]=="Observations"):
+        this_title = values[1]
+      else:
+        this_title = "%s %s" % (values[1], title)
+      if values[1] == "Residuals":
+        ylim = [-1.5, 1.5]
+      else:
+        ylim = None
+      plotData(values[0], endtime=sim_time, title=this_title,
+          ylim=ylim)
 
-def runExperiment(df_data, model, parameters, sim_time=1200):
+def runExperiment(df_data, model, parameters, sim_time=1200,
+    **kwargs):
   """
   Runs an experiment in which the the Antimony model is fitted to
   mRNA data and plots are produced to evaluate the result.
@@ -168,6 +186,7 @@ def runExperiment(df_data, model, parameters, sim_time=1200):
   :param lmfit.parameters/list-str parameters:
        Constants for which parameters are estimated
   :param int sim_time: length of the simulation 
+  :param dict kwargs: parameters for plotSimulations
   :return lmfit.Parameters:
   """
   num_points = int(sim_time/10)
@@ -181,5 +200,5 @@ def runExperiment(df_data, model, parameters, sim_time=1200):
     sim_time=sim_time, num_folds=3)
   parameters = mf.makeAverageParameters(list_parameters)
   plotSimulation(df_obs, model, parameters=parameters,
-      sim_time=sim_time)
+      sim_time=sim_time, **kwargs)
   return parameters

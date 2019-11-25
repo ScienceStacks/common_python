@@ -174,6 +174,9 @@ def _generateData():
 def testPlotSimulation():
   # Only smoke tests
   data = _generateData()
+  mg.plotSimulation(data, MODEL, is_plot_model=False,
+      title="title",
+      is_plot_observations=False)
   mg.plotSimulation(data, MODEL)
 
 def testRunExperiment():
@@ -181,7 +184,12 @@ def testRunExperiment():
   df_data = mf.cleanColumns(pd.read_csv("wild.csv"))
   parameters = mg.runExperiment(df_data, MODEL, parameters=["Vm1"])
   assert(len(parameters.valuesdict().keys()) == 1)
-  
+  # Smoke test for options
+  parameters = mg.runExperiment(df_data, MODEL, parameters=["Vm1"],
+      title="title",
+      is_plot_observations=False)
+ 
+ 
 if __name__ == '__main__':
-  testRunExperiment()
+  testPlotSimulation()
   print("OK.")

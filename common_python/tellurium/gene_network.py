@@ -37,11 +37,16 @@ import numpy as np
 import os
 import pandas as pd
 
-FILE_HEAD = "model_head.txt"
-FILE_TAIL = "model_tail.txt"
+HEAD = "head"
+PROTEIN = "protein"
+INITIALIZATIONS = "initializations"
+CONSTANTS = "constants"
+PARTS = [HEAD, PROTEIN, INITIALIZATIONS, CONSTANTS]
 CUR_DIR = os.path.dirname(os.path.abspath(__file__))
-PATH_HEAD = os.path.join(CUR_DIR, FILE_HEAD)
-PATH_TAIL = os.path.join(CUR_DIR, FILE_TAIL)
+PATH_DICT = {}
+for part in PARTS:
+  filename = "model_%s.txt" % part
+  PATH_DICT[part] = os.path.join(CUR_DIR, filename)
 NUM_GENE = 8  # Number of genes
 PLUS = "+"
 # Initial network from the modeling game
@@ -199,7 +204,9 @@ class GeneReaction(object):
         self._makeVar("L"),          # IDX_L
         self._makeVar("d_mRNA"),     # IDX_DMRNA
         ]
-    self.reaction = None
+    self.mrna_reaction = None
+    self.mrna_kinetics = None
+    self.protein_kinetics = None
     # Private
     self._k_index = 0  # Index of the K constants
     self._H = self._makeVar("H")  # H constant
@@ -239,11 +246,19 @@ class GeneReaction(object):
       stg = "P%d" % nprot
     return stg
 
-  def _makeBasicKinetics(self):
+  def _makeMrnaBasicKinetics(self):
     return "%s - %s*%s" % (
         self.constants[IDX_L], 
         self.constants[IDX_DMRNA],
         self._mrna)
+
+  def _makeProteinKinetics(self):
+    return "%s*%s - %s*%s" % (
+        self._makeVar("a_protein"),
+        self._mrna,
+        self._makeVar("d_protein"),
+        self._makeVar("P")
+        )
 
   def _makeTerm(self, nprots):
     """
@@ -348,32 +363,42 @@ class GeneReaction(object):
         self._Vm, numerator, denominator)
     return result
   
-  def _makeKinetics(self):
+  def _makeMrnaKinetics(self):
+    """
+    Constructs the kinetics expression for the mRNA.
+    :return str:
+    Updates
+      self.constants
+      self.mrna_kinetics
+    """
     if len(self.descriptor.nprots) == 0:
-      stg = self._makeBasicKinetics()
+      stg = self._makeMrnaBasicKinetics()
     else:
-      stg = "%s + %s" % (self._makeBasicKinetics(),
+      stg = "%s + %s" % (self._makeMrnaBasicKinetics(),
           self._makeTFKinetics())
       self.constants.extend([
           self._Vm,
           self._H,
           ])
-    return stg
+    self.mrna_kinetics = stg
 
   def generate(self):
     """
     Generates the reaction string.
     Updates:
-      self.reaction
+      self.mrna_reaction
+      self.protein_kinetics
     """
     label = self._makeVar("J")
-    self.reaction = "%s: => %s; %s" % (label, 
-        self._mrna, self._makeKinetics())
+    self._makeMrnaKinetics()
+    self.protein_kinetics = self._makeProteinKinetics()
+    self.mrna_reaction = "%s: => %s; %s" % (label, 
+        self._mrna, self.mrna_kinetics)
     
   def __repr__(self):
-    if self.reaction is None:
+    if self.mrna_reaction is None:
       self.generate()
-    return self.reaction
+    return self.mrna_reaction
 
   @classmethod
   def do(cls, descriptor):
@@ -467,9 +492,10 @@ class GeneNetwork(object):
       self.new_parameters
     """
     # 1: Append the head of the file
-    self.model = GeneNetwork._readFile(PATH_HEAD)
-    # 2: Append gene reactions
+    self.model = GeneNetwork._readFile(PATH_DICT[HEAD])
+    # 2: Append gene and protein reactions
     self.model += str(self)
+    self.model += GeneNetwork._readFile(PATH_DICT[PROTEIN])
     # 3a: Append constant initializations
     comment = "\n\n// Initializations for new constants\n"
     self.model += comment
@@ -488,7 +514,10 @@ class GeneNetwork(object):
       self.model += "\n"
       initialized_constants.extend(constants)
     # 4: Append the tail of the file
-    self.model += "\n" + GeneNetwork._readFile(PATH_TAIL)
+    self.model += "\n" + GeneNetwork._readFile(
+        PATH_DICT[INITIALIZATIONS])
+    self.model += "\n" + GeneNetwork._readFile(
+        PATH_DICT[CONSTANTS])
     # 5: Construct the lmfit.parameters for constants in the model
     self.parameters = mg.makeParameters(self._constants)
     new_constants = set(self._constants).difference(

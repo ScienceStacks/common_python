@@ -136,10 +136,10 @@ class TestGeneReaction(unittest.TestCase):
     nprot = 24
     self.assertEqual("P%d" % nprot, self.reaction._makePVar(nprot))
 
-  def testMakeBasicKinetics(self):
+  def testMakeMrnaBasicKinetics(self):
     if IGNORE_TEST:
       return
-    stg = self.reaction._makeBasicKinetics()
+    stg = self.reaction._makeMrnaBasicKinetics()
     self.assertTrue("L" in stg)
     self.assertTrue("d_mRNA" in stg)
     self.assertTrue("*mRNA" in stg)
@@ -242,15 +242,16 @@ class TestGeneReaction(unittest.TestCase):
     test("1")
     test("1+2")
 
-  def testMakeReaction(self):
+  def testGenerate(self):
     if IGNORE_TEST:
       return
     self._adds(self.reaction, NPROTS, IS_ACTIVATES)
     self.reaction.generate()
     self.assertEqual(len(self.reaction.constants), NCONST_2_TF)
-    self.assertTrue("=>" in self.reaction.reaction)
+    self.assertTrue("=>" in self.reaction.mrna_reaction)
     for constant in self.reaction.constants:
-      self.assertTrue(constant in self.reaction.reaction)
+      self.assertTrue(constant in self.reaction.mrna_reaction)
+    self.assertTrue("P%d" % NGENE in self.reaction.protein_kinetics)
  
   def testDo(self):
     if IGNORE_TEST:
@@ -353,6 +354,7 @@ class TestGeneNetwork(unittest.TestCase):
     self.network.generate()
     self.assertGreater(len(self.network.model), 4000)
     self.assertGreater(len(self.network.parameters.valuesdict()), 10)
+    import pdb; pdb.set_trace()
 
   def testAddInitialization(self):
     if IGNORE_TEST:
