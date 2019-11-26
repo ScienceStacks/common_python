@@ -203,7 +203,7 @@ class GeneReaction(object):
     self._k_index = 0  # Index of the K constants
     self._H = self._makeVar("H")  # H constant
     self._Vm = self._makeVar("Vm")  # H constant
-    self._mrna = self._makeVar("mRNA")
+    self._mrna = self.__class__.makeMrna(self.descriptor.ngene)
       
   def add(self, nprot, is_activate=True):
     """
@@ -222,7 +222,19 @@ class GeneReaction(object):
       )
       
   def _makeVar(self, name):
-    return "%s%d" % (name, self.descriptor.ngene)
+    return self.__class__.makeVar(name, self.descriptor.ngene)
+     
+  @classmethod
+  def makeVar(cls, name, ngene):
+    return "%s%d" % (name, ngene)
+     
+  @classmethod 
+  def makeMrna(cls, ngene):
+    return cls.makeVar("mRNA", ngene)
+     
+  @staticmethod 
+  def makeProtein(cls, ngene):
+    return cls.makeVar("P", ngene)
 
   def _makeKVar(self):
     self._k_index += 1
