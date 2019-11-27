@@ -18,3 +18,7 @@ def readFile(path):
   with open(path, "r") as fd:
     result = fd.readlines()
   return "\n".join(result)
+
+def calcRsq(ser_obs, ser_est):
+  ser_res = ser_obs - ser_est
+  return 1 - ser_res.var() / ser_obs.var()

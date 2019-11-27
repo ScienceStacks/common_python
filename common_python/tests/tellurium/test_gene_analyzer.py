@@ -35,10 +35,7 @@ class TestGeneAnalyzer(unittest.TestCase):
   def testConstructor(self):
     if IGNORE_TEST:
       return
-    self.assertTrue(isinstance(self.analyzer.parameters,
-        lmfit.Parameters))
-    self.assertGreater(
-        len(self.analyzer.parameters.valuesdict().keys()), 2)
+    self.assertTrue(self.analyzer.parameters is None)
     self.assertTrue("P1" in self.analyzer.namespace.keys())
 
   def testTransformKinetics(self):
