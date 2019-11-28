@@ -2,6 +2,11 @@
 
 import os
 
+# Paths
+TELLURIUM_DIR = os.path.dirname(os.path.abspath(__file__))
+MRNA_PATH = os.path.join(TELLURIUM_DIR, "wild.csv")
+
+
 # DataFrame columns
 MEAN = "mean"
 STD = "std"
@@ -18,3 +23,5 @@ PATH_DICT = {}
 for part in PARTS:
   filename = "model_%s.txt" % part
   PATH_DICT[part] = os.path.join(CUR_DIR, filename)
+
+# Paths

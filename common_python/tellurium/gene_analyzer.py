@@ -27,8 +27,10 @@ import copy
 import lmfit   # Fitting lib
 import pandas as pd
 import numpy as np
+from scipy.integrate import odeint
 
 PROTEIN_KINETICS = "a_protein%d*mRNA%d - d_protein%d*P%d"
+DEFAULT_CONSTANT = "Vm1"
 
 
 class GeneAnalyzer(object):
@@ -45,16 +47,78 @@ class GeneAnalyzer(object):
     self._stmt_initializations = util.readFile(
         cn.PATH_DICT[cn.INITIALIZATIONS])
     self._df_mrna = df_mrna
-    # The following are used during analysis
+    # The following are used in the OD Scope.
+    self.network = None
     self.descriptor = None
     self.mrna_name = None
     self.reaction = None
     self.mrna_kinetics = None
-    self.namespace = None
+    self.mrna_kinetics_compiled = None  # Compiled mRNA kinetics
+    self.protein_kinetics_compiled = None   # list-compiled protein kinetics
+    self.namespace = None  # Also used in the ODP scope
     # Results
     self.ser_est = None  # Estimate of the mRNA
-    self.parameters = None  # Parameter values from estimates
+    # Parameter values from estimates
+    self.parameters = lmfit.Parameters()
     self.rsq = None  # rsq for estimate w.r.t. observations
+
+  def do(self, desc_stg, end_time=1200):
+    """
+    Do an analysis for the descriptor string provided.
+    :param str desc_stg:
+    Updates:
+      self.ser_est
+      self.parameters
+    Scope: OD.
+    """
+    def calcResiduals(parameters):
+      """
+      Calculates the residuals in a fit.
+      :param lmfit.Parameters parameters:
+      :return list-float: variance of residuals
+      Scope: ODP.
+      """
+      self._calcMrnaEstimates(parameters)
+      ser_res = self._df_mrna[self.mrna_name] - self.ser_est
+      return ser_res.to_list()
+    # Initializations
+    self._initializeODScope(desc_stg)
+    # Do the fits
+    fitter = lmfit.Minimizer(calcResiduals, self.parameters)
+    try:
+      fitter_result = fitter.minimize(method="differential_evolution")
+    except:
+      import pdb; pdb.set_trace()
+    # Assign the results
+    self.params = fitter_result.parameters
+    self.rsq = util.calcRsq(self._df_mrna[self.mrna_name],
+        self.ser_est)
+
+  def _initializeODScope(self, desc_stg):
+    """
+    Initializes instance variables for the OD Scope.
+    :param str desc_stg:
+    Updates:
+      self.descriptor
+      self.mrna_name
+      self.mrna_kinetics
+      self.network (updated with the descriptor)
+      self.parameters
+      self.reaction
+    Scope: OD.
+    """
+    self.descriptor = gn.GeneDescriptor.parse(desc_stg)
+    self.mrna_name = gn.GeneReaction.makeMrna(self.descriptor.ngene)
+    self.network = gn.GeneNetwork()
+    self.network.update([desc_stg])
+    self.network.generate()
+    self.reaction = gn.GeneReaction(self.descriptor)
+    self.reaction.generate()
+    self.mrna_kinetics = self.__class__._makePythonExpression(
+        self.reaction.mrna_kinetics)
+    self.parameters = copy.deepcopy(self.network.new_parameters)
+    if not (isinstance(self.parameters, lmfit.Parameters)):
+      self.parameters = mg.makeParameters([DEFAULT_CONSTANT])
      
   @staticmethod
   def _makePythonExpression(kinetics):
@@ -67,59 +131,6 @@ class GeneAnalyzer(object):
     new_kinetics = kinetics.replace("^", "**")
     return new_kinetics.replace(";", "")
 
-  def do(self, desc_stg, end_time=1200):
-    """
-    Do an analysis for the descriptor string provided.
-    :param str desc_stg:
-    Updates:
-      self.descriptor
-      self.reaction
-      self.mrna_name
-      self.mrna_kinetics
-    Scope OD.
-    """
-    # Initializations for a new gene descriptor
-    self.descriptor = gn.GeneDescriptor.parse(desc_stg)
-    network = gn.GeneNetwork()
-    network.update([desc_stg])
-    network.generate()
-    self.reaction = gn.GeneReaction(descriptor)
-    self.mrna_name = gn.GeneReaction.makeMrna(self.descriptor.ngene)
-    reaction.generate()
-    mrna_kinetics = self.__class__._makePythonExpression(
-        self.reaction.mrna_kinetics)
-    # Do estimates
-    self._estimate(network.new_parameters, end_time)
-
-  def _estimate(self, parameters, end_time):
-    """
-    For the current gene descriptor,
-    estimates the time series for mRNA, protein, and fits parameter values.
-    :param lmfit.Parameters parameters: Initial parameters values
-    :param int end_time: end time of the integration
-    Updates:
-      self.ser_est
-      self.parameters
-    Scope OD.
-    """
-    def calcResiduals(parameters):
-      """
-      Calculates the residuals in a fit.
-      :param lmfit.Parameters parameters:
-      :return float: variance of residuals
-      """
-      self._calcMrnaEstimates(parameters)
-      ser_res = self._df_mrna[self.mrna_name] - self.ser_est
-      return ser_res.var()
-    #
-    self.parameters = copy.deepcopy(parameters)
-    fitter = lmfit.Minimizer(calcResiduals, self.parameters)
-    fitter_result = fitter.minimize(method="differential_evolution")
-    # Assign the results
-    self.params = fitter_result.parameters
-    self.rsq = util.calcRsq(self._df_mrna[self.mrna_name],
-        self.ser_est)
-
   def _calcMrnaEstimates(self, parameters):
     """
     Calculates mRNA estimates using numerical integration
@@ -129,20 +140,19 @@ class GeneAnalyzer(object):
       self.ser_est
     Scope ODP.
     """
-    self._initialize(parameters)
+    self._initializeODPScope(parameters)
     # Construct initial values for the integration
     y0_arr = [self.namespace[gn.GeneReaction.makeProtein(n)]
         for n in range(1, gn.NUM_GENE+1)]
     y0_arr.insert(0, self.namespace[self.mrna_name])
     y0_arr = np.array(y0_arr)
-    times = np.array(df_mrna.index.tolist())
+    times = np.array(self._df_mrna.index.tolist())
     y_mat = odeint(self.__class__._calcKinetics, y0_arr, times, args=(self,))
     self.ser_est = pd.Series(y_mat[:, 0], index=times)
   
-  def _initialize(self, parameters):
+  def _initializeODPScope(self, parameters):
     """
-    Initializes variables for a numerical integration using
-    the parameters values.
+    Initializes variables for the ODP scope.
     Updates:
       self.parameters
       self.namespace
@@ -157,6 +167,14 @@ class GeneAnalyzer(object):
     valuesdict = parameters.valuesdict()
     for name, value in valuesdict.items():
         self.namespace[name] = value
+    # Compile kinetics
+    self.mrna_kinetics_compiled = compile(
+        self.mrna_kinetics, 'mrna_kinetics', 'eval')
+    self.protein_kinetics_compiled = []
+    for idx in range(1, gn.NUM_GENE + 1):
+      expression = PROTEIN_KINETICS % (idx, idx, idx, idx)
+      self.protein_kinetics_compiled.append(compile(
+        expression, 'protein%d_kinetics' % idx, 'eval'))
 
   @staticmethod
   def _calcKinetics(y_arr, time, analyzer):
@@ -176,14 +194,14 @@ class GeneAnalyzer(object):
     # mRNA values from the observations
     for idx in range(1, 8):
       protein = gn.GeneReaction.makeProtein(idx)
-      analyzer.namespace[protein] = y[idx]
+      analyzer.namespace[protein] = y_arr[idx]
       col = gn.GeneReaction.makeMrna(idx)
-      analyzer.namespace[col] = analyzer.df_mrna.loc[time, col]
+      analyzer.namespace[col] = analyzer._df_mrna.loc[time, col]
     # Update to the new values of mRNA for the gene under analysis
-    analyzer.namespace[self.mrna_name] = y[0]
+    analyzer.namespace[analyzer.mrna_name] = y_arr[0]
     # Calculate the drivatives
-    dydt = [eval(analyzer.mrna_kinetics, analyzer.namespace)]
-    for idx in range(1, 9):
-      statement = PROTEIN_KINETICS % (idx, idx, idx, idx)
-      dydt.append(eval(statement, analyzer.namespace))
+    dydt = [eval(analyzer.mrna_kinetics_compiled, analyzer.namespace)]
+    for idx in range(1, gn.NUM_GENE + 1):
+      dydt.append(eval(analyzer.protein_kinetics_compiled[idx-1],
+          analyzer.namespace))
     return dydt

@@ -232,7 +232,7 @@ class GeneReaction(object):
   def makeMrna(cls, ngene):
     return cls.makeVar("mRNA", ngene)
      
-  @staticmethod 
+  @classmethod
   def makeProtein(cls, ngene):
     return cls.makeVar("P", ngene)
 
