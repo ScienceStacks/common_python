@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 DESC_STG = "7-7"
 END_TIME = 300
 
@@ -124,7 +124,7 @@ class TestGeneAnalyzer(unittest.TestCase):
   def testMakeProtein(self):
     if IGNORE_TEST:
       return
-    df = ga.GeneAnalyzer.makeProteinDF(end_time=30)
+    df = ga.GeneAnalyzer.makeProteinDF(end_time=30, is_write=False)
     columns = [gn.GeneReaction.makeProtein(n)
         for n in range(1, gn.NUM_GENE+1)]
     columns.insert(0, cn.TIME)
