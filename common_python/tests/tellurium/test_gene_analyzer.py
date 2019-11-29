@@ -94,6 +94,8 @@ class TestGeneAnalyzer(unittest.TestCase):
     self.assertLess(np.abs(result[-1][0] - MAX*MAX), 1)
 
   def testProteinInitializations(self):
+    if IGNORE_TEST:
+      return
     df_mrna, compileds = ga.GeneAnalyzer.proteinInitializations(
         cn.MRNA_PATH)
     self.assertTrue("code" in str(compileds[0].__class__))
@@ -101,13 +103,32 @@ class TestGeneAnalyzer(unittest.TestCase):
         df_mrna.columns))
 
   def testProteinDydt(self):
+    if IGNORE_TEST:
+      return
+    MAX = 10
+    times = [10.0*n for n in range(MAX)]
     df_mrna, compileds = ga.GeneAnalyzer.proteinInitializations(
         cn.MRNA_PATH)
-    y_arr = np.repeat(0, gn.NUM_GENE + 1)
-    time = 0.0
-    result = ga.GeneAnalyzer._proteinDydt(y_arr, time,
-        df_mrna, compileds)
-    import pdb; pdb.set_trace()
+    y0_arr = np.repeat(0, gn.NUM_GENE + 1)
+    y_arr = np.array(y0_arr)
+    y_arrs = []
+    for time in times:
+      y_arr = ga.GeneAnalyzer._proteinDydt(y_arr, time,
+          df_mrna, compileds)
+      y_arrs.append(y_arr)
+    trues = [np.isclose(v, 0) for v in y_arrs[0]]
+    self.assertTrue(all(trues))
+    trues = [v > 0.0 for v in y_arrs[-1]]
+    self.assertTrue(all(trues))
+
+  def testMakeProtein(self):
+    if IGNORE_TEST:
+      return
+    df = ga.GeneAnalyzer.makeProteinDF(end_time=30)
+    columns = [gn.GeneReaction.makeProtein(n)
+        for n in range(1, gn.NUM_GENE+1)]
+    columns.insert(0, cn.TIME)
+    self.assertTrue(helpers.isValidDataFrame(df, columns))
   
 
 if __name__ == '__main__':
