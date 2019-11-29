@@ -9,6 +9,7 @@ from common_python.tellurium import gene_network as gn
 from common_python.tellurium import gene_analyzer as ga
 from common_python.tellurium.gene_network import  \
     GeneDescriptor, GeneReaction, GeneNetwork
+from common_python.testing import helpers
 
 import lmfit
 import pandas as pd
@@ -29,8 +30,7 @@ class TestGeneAnalyzer(unittest.TestCase):
     self._init()
 
   def _init(self):
-    self.df_mrna = mf.cleanColumns(pd.read_csv(cn.MRNA_PATH))
-    self.analyzer = ga.GeneAnalyzer(self.df_mrna)
+    self.analyzer = ga.GeneAnalyzer()
     self.analyzer._initializeODScope(DESC_STG, END_TIME)
     self.analyzer._initializeODPScope(
         self.analyzer.network.new_parameters)
@@ -38,9 +38,12 @@ class TestGeneAnalyzer(unittest.TestCase):
   def testConstructor(self):
     if IGNORE_TEST:
       return
+    self._init()
     self.assertTrue(
         isinstance(self.analyzer.parameters, lmfit.Parameters))
     self.assertTrue("P1" in self.analyzer.namespace.keys())
+    self.assertTrue(helpers.isValidDataFrame(self.analyzer._df_mrna,
+        self.analyzer._df_mrna.columns))
 
   def testMakePythonExpression(self):
     if IGNORE_TEST:
@@ -72,6 +75,8 @@ class TestGeneAnalyzer(unittest.TestCase):
         END_TIME/ga.NUM_TO_TIME)
 
   def testDo(self):
+    if IGNORE_TEST:
+      return
     self._init()
     self.analyzer.do(DESC_STG, end_time=END_TIME)
     import pdb; pdb.set_trace()
@@ -88,6 +93,22 @@ class TestGeneAnalyzer(unittest.TestCase):
         num_iter=20)
     self.assertLess(np.abs(result[-1][0] - MAX*MAX), 1)
 
+  def testProteinInitializations(self):
+    df_mrna, compileds = ga.GeneAnalyzer.proteinInitializations(
+        cn.MRNA_PATH)
+    self.assertTrue("code" in str(compileds[0].__class__))
+    self.assertTrue(helpers.isValidDataFrame(df_mrna,
+        df_mrna.columns))
+
+  def testProteinDydt(self):
+    df_mrna, compileds = ga.GeneAnalyzer.proteinInitializations(
+        cn.MRNA_PATH)
+    y_arr = np.repeat(0, gn.NUM_GENE + 1)
+    time = 0.0
+    result = ga.GeneAnalyzer._proteinDydt(y_arr, time,
+        df_mrna, compileds)
+    import pdb; pdb.set_trace()
+  
 
 if __name__ == '__main__':
   unittest.main()

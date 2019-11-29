@@ -40,7 +40,7 @@ NUM_TO_TIME = 10
 class GeneAnalyzer(object):
   # Analyzes genes for a set of mRNA data
 
-  def __init__(self, df_mrna):
+  def __init__(self, mrna_path=cn.MRNA_PATH):
     """
     :param pd.DataFrame df_mrna:
         columns: mRNA observations
@@ -48,9 +48,12 @@ class GeneAnalyzer(object):
     :param str desc_stg: string descriptor for a gene
     Scope O.
     """
+    # The folowing are used in the D scope
     self._stmt_initializations = util.readFile(
         cn.PATH_DICT[cn.INITIALIZATIONS])
-    self._df_mrna = df_mrna
+    self._mrna_path = mrna_path
+    self._df_mrna = pd.read_csv(mrna_path)
+    self._df_mrna = self._df_mrna.set_index(cn.TIME)
     # The following are used in the OD Scope.
     self.network = None
     self.descriptor = None
@@ -58,7 +61,6 @@ class GeneAnalyzer(object):
     self.reaction = None
     self.mrna_kinetics = None
     self.mrna_kinetics_compiled = None  # Compiled mRNA kinetics
-    self.protein_kinetics_compiled = None   # list-compiled protein kinetics
     self.namespace = None  # Also used in the ODP scope
     self.end_time = None
     self._makeProteinEstimates()
@@ -66,6 +68,95 @@ class GeneAnalyzer(object):
     self.ser_est = None  # Estimate of the mRNA
     self.parameters = None # Parameter values from estimates
     self.rsq = None  # rsq for estimate w.r.t. observations
+
+  def _getProteinDF(self):
+    """
+    Obtains the protein dataframe from a file, it exists.
+    Updates
+      self._df_protein - columns are protein; index is time
+    """
+    path = GeneAnalyzer.makeProteinPath(mrna_path=self._mrna_path)
+    if os.ispath.isfile(path):
+      self._df_protein = pd.read_csv(path)
+      self._df_protein = self._df_protein.set_index(TIME)
+      return
+    # Estimate protein concentrations
+
+  @staticmethod
+  def _makeProteinPath(mrna_path=cn.MRNA_PATH):
+    """
+    Creates the path to the protein CSV file based on 
+    the path to the mRNA file.
+    """
+    path = mrna_path.replace(".csv", "")
+    return "%s_protein.csv" % path
+
+  @classmethod
+  def makeProteinDF(cls, mrna_path=cn.MRNA_PATH, end_time=1200):
+    """
+    Creates a CSV file with the estimates of protein concentrations.
+    :param str mrna_path: path to mRNA data
+    Creates a file in the same directory as cn.MRNA_PATH with
+    "_protein.csv".
+    This method runs for a long time.
+    """
+    # Initializations
+    df_mrna, compileds = cls.proteinInitializations(mrna_path)
+    # Integrate to obtain protein concetrations
+    df_sub = df_mrna[df_mrna.index <= endtime]
+    times = df_sub.index.tolist()
+    y0_arr = np.repeat(0, gn.NUM_GENE)
+    y_mat = scipy.integrate.odeint(y0_arr, times, args=(df_mrna, compileds))
+    # Write the result
+    columns = [gn.GeneReaction.makeProtein(n)
+        for n in range(1, gn.NUM_GENE + 1)]
+    df = pd.DataFrame(y_mat)
+    df.columns = columns
+    df.index = times
+    df.to_csv(path)
+
+  @staticmethod
+  def proteinInitializations(mrna_path):
+    """
+    Constructs data needed to initialize the estimates of proteins
+    :return pd.DataFrame, list-Bytecodes: df_mrna, compileds
+    """
+    path = GeneAnalyzer._makeProteinPath(mrna_path)
+    df_mrna = pd.read_csv(mrna_path)
+    # Construct the compiled expressions for protein kinetics
+    compileds = []
+    for idx in range(1, gn.NUM_GENE + 1):
+      expression = PROTEIN_KINETICS % (idx, idx, idx, idx)
+      compileds.append(compile(
+        expression, 'protein%d_kinetics' % idx, 'eval'))
+    return df_mrna, compileds
+
+  @staticmethod
+  def _proteinDydt(y_arr, time, df_mrna, compileds):
+    """
+    Evaluates the kinetics expressions for the mRNA under study
+    (self.mrna_name) and its associated protein (self.protein_name)
+    :param np.array y_arr: 0, y_arr[1],...y[8] = _, P1, ..., P8
+    :param float time: time of the evaluation
+    :param pd.DataFrame df_mrna: observed mRNA (columns); index is time
+    :param list-Bytecodes compileds: compiled expressions for protein kinetics
+    :return np.array: dydt for 0, P1, ..., P8
+    """
+    namespace = {}
+    dydts = [0]  # First entry is always 0
+    stmt_initializations = util.readFile(
+        cn.PATH_DICT[cn.INITIALIZATIONS])
+    exec(stmt_initializations, namespace)
+    # Update the namespace and calculate the derivative
+    for idx in range(1, gn.NUM_GENE + 1):
+      col = gn.GeneReaction.makeMrna(idx)
+      namespace[col] = df_mrna.loc[time, col]
+      protein = gn.GeneReaction.makeMrna(idx)
+      namespace[protein] = y_arr[idx-1]
+      dydt = eval(compileds[idx-1], namespace)
+      dydts.append(dydt)
+    # 
+    return dydt
 
   def _makeProteinEstimates(self, path=None):
     """
@@ -120,7 +211,7 @@ class GeneAnalyzer(object):
     self.network.generate()
     self.reaction = gn.GeneReaction(self.descriptor)
     self.reaction.generate()
-    self.mrna_kinetics = self.__class__._makePythonExpression(
+    self.mrna_kinetics = GeneAnalyzer._makePythonExpression(
         self.reaction.mrna_kinetics)
     self.parameters = copy.deepcopy(self.network.new_parameters)
     if not (isinstance(self.parameters, lmfit.Parameters)):
@@ -130,11 +221,6 @@ class GeneAnalyzer(object):
     # Compile kinetics
     self.mrna_kinetics_compiled = compile(
         self.mrna_kinetics, 'mrna_kinetics', 'eval')
-    self.protein_kinetics_compiled = []
-    for idx in range(1, gn.NUM_GENE + 1):
-      expression = PROTEIN_KINETICS % (idx, idx, idx, idx)
-      self.protein_kinetics_compiled.append(compile(
-        expression, 'protein%d_kinetics' % idx, 'eval'))
      
   @staticmethod
   def _makePythonExpression(kinetics):
@@ -168,7 +254,7 @@ class GeneAnalyzer(object):
     times = np.array(self._df_mrna.index.tolist())
     num_times = int(self.end_time/NUM_TO_TIME)
     times = times[0:num_times]
-    y_mat = scipy.integrate.odeint(self.__class__._calcKinetics,
+    y_mat = scipy.integrate.odeint(GeneAnalyzer._calcKinetics,
         y0_arr, times, args=(self,))
     self.ser_est = pd.Series(y_mat[:, 0], index=times)
 
@@ -217,7 +303,7 @@ class GeneAnalyzer(object):
     """
     Evaluates the kinetics expressions for the mRNA under study
     (self.mrna_name) and its associated protein (self.protein_name)
-    :param np.array y_arr: y_arr[0] = mRNA, y_arr[1] = Protein
+    :param np.array y_arr: y_arr[0] = mRNA
     :param float time: time of the evaluation
     :param GeneAnalyzer analyzer:
     :return np.array: dydt for the elements of the vector
@@ -227,21 +313,11 @@ class GeneAnalyzer(object):
     # FIXME: Generalize the selection of time indices
     # Adjust time
     time = 10*round(time/10)  # Adjust time to be consistent with the dataframe
-    # Update the namespace with the new protein values and the
-    # mRNA values from the observations
+    # Update the namespace for the current time and mRNA
+    analyzer.namespace[analyzer.mrna_name] = y_arr[0]
     for idx in range(1, gn.NUM_GENE + 1):
       col = gn.GeneReaction.makeProtein(idx)
       analyzer.namespace[col] = analyzer._df_protein.loc[time, col]
-      if idx == self.descriptor.ngene:
-        analyzer.namespace[col] = y_arr[1]
-    # Update to the new values of mRNA for the gene under analysis
-    analyzer.namespace[analyzer.mrna_name] = y_arr[0]
-    # Calculate the drivatives
-    # Can compute this once for all proteins.
-    # TODO: Just do protein calculation if the protein is in the
-    #       mRNA kinetics
-    dydt = [
-        eval(analyzer.mrna_kinetics_compiled, analyzer.namespace),
-        eval(analyzer.protein_kinetics_compiled, analyzer.namespace)
-        ]
+    # Evaluate the derivative
+    dydt = [eval(analyzer.mrna_kinetics_compiled, analyzer.namespace)]
     return dydt
