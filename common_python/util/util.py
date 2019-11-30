@@ -4,6 +4,8 @@ import os
 import random
 import string
 import sys
+import pandas as pd
+import numpy as np
 
 LETTERS = 'abcdefghijklmnopqrstuvwxyz'
 
@@ -169,3 +171,34 @@ def addPath(repo_name, sub_dirs=None):
   for folder in sub_dirs:
     path = os.path.join(path, folder)
   sys.path.insert(0, path)
+
+def interpolateTime(ser, time):
+  """
+  Interpolates a values between two times.
+  :param pd.Series ser: index is time
+  :param float time:
+  :return float:
+  """
+  def findTime(a_list, func):
+    if len(a_list) == 0:
+      return np.nan
+    else:
+      return func(a_list)
+  def findValue(time):
+    if np.isnan(time):
+      return np.nan
+    else:
+      return ser[time]
+  #
+  time_lb = findTime([t for t in ser.index if t <= time], max)
+  time_ub = findTime([t for t in ser.index if t >= time], min)
+  value_lb = findValue(time_lb)
+  value_ub = findValue(time_ub)
+  if np.isnan(value_lb):
+    return value_ub
+  if np.isnan(value_ub):
+    return value_lb
+  if time_ub == time_lb:
+    return value_ub
+  frac = (time - time_lb)/(time_ub - time_lb)
+  return (1 - frac)*value_lb + frac*value_ub

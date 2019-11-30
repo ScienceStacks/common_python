@@ -2,6 +2,8 @@
 
 import common_python.util.util as ut
 
+import numpy as np
+import pandas as pd
 import sys
 import unittest
 
@@ -92,6 +94,13 @@ class TestFunctions(unittest.TestCase):
     #
     test([], repo_name)
     test([repo_name, 'classifier'], 'classifier')
+
+  def testInterpolateTime(self):
+    MAX = 10
+    SER = pd.Series(range(MAX), index=range(MAX))
+    self.assertEqual(ut.interpolateTime(SER, 0.4), 0.4)
+    self.assertEqual(ut.interpolateTime(SER, -1), 0)
+    self.assertEqual(ut.interpolateTime(SER, MAX), MAX-1)
 
 
 if __name__ == '__main__':

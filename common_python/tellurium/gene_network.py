@@ -136,6 +136,10 @@ class GeneDescriptor(object):
     :param str string: gene descriptor string
     :return GeneDescriptor:
     """
+    if isinstance(string, int):
+      string = str(string)
+    if not len(string) in [1, 3, 6]:
+      raise ValueError("Invalid string descriptor: %s" % string)
     # Initializations
     string = str(string)  # With 0 TFs, may have an int
     nprots = []

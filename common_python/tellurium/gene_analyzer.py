@@ -28,6 +28,7 @@ import util
 
 import copy
 import lmfit   # Fitting lib
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
@@ -110,8 +111,7 @@ class GeneAnalyzer(object):
     # Initializations
     df_mrna, compileds = cls.proteinInitializations(mrna_path)
     # Integrate to obtain protein concetrations
-    df_sub = df_mrna[df_mrna.index <= end_time]
-    times = df_sub.index.tolist()
+    times = [t for t in df_mrna.index if t <= end_time]
     y0_arr = np.repeat(0, gn.NUM_GENE)
     y_mat = scipy.integrate.odeint(GeneAnalyzer._proteinDydt,
          y0_arr, times,
@@ -158,11 +158,9 @@ class GeneAnalyzer(object):
     :param list-Bytecodes compileds: compiled expressions for protein kinetics
     :return np.array: dydt for P1, ..., P8
     """
-    def adj(n):
-      # Adjusts the index
-      return n + 1
+    def adjIndex(idx):
+      return idx + 1
     #
-    time = GeneAnalyzer._adjustTime(time)
     namespace = {}
     dydts = []
     stmt_initializations = util.readFile(
@@ -170,9 +168,9 @@ class GeneAnalyzer(object):
     exec(stmt_initializations, namespace)
     # Update the namespace and calculate the derivative
     for idx in range(gn.NUM_GENE):
-      col = gn.GeneReaction.makeMrna(adj(idx))
-      namespace[col] = df_mrna.loc[time, col]
-      protein = gn.GeneReaction.makeProtein(adj(idx))
+      col = gn.GeneReaction.makeMrna(adjIndex(idx))
+      namespace[col] = util.interpolateTime(df_mrna[col], time)
+      protein = gn.GeneReaction.makeProtein(adjIndex(idx))
       namespace[protein] = y_arr[idx]
       dydt = eval(compileds[idx], namespace)
       dydts.append(dydt)
@@ -206,7 +204,7 @@ class GeneAnalyzer(object):
     fitter = lmfit.Minimizer(calcResiduals, self.parameters)
     fitter_result = fitter.minimize(method="differential_evolution")
     # Assign the results
-    self.params = fitter_result.params
+    self.parameters = fitter_result.params
     self.rsq = util.calcRsq(self._df_mrna[self.mrna_name],
         self.ser_est)
 
@@ -312,11 +310,6 @@ class GeneAnalyzer(object):
     for name, value in valuesdict.items():
         self.namespace[name] = value
 
-  # FIXME: Generalize the selection of time indices
-  @staticmethod
-  def _adjustTime(time):
-    return NUM_TO_TIME*round(time/NUM_TO_TIME)
-
   @staticmethod
   def _calcKinetics(y_arr, time, analyzer):
     """
@@ -329,19 +322,26 @@ class GeneAnalyzer(object):
     Scope ODPT.
     Just estimate mRNA and its protein.
     """
-    # Adjust time
-    time = GeneAnalyzer._adjustTime(time)
     # Update the namespace for the current time and mRNA
     analyzer.namespace[analyzer.mrna_name] = y_arr[0]
     for idx in range(1, gn.NUM_GENE + 1):
       col = gn.GeneReaction.makeProtein(idx)
-      try:
-        analyzer.namespace[col] = analyzer._df_protein.loc[time, col]
-      except:
-        import pdb; pdb.set_trace()
+      analyzer.namespace[col] = util.interpolateTime(
+          analyzer._df_protein[col], time)
     # Evaluate the derivative
     dydt = [eval(analyzer.mrna_kinetics_compiled, analyzer.namespace)]
     return dydt
+
+  def plot(self):
+    """
+    Plots the results of a gene analysis.
+    """
+    length = len(self.ser_est)
+    mrna_name = gn.GeneReaction.makeMrna(self.descriptor.ngene)
+    ser_obs = self._df_mrna[mrna_name]
+    ser_obs = ser_obs[ser_obs.index[0:length]]
+    times = self.ser_est.index.tolist()
+    plt.plot(times, ser_obs, times, self.ser_est)
   
 
 if __name__ == '__main__':

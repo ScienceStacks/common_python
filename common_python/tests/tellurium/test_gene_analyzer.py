@@ -16,9 +16,9 @@ import pandas as pd
 import numpy as np
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 DESC_STG = "7-7"
-END_TIME = 300
+END_TIME = 50
 
 
 ###########################################################
@@ -79,7 +79,7 @@ class TestGeneAnalyzer(unittest.TestCase):
       return
     self._init()
     self.analyzer.do(DESC_STG, end_time=END_TIME)
-    import pdb; pdb.set_trace()
+    self.assertTrue(isinstance(self.analyzer.rsq, float))
 
   def testEulerOdeint(self):
     if IGNORE_TEST:
@@ -129,6 +129,11 @@ class TestGeneAnalyzer(unittest.TestCase):
         for n in range(1, gn.NUM_GENE+1)]
     columns.insert(0, cn.TIME)
     self.assertTrue(helpers.isValidDataFrame(df, columns))
+
+  def testPlot(self):
+    analyzer = ga.GeneAnalyzer()
+    analyzer.do("7", end_time=100)
+    analyzer.plot()
   
 
 if __name__ == '__main__':

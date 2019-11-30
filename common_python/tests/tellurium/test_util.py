@@ -19,6 +19,13 @@ class TestFunctions(unittest.TestCase):
     ser = util.dfToSer(df)
     assert(len(ser) == len(df.columns)*len(df))
 
+  def testInterpolateTime(self):
+    MAX = 10
+    SER = pd.Series(range(MAX), index=range(MAX))
+    self.assertEqual(util.interpolateTime(SER, 0.4), 0.4)
+    self.assertEqual(util.interpolateTime(SER, -1), 0)
+    self.assertEqual(util.interpolateTime(SER, MAX), MAX-1)
+
 
 if __name__ == '__main__':
   unittest.main()
