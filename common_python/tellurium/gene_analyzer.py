@@ -36,7 +36,10 @@ import scipy
 
 PROTEIN_KINETICS = "a_protein%d*mRNA%d - d_protein%d*P%d"
 DEFAULT_CONSTANT = "Vm1"
-NUM_TO_TIME = 10
+NUM_INTERPOLATATION = 100
+PROTEIN_NAMES = [gn.GeneReaction.makeProtein(n)
+     for n in range(1, gn.NUM_GENE + 1)]
+TIME_UNIT = 10.0  # Time is integer multiples of these units
 
 
 class GeneAnalyzer(object):
@@ -44,19 +47,22 @@ class GeneAnalyzer(object):
 
   def __init__(self, mrna_path=cn.MRNA_PATH):
     """
-    :param pd.DataFrame df_mrna:
-        columns: mRNA observations
-        index: time
+    :param str mrna_path: path to csv file w/mRNA data
+        has a time column
     :param str desc_stg: string descriptor for a gene
     Scope O.
     """
-    # The folowing are in the D scope
+    # O scope initializations
     self._stmt_initializations = util.readFile(
         cn.PATH_DICT[cn.INITIALIZATIONS])
     self._mrna_path = mrna_path
     self._df_mrna = pd.read_csv(mrna_path)
     self._df_mrna = self._df_mrna.set_index(cn.TIME)
+    self._matrix_mrna = makeTimeInterpolatedMatrix(
+        self._df_mrna, num_interpolation=NUM_INTERPOLATION)
     self._getProteinDF()  # self._df_protein
+    self._matrix_protein = makeTimeInterpolatedMatrix(
+        self._df_protein, num_interpolation=NUM_INTERPOLATION)
     # The following are in the OD Scope.
     self.network = None
     self.descriptor = None
@@ -65,10 +71,12 @@ class GeneAnalyzer(object):
     self.mrna_kinetics = None
     self.mrna_kinetics_compiled = None  # Compiled mRNA kinetics
     self.end_time = None
+    self.times_est = None  # Times at which estimates are done
+    self.times_all = None  # Includes times of interpolations
     # The following are in the ODP Scope
     self.namespace = None
     # Results
-    self.ser_est = None  # Estimate of the mRNA
+    self.arr_est = None  # Estimate of the mRNA
     self.parameters = None # Parameter values from estimates
     self.rsq = None  # rsq for estimate w.r.t. observations
 
@@ -76,11 +84,12 @@ class GeneAnalyzer(object):
     """
     Obtains the protein dataframe from a file, it exists.
     Updates
-      self._df_protein - columns are protein; index is time
+      self._marix_protein - columns are protein; index is time
     """
     path = GeneAnalyzer._makeProteinPath(mrna_path=self._mrna_path)
     if os.path.isfile(path):
-      self._df_protein = pd.read_csv(path)
+      # TODO: convert to matrix
+      df_protein = pd.read_csv(path)
       self._df_protein = self._df_protein.set_index(cn.TIME)
       return
     else:
@@ -182,7 +191,7 @@ class GeneAnalyzer(object):
     Do an analysis for the descriptor string provided.
     :param str desc_stg:
     Updates:
-      self.ser_est
+      self.arr_est
       self.parameters
     Scope: OD.
     """
@@ -194,10 +203,9 @@ class GeneAnalyzer(object):
       Scope: ODP.
       """
       self._calcMrnaEstimates(parameters)
-      ser_obs = self._df_mrna.loc[:self.end_time, self.mrna_name]
-      del ser_obs[end_time]
-      ser_res = ser_obs - self.ser_est
-      return ser_res.to_list()
+      arr_obs = self._matrix_mrna[self.times_est, self.descriptor.ngene]
+      arr_res = arr_obs - self.arr_est
+      return arr_res
     # Initializations
     self._initializeODScope(desc_stg, end_time)
     # Do the fits
@@ -205,8 +213,8 @@ class GeneAnalyzer(object):
     fitter_result = fitter.minimize(method="differential_evolution")
     # Assign the results
     self.parameters = fitter_result.params
-    self.rsq = util.calcRsq(self._df_mrna[self.mrna_name],
-        self.ser_est)
+    # FIXME: use arrays
+    #self.rsq = util.calcRsq(self._df_mrna[self.mrna_name], self.ser_est)
 
   def _initializeODScope(self, desc_stg, end_time):
     """
@@ -230,6 +238,8 @@ class GeneAnalyzer(object):
       self.parameters = mg.makeParameters([DEFAULT_CONSTANT])
     elif len(self.parameters.valuesdict()) == 0:
       self.parameters = mg.makeParameters([DEFAULT_CONSTANT])
+    self.times_all = [t for t in self._matrix_mrna[:, 0] if t <= end_time]
+    self.times_est = [t for t in self._df_mrna.index if t <= end_time]
     # Compile kinetics
     self.mrna_kinetics_compiled = compile(
         self.mrna_kinetics, 'mrna_kinetics', 'eval')
@@ -256,19 +266,10 @@ class GeneAnalyzer(object):
     """
     self._initializeODPScope(parameters)
     # Construct initial values for the integration
-    if False:
-      y0_arr = [self.namespace[gn.GeneReaction.makeProtein(n)]
-        for n in range(1, gn.NUM_GENE+1)]
-    else:
-      y0_arr = []
-    y0_arr.insert(0, self.namespace[self.mrna_name])
-    y0_arr = np.array(y0_arr)
-    times = np.array(self._df_mrna.index.tolist())
-    num_times = int(self.end_time/NUM_TO_TIME)
-    times = times[0:num_times]
+    y0_arr = np.array([self.namespace[self.mrna_name]])
     y_mat = scipy.integrate.odeint(GeneAnalyzer._calcKinetics,
-        y0_arr, times, args=(self,))
-    self.ser_est = pd.Series(y_mat[:, 0], index=times)
+        y0_arr, self.times_est, args=(self,))
+    self.arr_est = y_mat[:, 0]
 
   def eulerOdeint(self, func, y0_arr, times, num_iter=10):
     """
@@ -324,10 +325,10 @@ class GeneAnalyzer(object):
     """
     # Update the namespace for the current time and mRNA
     analyzer.namespace[analyzer.mrna_name] = y_arr[0]
+    time = float(int(time*TIME_UNIT)/TIME_UNIT)
     for idx in range(1, gn.NUM_GENE + 1):
-      col = gn.GeneReaction.makeProtein(idx)
-      analyzer.namespace[col] = util.interpolateTime(
-          analyzer._df_protein[col], time)
+      analyzer.namespace[col] = analyzer._matrix_protein[
+          time, PROTEIN_NAMES[idx]]
     # Evaluate the derivative
     dydt = [eval(analyzer.mrna_kinetics_compiled, analyzer.namespace)]
     return dydt
@@ -338,10 +339,8 @@ class GeneAnalyzer(object):
     """
     length = len(self.ser_est)
     mrna_name = gn.GeneReaction.makeMrna(self.descriptor.ngene)
-    ser_obs = self._df_mrna[mrna_name]
-    ser_obs = ser_obs[ser_obs.index[0:length]]
-    times = self.ser_est.index.tolist()
-    plt.plot(times, ser_obs, times, self.ser_est)
+    arr_obs = self._matrix_mrna[self.times_est, self.descriptor.ngene]
+    plt.plot(self.times_est, arr_obs, self.times_est, self.arr_est)
   
 
 if __name__ == '__main__':

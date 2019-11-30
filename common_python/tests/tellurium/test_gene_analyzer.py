@@ -134,7 +134,7 @@ class TestGeneAnalyzer(unittest.TestCase):
     analyzer = ga.GeneAnalyzer()
     analyzer.do("7", end_time=100)
     analyzer.plot()
-  
+
 
 if __name__ == '__main__':
   unittest.main()

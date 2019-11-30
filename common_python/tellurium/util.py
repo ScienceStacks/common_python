@@ -53,3 +53,28 @@ def interpolateTime(ser, time):
     return value_ub
   frac = (time - time_lb)/(time_ub - time_lb)
   return (1 - frac)*value_lb + frac*value_ub
+
+def makeTimeInterpolatedMatrix(df, num_interpolation=10):
+  """
+  Does linear interpolations of values based on time.
+  :param pd.DataFrame df: index is time
+  :param int num_interpolation: number of interpolations between time
+  :return np.array: first column is time
+  Assumes that index is sorted ascending
+  """
+  times = df.index.tolist()
+  time_last = times[0]
+  matrix = []
+  # For each pair of times
+  for time in times[1:]:
+    time_incr = (time - time_last)/num_interpolation
+    arr_last = np.array(df.loc[time_last, :])
+    arr_cur = np.array(df.loc[time, :])
+    arr_incr = (arr_cur - arr_last)/num_interpolation
+    # For each interpolation
+    for idx in range(num_interpolation):
+      arr = arr_last + idx*arr_incr
+      arr = np.insert(arr, 0, time_last + idx*time_incr)
+      matrix.append(arr)
+    time_last = time
+  return np.array(matrix)

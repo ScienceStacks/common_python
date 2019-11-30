@@ -102,6 +102,20 @@ class TestFunctions(unittest.TestCase):
     self.assertEqual(ut.interpolateTime(SER, -1), 0)
     self.assertEqual(ut.interpolateTime(SER, MAX), MAX-1)
 
+  def testMakeTimeInterpolationedMatrix(self):
+    MAX = 5
+    COLUMNS = ['a', 'b']
+    FACTORS = [5, 10]
+    df = pd.DataFrame({'time': range(MAX)})
+    for n in range(len(COLUMNS)):
+      df[COLUMNS[n]] = FACTORS[n]*df['time']
+    df = df.set_index('time')
+    #
+    matrix = ut.makeTimeInterpolatedMatrix(df, num_interpolation=4)
+    for idx in range(len(COLUMNS)):
+      trues = [a[idx+1] == FACTORS[idx]*a[0] for a in matrix]
+      self.assertTrue(all(trues))
+
 
 if __name__ == '__main__':
   unittest.main()
