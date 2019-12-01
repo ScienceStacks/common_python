@@ -293,8 +293,6 @@ class GeneAnalyzer(object):
     # Compile kinetics
     self.mrna_kinetics_compiled = compile(
         self.mrna_kinetics, 'mrna_kinetics', 'eval')
-    # TEMP
-    self.mrna_kinetics_compiled = self.mrna_kinetics
     # Namespace initializations
     self.namespace = {}
     exec(self._stmt_initializations, self.namespace)
