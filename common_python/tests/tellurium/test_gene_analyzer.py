@@ -82,7 +82,7 @@ class TestGeneAnalyzer(unittest.TestCase):
         self.analyzer.network.new_parameters)
     self.assertTrue(isinstance(self.analyzer.arr_est, np.ndarray))
     self.assertEqual(len(self.analyzer.arr_est),
-        int(END_TIME/ga.TIME_UNIT) + 1)
+        int(END_TIME/ga.TIME_UNIT))
 
   def testCalcMrnaEstimates2(self):
     if IGNORE_TEST:
@@ -103,6 +103,13 @@ class TestGeneAnalyzer(unittest.TestCase):
     self.analyzer.do(DESC_STG, end_time=END_TIME,
         max_iteration=5)
     self.assertTrue(isinstance(self.analyzer.rsq, float))
+
+  def testDo1(self):
+    if IGNORE_TEST:
+      return
+    analyzer = ga.GeneAnalyzer()
+    analyzer.do("7-7", end_time=300, max_iteration=10, min_rsq=0.8)
+    self.assertGreater(analyzer.rsq, 0.3)
 
   def testProteinInitializations(self):
     if IGNORE_TEST:

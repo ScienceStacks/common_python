@@ -211,7 +211,10 @@ class GeneAnalyzer(object):
     self._initializeODScope(desc_stg, end_time)
     indices = [n*NUM_INTERPOLATION 
         for n in range(len(self.times_est))]
-    arr_obs = self._matrix_mrna[indices, self.descriptor.ngene]
+    try:
+      arr_obs = self._matrix_mrna[indices, self.descriptor.ngene]
+    except:
+      import pdb; pdb.set_trace()
     history_dict = {}
     for kw in HIST_KWS:
       history_dict[kw] = []
@@ -252,7 +255,9 @@ class GeneAnalyzer(object):
       pass
     # Find the best fits
     df_history = pd.DataFrame(history_dict)
-    df_history = df_history.sort_values(HIST_RSQ, ascending=False)
+    df_history['sort'] = 1 - df_history[HIST_RSQ]
+    df_history = df_history.sort_values('sort')
+    del df_history['sort']
     df_history = df_history.reset_index()
     self.parameters = df_history.loc[0, HIST_PARAMETERS]
     self.arr_est = df_history.loc[0, HIST_ESTIMATE]
@@ -283,8 +288,8 @@ class GeneAnalyzer(object):
     elif len(self.parameters.valuesdict()) == 0:
       self.parameters = mg.makeParameters([DEFAULT_CONSTANT])
     self.times_all = [np.round(t, ROUND_VALUE) 
-        for t in self._matrix_mrna[:, 0] if t <= end_time]
-    self.times_est = [t for t in self._df_mrna.index if t <= end_time]
+        for t in self._matrix_mrna[:, 0] if t < end_time]
+    self.times_est = [t for t in self._df_mrna.index if t < end_time]
     # Compile kinetics
     self.mrna_kinetics_compiled = compile(
         self.mrna_kinetics, 'mrna_kinetics', 'eval')
@@ -376,7 +381,7 @@ class GeneAnalyzer(object):
     dydt = [eval(analyzer.mrna_kinetics_compiled, analyzer.namespace)]
     return dydt
 
-  def plot(self):
+  def plot(self, title=""):
     """
     Plots the results of a gene analysis.
     """
@@ -384,6 +389,10 @@ class GeneAnalyzer(object):
     mrna_name = gn.GeneReaction.makeMrna(self.descriptor.ngene)
     arr_obs = self._df_mrna.loc[self.times_est, self.mrna_name]
     plt.plot(self.times_est, arr_obs, self.times_est, self.arr_est)
+    plt.title(title)
+    plt.xlabel("Time")
+    plt.ylabel("Concentration")
+    plt.legend(["Observed", "Predicted"])
   
 
 if __name__ == '__main__':
