@@ -16,9 +16,9 @@ import pandas as pd
 import numpy as np
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 DESC_STG = "7-7"
-END_TIME = 50
+END_TIME = 300
 
 
 ###########################################################
@@ -48,50 +48,61 @@ class TestGeneAnalyzer(unittest.TestCase):
   def testMakePythonExpression(self):
     if IGNORE_TEST:
       return
+    self._init()
     self.analyzer._initializeODScope(DESC_STG, END_TIME)
     result = ga.GeneAnalyzer._makePythonExpression(
         self.analyzer.reaction.mrna_kinetics)
+    keys = self.analyzer.network.new_parameters.valuesdict().keys()
+    for key in keys:
+        self.analyzer.namespace[key] = 0
     self.assertTrue(isinstance(eval(result, self.analyzer.namespace),
         float))
 
   def testCalcKinetics(self):
     if IGNORE_TEST:
       return
-    y_arr = np.repeat(0, gn.NUM_GENE + 2)
-    time = 0
-    result = ga.GeneAnalyzer._calcKinetics(y_arr, time, self.analyzer)
-    trues = [x >= 0 for x in result]
-    self.assertTrue(all(trues))
-    self.assertGreater(result[0], 0)
+    self._init()
+    def test(time):
+      y_arr = [0]
+      result = ga.GeneAnalyzer._calcKinetics(y_arr,
+          time, self.analyzer)
+      trues = [x >= 0 for x in result]
+      self.assertTrue(all(trues))
+      self.assertGreater(result[0], 0)
+    #
+    test(0)
+    test(0.012)
 
-  def testCalcMrnaEstimates(self):
+  def testCalcMrnaEstimates1(self):
     if IGNORE_TEST:
       return
-    self.assertTrue(self.analyzer.ser_est is None)
+    self._init()
+    self.assertTrue(self.analyzer.arr_est is None)
     self.analyzer._calcMrnaEstimates(
         self.analyzer.network.new_parameters)
-    self.assertTrue(isinstance(self.analyzer.ser_est, pd.Series))
-    self.assertEqual(len(self.analyzer.ser_est),
-        END_TIME/ga.NUM_TO_TIME)
+    self.assertTrue(isinstance(self.analyzer.arr_est, np.ndarray))
+    self.assertEqual(len(self.analyzer.arr_est),
+        int(END_TIME/ga.TIME_UNIT) + 1)
+
+  def testCalcMrnaEstimates2(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    parameters = mg.makeParameters(
+        ['Vm7', 'H7', 'K1_7'],
+        values=[0.01000148, 1.52295321, 2.17466603]
+        )
+    self.analyzer._calcMrnaEstimates(parameters)
+    trues = [v > 0.3 for v in self.analyzer.arr_est[1:]]
+    self.assertTrue(all(trues))
 
   def testDo(self):
     if IGNORE_TEST:
       return
     self._init()
-    self.analyzer.do(DESC_STG, end_time=END_TIME)
+    self.analyzer.do(DESC_STG, end_time=END_TIME,
+        max_iteration=5)
     self.assertTrue(isinstance(self.analyzer.rsq, float))
-
-  def testEulerOdeint(self):
-    if IGNORE_TEST:
-      return
-    def square(_, time, __):
-      return np.array(2*time)
-    #
-    self._init()
-    MAX = 9
-    result = self.analyzer.eulerOdeint(square, [0], range(MAX+1),
-        num_iter=20)
-    self.assertLess(np.abs(result[-1][0] - MAX*MAX), 1)
 
   def testProteinInitializations(self):
     if IGNORE_TEST:
@@ -131,6 +142,8 @@ class TestGeneAnalyzer(unittest.TestCase):
     self.assertTrue(helpers.isValidDataFrame(df, columns))
 
   def testPlot(self):
+    if IGNORE_TEST:
+      return
     analyzer = ga.GeneAnalyzer()
     analyzer.do("7", end_time=100)
     analyzer.plot()

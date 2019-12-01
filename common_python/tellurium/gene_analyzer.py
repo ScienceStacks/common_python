@@ -26,6 +26,7 @@ import model_fitting as mf
 import modeling_game as mg
 import util
 
+import collections
 import copy
 import lmfit   # Fitting lib
 import matplotlib.pyplot as plt
@@ -36,10 +37,17 @@ import scipy
 
 PROTEIN_KINETICS = "a_protein%d*mRNA%d - d_protein%d*P%d"
 DEFAULT_CONSTANT = "Vm1"
-NUM_INTERPOLATATION = 100
+NUM_INTERPOLATION = 100
 PROTEIN_NAMES = [gn.GeneReaction.makeProtein(n)
      for n in range(1, gn.NUM_GENE + 1)]
 TIME_UNIT = 10.0  # Time is integer multiples of these units
+ROUND_VALUE = int(np.log10(NUM_INTERPOLATION)) - 1
+HIST_ESTIMATE = "estimate"
+HIST_PARAMETERS = "parameters"
+HIST_ITERATION = "iteration"
+HIST_RSQ = "rsq"
+HIST_KWS = [HIST_ESTIMATE, HIST_PARAMETERS, HIST_ITERATION,
+    HIST_RSQ]
 
 
 class GeneAnalyzer(object):
@@ -58,10 +66,10 @@ class GeneAnalyzer(object):
     self._mrna_path = mrna_path
     self._df_mrna = pd.read_csv(mrna_path)
     self._df_mrna = self._df_mrna.set_index(cn.TIME)
-    self._matrix_mrna = makeTimeInterpolatedMatrix(
+    self._matrix_mrna = util.makeTimeInterpolatedMatrix(
         self._df_mrna, num_interpolation=NUM_INTERPOLATION)
     self._getProteinDF()  # self._df_protein
-    self._matrix_protein = makeTimeInterpolatedMatrix(
+    self._matrix_protein = util.makeTimeInterpolatedMatrix(
         self._df_protein, num_interpolation=NUM_INTERPOLATION)
     # The following are in the OD Scope.
     self.network = None
@@ -89,7 +97,7 @@ class GeneAnalyzer(object):
     path = GeneAnalyzer._makeProteinPath(mrna_path=self._mrna_path)
     if os.path.isfile(path):
       # TODO: convert to matrix
-      df_protein = pd.read_csv(path)
+      self._df_protein = pd.read_csv(path)
       self._df_protein = self._df_protein.set_index(cn.TIME)
       return
     else:
@@ -186,15 +194,28 @@ class GeneAnalyzer(object):
     # 
     return dydts
 
-  def do(self, desc_stg, end_time=1200):
+  def do(self, desc_stg, end_time=1200, min_rsq=0.8,
+      max_iteration=20):
     """
     Do an analysis for the descriptor string provided.
     :param str desc_stg:
+    :param int end_time: ending time of the simulation
+    :param float min_rsq: minimum value of r-squared
     Updates:
       self.arr_est
       self.parameters
     Scope: OD.
     """
+    global iteration
+    # Initializations
+    self._initializeODScope(desc_stg, end_time)
+    indices = [n*NUM_INTERPOLATION 
+        for n in range(len(self.times_est))]
+    arr_obs = self._matrix_mrna[indices, self.descriptor.ngene]
+    history_dict = {}
+    for kw in HIST_KWS:
+      history_dict[kw] = []
+    #
     def calcResiduals(parameters):
       """
       Calculates the residuals in a fit.
@@ -203,18 +224,41 @@ class GeneAnalyzer(object):
       Scope: ODP.
       """
       self._calcMrnaEstimates(parameters)
-      arr_obs = self._matrix_mrna[self.times_est, self.descriptor.ngene]
       arr_res = arr_obs - self.arr_est
-      return arr_res
-    # Initializations
-    self._initializeODScope(desc_stg, end_time)
+      # Used named tuple to track history and then select best
+      iteration = len(history_dict[HIST_RSQ])
+      ser_est = pd.Series(self.arr_est, index=self.times_est)
+      rsq = util.calcRsq(self._df_mrna[self.mrna_name], ser_est)
+      terms = [
+          (HIST_ESTIMATE, copy.deepcopy(self.arr_est)),
+          (HIST_PARAMETERS, copy.deepcopy(self.parameters)),
+          (HIST_ITERATION, iteration),
+          (HIST_RSQ, rsq),
+          ]
+      # Update the history
+      for term in terms:
+         history_dict[term[0]].append(term[1])
+      # End the search if meet termination criteria
+      if (rsq >= min_rsq) or (iteration > max_iteration):
+        self.parameters = parameters
+        raise RuntimeError
+      return 1 - rsq
+    #
     # Do the fits
     fitter = lmfit.Minimizer(calcResiduals, self.parameters)
-    fitter_result = fitter.minimize(method="differential_evolution")
-    # Assign the results
-    self.parameters = fitter_result.params
-    # FIXME: use arrays
-    #self.rsq = util.calcRsq(self._df_mrna[self.mrna_name], self.ser_est)
+    try:
+      fitter_result = fitter.minimize(method="differential_evolution")
+    except RuntimeError:
+      pass
+    # Find the best fits
+    df_history = pd.DataFrame(history_dict)
+    df_history = df_history.sort_values(HIST_RSQ, ascending=False)
+    df_history = df_history.reset_index()
+    self.parameters = df_history.loc[0, HIST_PARAMETERS]
+    self.arr_est = df_history.loc[0, HIST_ESTIMATE]
+    # Parameter values and estimate have been assigned
+    ser_est = pd.Series(self.arr_est, index=self.times_est)
+    self.rsq = util.calcRsq(self._df_mrna[self.mrna_name], ser_est)
 
   def _initializeODScope(self, desc_stg, end_time):
     """
@@ -238,11 +282,17 @@ class GeneAnalyzer(object):
       self.parameters = mg.makeParameters([DEFAULT_CONSTANT])
     elif len(self.parameters.valuesdict()) == 0:
       self.parameters = mg.makeParameters([DEFAULT_CONSTANT])
-    self.times_all = [t for t in self._matrix_mrna[:, 0] if t <= end_time]
+    self.times_all = [np.round(t, ROUND_VALUE) 
+        for t in self._matrix_mrna[:, 0] if t <= end_time]
     self.times_est = [t for t in self._df_mrna.index if t <= end_time]
     # Compile kinetics
     self.mrna_kinetics_compiled = compile(
         self.mrna_kinetics, 'mrna_kinetics', 'eval')
+    # TEMP
+    self.mrna_kinetics_compiled = self.mrna_kinetics
+    # Namespace initializations
+    self.namespace = {}
+    exec(self._stmt_initializations, self.namespace)
      
   @staticmethod
   def _makePythonExpression(kinetics):
@@ -261,7 +311,7 @@ class GeneAnalyzer(object):
     for a set of parameters.
     :param lmfit.Parameters parameters:
     Updates:
-      self.ser_est
+      self.arr_est
     Scope ODP.
     """
     self._initializeODPScope(parameters)
@@ -270,28 +320,6 @@ class GeneAnalyzer(object):
     y_mat = scipy.integrate.odeint(GeneAnalyzer._calcKinetics,
         y0_arr, self.times_est, args=(self,))
     self.arr_est = y_mat[:, 0]
-
-  def eulerOdeint(self, func, y0_arr, times, num_iter=10):
-    """
-    Does Euler integration for a specified number of iterations.
-    :param Function func:
-    :param np.array y0_arr:
-    :param list-float times: first time must be 0
-    :param int num_iter: number of iterations for a point
-    :return np.array: matrix with indices corresponding to times
-    """
-    values = [np.array([float(v) for v in y0_arr])]
-    for idx, time in enumerate(times[1:]):
-      y_arr = np.array(values[idx])
-      new_y_arr = np.array(y_arr)
-      last_time = times[idx]
-      incr = (time - last_time)/num_iter
-      for count in range(num_iter):
-        cur_time = last_time + (count+1)*incr
-        dydt = func(y_arr, cur_time, self)
-        new_y_arr = new_y_arr + np.array(dydt)*incr
-      values.append(np.array(new_y_arr))
-    return np.array(values)
   
   def _initializeODPScope(self, parameters):
     """
@@ -303,8 +331,6 @@ class GeneAnalyzer(object):
     """
     self.parameters = parameters
     # Base initializations
-    self.namespace = {}
-    exec(self._stmt_initializations, self.namespace)
     # Initializations for the parameters
     # This may overwrite vales in self._stmt_initialization
     valuesdict = parameters.valuesdict()
@@ -325,10 +351,27 @@ class GeneAnalyzer(object):
     """
     # Update the namespace for the current time and mRNA
     analyzer.namespace[analyzer.mrna_name] = y_arr[0]
-    time = float(int(time*TIME_UNIT)/TIME_UNIT)
-    for idx in range(1, gn.NUM_GENE + 1):
-      analyzer.namespace[col] = analyzer._matrix_protein[
-          time, PROTEIN_NAMES[idx]]
+    idx_lb = len([t for t in analyzer.times_all if time >= t]) - 1
+    if analyzer.times_all[idx_lb] == time:
+      idx_ub = idx_lb
+    else:
+      idx_ub = min(idx_lb + 1, len(analyzer.times_all) - 1)
+    if idx_lb == idx_ub:
+      # Exact match of time
+      for protein_idx in range(1, gn.NUM_GENE + 1):
+        protein_name = PROTEIN_NAMES[protein_idx - 1]
+        value = analyzer._matrix_protein[idx_lb, protein_idx]
+        analyzer.namespace[protein_name] = value
+    else:
+      # Linear interpolation between two imes
+      time_diff = analyzer.times_all[idx_ub] - analyzer.times_all[idx_lb]
+      time_frac = (time - analyzer.times_all[idx_lb]) / time_diff
+      for protein_idx in range(1, gn.NUM_GENE + 1):
+        protein_name = PROTEIN_NAMES[protein_idx - 1]
+        value_lb = analyzer._matrix_protein[idx_lb, protein_idx]
+        value_ub = analyzer._matrix_protein[idx_ub, protein_idx]
+        value = value_lb*(1- time_frac) + value_ub*time_frac
+        analyzer.namespace[protein_name] = value
     # Evaluate the derivative
     dydt = [eval(analyzer.mrna_kinetics_compiled, analyzer.namespace)]
     return dydt
@@ -337,9 +380,9 @@ class GeneAnalyzer(object):
     """
     Plots the results of a gene analysis.
     """
-    length = len(self.ser_est)
+    length = len(self.times_est)
     mrna_name = gn.GeneReaction.makeMrna(self.descriptor.ngene)
-    arr_obs = self._matrix_mrna[self.times_est, self.descriptor.ngene]
+    arr_obs = self._df_mrna.loc[self.times_est, self.mrna_name]
     plt.plot(self.times_est, arr_obs, self.times_est, self.arr_est)
   
 
