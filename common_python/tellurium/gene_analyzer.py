@@ -80,6 +80,7 @@ class GeneAnalyzer(object):
     self.reaction = None
     self.mrna_kinetics = None
     self.mrna_kinetics_compiled = None  # Compiled mRNA kinetics
+    self.start_time = None
     self.end_time = None
     self.times_est = None  # Times at which estimates are done
     self.times_all = None  # Includes times of interpolations
@@ -196,11 +197,12 @@ class GeneAnalyzer(object):
     # 
     return dydts
 
-  def do(self, desc_stg, end_time=1200, min_rsq=0.8,
+  def do(self, desc_stg, start_time=0, end_time=1200, min_rsq=0.8,
       max_iteration=20, is_scipy=True):
     """
     Do an analysis for the descriptor string provided.
     :param str desc_stg:
+    :param int start_time: starting time of the simulation
     :param int end_time: ending time of the simulation
     :param float min_rsq: minimum value of r-squared
     Updates:
@@ -210,7 +212,7 @@ class GeneAnalyzer(object):
     """
     global iteration
     # Initializations
-    self._initializeODScope(desc_stg, end_time)
+    self._initializeODScope(desc_stg, start_time, end_time)
     indices = [n*NUM_INTERPOLATION 
         for n in range(len(self.times_est))]
     arr_obs = self._matrix_mrna[indices, self.descriptor.ngene]
@@ -276,13 +278,18 @@ class GeneAnalyzer(object):
     ser_est = pd.Series(self.arr_est, index=self.times_est)
     self.rsq = util.calcRsq(self._df_mrna[self.mrna_name], ser_est)
 
-  def _initializeODScope(self, desc_stg, end_time):
+  def _initializeODScope(self, desc_stg, start_time, end_time):
     """
     Initializes instance variables for the OD Scope.
     :param str desc_stg:
+    :param int start_time: starting time of simulation
     :param int end_time: ending time of simulation
     Scope: OD.
     """
+    isValidTime = lambda t:  \
+        (t >= self.start_time) and (t < self.end_time)
+    #
+    self.start_time = start_time
     self.end_time = end_time
     self.descriptor = gn.GeneDescriptor.parse(desc_stg)
     self.mrna_name = gn.GeneReaction.makeMrna(self.descriptor.ngene)
@@ -299,8 +306,8 @@ class GeneAnalyzer(object):
     elif len(self.parameters.valuesdict()) == 0:
       self.parameters = mg.makeParameters([DEFAULT_CONSTANT])
     self.times_all = [np.round(t, ROUND_VALUE) 
-        for t in self._matrix_mrna[:, 0] if t < end_time]
-    self.times_est = [t for t in self._df_mrna.index if t < end_time]
+        for t in self._matrix_mrna[:, 0] if isValidTime(t)]
+    self.times_est = [t for t in self._df_mrna.index if isValidTime(t)]
     # Compile kinetics
     self.mrna_kinetics_compiled = compile(
         self.mrna_kinetics, 'mrna_kinetics', 'eval')

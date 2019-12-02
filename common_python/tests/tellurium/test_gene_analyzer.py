@@ -16,8 +16,9 @@ import pandas as pd
 import numpy as np
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 DESC_STG = "7-7"
+START_TIME = 0
 END_TIME = 300
 
 
@@ -31,7 +32,7 @@ class TestGeneAnalyzer(unittest.TestCase):
 
   def _init(self):
     self.analyzer = ga.GeneAnalyzer()
-    self.analyzer._initializeODScope(DESC_STG, END_TIME)
+    self.analyzer._initializeODScope(DESC_STG, START_TIME, END_TIME)
     self.analyzer._initializeODPScope(
         self.analyzer.network.new_parameters)
 
@@ -49,7 +50,7 @@ class TestGeneAnalyzer(unittest.TestCase):
     if IGNORE_TEST:
       return
     self._init()
-    self.analyzer._initializeODScope(DESC_STG, END_TIME)
+    self.analyzer._initializeODScope(DESC_STG, START_TIME, END_TIME)
     result = ga.GeneAnalyzer._makePythonExpression(
         self.analyzer.reaction.mrna_kinetics)
     keys = self.analyzer.network.new_parameters.valuesdict().keys()
@@ -97,12 +98,16 @@ class TestGeneAnalyzer(unittest.TestCase):
     self.assertTrue(all(trues))
 
   def testDo(self):
-    if IGNORE_TEST:
-      return
-    self._init()
-    self.analyzer.do(DESC_STG, end_time=END_TIME, min_rsq=1.0,
+    analyzer1 = ga.GeneAnalyzer()
+    analyzer1.do(DESC_STG, end_time=END_TIME, min_rsq=1.0,
         max_iteration=5)
-    self.assertTrue(isinstance(self.analyzer.rsq, float))
+    self.assertTrue(isinstance(analyzer1.rsq, float))
+    #
+    analyzer2 = ga.GeneAnalyzer()
+    analyzer2.do(DESC_STG, start_time=END_TIME/2,
+        end_time=END_TIME, min_rsq=1.0,
+        max_iteration=5)
+    self.assertGreater(len(analyzer1.arr_est), len(analyzer2.arr_est))
 
   def testDo1(self):
     if IGNORE_TEST:
