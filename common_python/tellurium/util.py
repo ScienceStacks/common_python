@@ -21,7 +21,8 @@ def readFile(path):
 
 def calcRsq(ser_obs, ser_est):
   ser_res = ser_obs - ser_est
-  return 1 - ser_res.var() / ser_obs.var()
+  ser_res = ser_res.dropna()
+  return 1 - ser_res.var() / ser_obs[ser_res.index].var()
 
 def interpolateTime(ser, time):
   """

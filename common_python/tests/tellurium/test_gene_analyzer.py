@@ -98,15 +98,16 @@ class TestGeneAnalyzer(unittest.TestCase):
     self.assertTrue(all(trues))
 
   def testDo(self):
+    analyzer2 = ga.GeneAnalyzer()
+    analyzer2.do(DESC_STG, start_time=END_TIME/2,
+        end_time=END_TIME, min_rsq=1.0,
+        max_iteration=5)
+    #
     analyzer1 = ga.GeneAnalyzer()
     analyzer1.do(DESC_STG, end_time=END_TIME, min_rsq=1.0,
         max_iteration=5)
     self.assertTrue(isinstance(analyzer1.rsq, float))
     #
-    analyzer2 = ga.GeneAnalyzer()
-    analyzer2.do(DESC_STG, start_time=END_TIME/2,
-        end_time=END_TIME, min_rsq=1.0,
-        max_iteration=5)
     self.assertGreater(len(analyzer1.arr_est), len(analyzer2.arr_est))
 
   def testDo1(self):
