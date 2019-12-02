@@ -100,7 +100,7 @@ class TestGeneAnalyzer(unittest.TestCase):
     if IGNORE_TEST:
       return
     self._init()
-    self.analyzer.do(DESC_STG, end_time=END_TIME,
+    self.analyzer.do(DESC_STG, end_time=END_TIME, min_rsq=1.0,
         max_iteration=5)
     self.assertTrue(isinstance(self.analyzer.rsq, float))
 

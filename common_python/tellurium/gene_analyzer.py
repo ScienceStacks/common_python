@@ -48,6 +48,8 @@ HIST_ITERATION = "iteration"
 HIST_RSQ = "rsq"
 HIST_KWS = [HIST_ESTIMATE, HIST_PARAMETERS, HIST_ITERATION,
     HIST_RSQ]
+# Column names
+SORT = 'sort'
 
 
 class GeneAnalyzer(object):
@@ -195,7 +197,7 @@ class GeneAnalyzer(object):
     return dydts
 
   def do(self, desc_stg, end_time=1200, min_rsq=0.8,
-      max_iteration=20):
+      max_iteration=20, is_scipy=True):
     """
     Do an analysis for the descriptor string provided.
     :param str desc_stg:
@@ -211,21 +213,25 @@ class GeneAnalyzer(object):
     self._initializeODScope(desc_stg, end_time)
     indices = [n*NUM_INTERPOLATION 
         for n in range(len(self.times_est))]
-    try:
-      arr_obs = self._matrix_mrna[indices, self.descriptor.ngene]
-    except:
-      import pdb; pdb.set_trace()
+    arr_obs = self._matrix_mrna[indices, self.descriptor.ngene]
     history_dict = {}
     for kw in HIST_KWS:
       history_dict[kw] = []
     #
-    def calcResiduals(parameters):
+    def getBounds(parameters):
+      return [(p[1].min, p[1].max) for p in parameters.items()]
+    def calcResiduals(values):
       """
       Calculates the residuals in a fit.
-      :param lmfit.Parameters parameters:
+      :param lmfit.Parameters/values values:
       :return list-float: variance of residuals
       Scope: ODP.
       """
+      if isinstance(values, lmfit.Parameters):
+        parameters = values
+      else:
+        names = self.parameters.valuesdict().keys()
+        parameters = mg.makeParameters(names, values)
       self._calcMrnaEstimates(parameters)
       arr_res = arr_obs - self.arr_est
       # Used named tuple to track history and then select best
@@ -248,16 +254,21 @@ class GeneAnalyzer(object):
       return 1 - rsq
     #
     # Do the fits
-    fitter = lmfit.Minimizer(calcResiduals, self.parameters)
     try:
-      fitter_result = fitter.minimize(method="differential_evolution")
+      if is_scipy:
+        bounds = getBounds(self.parameters)
+        _ = scipy.optimize.differential_evolution(
+            calcResiduals, bounds)
+      else:
+        fitter = lmfit.Minimizer(calcResiduals, self.parameters)
+        _ = fitter.minimize(method="differential_evolution")
     except RuntimeError:
       pass
     # Find the best fits
     df_history = pd.DataFrame(history_dict)
-    df_history['sort'] = 1 - df_history[HIST_RSQ]
-    df_history = df_history.sort_values('sort')
-    del df_history['sort']
+    df_history[SORT] = 1 - df_history[HIST_RSQ]
+    df_history = df_history.sort_values(SORT)
+    del df_history[SORT]
     df_history = df_history.reset_index()
     self.parameters = df_history.loc[0, HIST_PARAMETERS]
     self.arr_est = df_history.loc[0, HIST_ESTIMATE]
