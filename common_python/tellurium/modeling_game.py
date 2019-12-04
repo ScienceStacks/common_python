@@ -84,11 +84,11 @@ def makeResiduals(model, df, **kwargs):
   columns = set(df_sim.columns).intersection(df.columns)
   return df[columns] - df_sim[columns]
 
-def plotData(df_data, starttime=0, endtime=1200, title="",
+def plotData(df_data, start_time=0, end_time=1200, title="",
     ylim=None):
-  last = int(endtime/TIME_TO_POINT)
-  indices = df_data.index[0:last]
-  plt.plot(indices, df_data.loc[indices,:])
+  times = [t for t in df_data.index
+      if (t >= start_time) and (t < end_time)]
+  plt.plot(times, df_data.loc[times, :])
   plt.xlabel("Time")
   plt.title(title)
   if ylim is not None:
@@ -172,7 +172,7 @@ def plotSimulation(df_data, model, parameters=None, sim_time=1200,
         ylim = [-1.5, 1.5]
       else:
         ylim = None
-      plotData(values[0], endtime=sim_time, title=this_title,
+      plotData(values[0], end_time=sim_time, title=this_title,
           ylim=ylim)
 
 def runExperiment(df_data, model, parameters, sim_time=1200,

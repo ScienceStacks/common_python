@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 DESC_STG = "7-7"
 START_TIME = 0
 END_TIME = 300
@@ -98,6 +98,8 @@ class TestGeneAnalyzer(unittest.TestCase):
     self.assertTrue(all(trues))
 
   def testDo(self):
+    if IGNORE_TEST:
+      return
     analyzer2 = ga.GeneAnalyzer()
     analyzer2.do(DESC_STG, start_time=END_TIME/2,
         end_time=END_TIME, min_rsq=1.0,

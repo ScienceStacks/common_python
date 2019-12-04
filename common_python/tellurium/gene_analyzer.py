@@ -45,9 +45,10 @@ ROUND_VALUE = int(np.log10(NUM_INTERPOLATION)) - 1
 HIST_ESTIMATE = "estimate"
 HIST_PARAMETERS = "parameters"
 HIST_ITERATION = "iteration"
+HIST_CRITERIA = "criteria"
 HIST_RSQ = "rsq"
 HIST_KWS = [HIST_ESTIMATE, HIST_PARAMETERS, HIST_ITERATION,
-    HIST_RSQ]
+    HIST_CRITERIA, HIST_RSQ]
 # Column names
 SORT = 'sort'
 
@@ -222,9 +223,16 @@ class GeneAnalyzer(object):
     #
     def getBounds(parameters):
       return [(p[1].min, p[1].max) for p in parameters.items()]
+    def calcL1Rsq(arr_obs, arr_est):
+      arr_res = arr_obs - arr_est
+      abs_res = sum(np.absolute(arr_res))
+      l1rsq = 1 - abs_res / sum(arr_obs)
+      return l1rsq, abs_res
+    #
     def calcResiduals(values):
       """
-      Calculates the residuals in a fit.
+      Calculates the objective function for a fit
+      using l1.
       :param lmfit.Parameters/values values:
       :return list-float: variance of residuals
       Scope: ODP.
@@ -235,15 +243,17 @@ class GeneAnalyzer(object):
         names = self.parameters.valuesdict().keys()
         parameters = mg.makeParameters(names, values)
       self._calcMrnaEstimates(parameters)
-      arr_res = arr_obs - self.arr_est
+      rsq, abs_res = calcL1Rsq(arr_obs, self.arr_est)
+      #arr_res = arr_obs - self.arr_est
       # Used named tuple to track history and then select best
       iteration = len(history_dict[HIST_RSQ])
-      ser_est = pd.Series(self.arr_est, index=self.times_est)
-      rsq = util.calcRsq(self._df_mrna[self.mrna_name], ser_est)
+      #ser_est = pd.Series(self.arr_est, index=self.times_est)
+      #rsq = util.calcRsq(self._df_mrna[self.mrna_name], ser_est)
       terms = [
           (HIST_ESTIMATE, copy.deepcopy(self.arr_est)),
           (HIST_PARAMETERS, copy.deepcopy(self.parameters)),
           (HIST_ITERATION, iteration),
+          (HIST_CRITERIA, abs_res),
           (HIST_RSQ, rsq),
           ]
       # Update the history
@@ -253,7 +263,7 @@ class GeneAnalyzer(object):
       if (rsq >= min_rsq) or (iteration > max_iteration):
         self.parameters = parameters
         raise RuntimeError
-      return 1 - rsq
+      return abs_res
     #
     # Do the fits
     try:
