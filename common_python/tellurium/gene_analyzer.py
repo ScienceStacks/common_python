@@ -223,11 +223,17 @@ class GeneAnalyzer(object):
     #
     def getBounds(parameters):
       return [(p[1].min, p[1].max) for p in parameters.items()]
+    #
     def calcL1Rsq(arr_obs, arr_est):
       arr_res = arr_obs - arr_est
       abs_res = sum(np.absolute(arr_res))
       l1rsq = 1 - abs_res / sum(arr_obs)
       return l1rsq, abs_res
+    #
+    def calcL2Rsq(arr_obs, arr_est):
+      arr_res = arr_obs - arr_est
+      l2rsq = 1 - np.var(arr_res) / np.var(arr_obs)
+      return l2rsq
     #
     def calcResiduals(values):
       """
@@ -243,17 +249,14 @@ class GeneAnalyzer(object):
         names = self.parameters.valuesdict().keys()
         parameters = mg.makeParameters(names, values)
       self._calcMrnaEstimates(parameters)
-      rsq, abs_res = calcL1Rsq(arr_obs, self.arr_est)
-      #arr_res = arr_obs - self.arr_est
+      rsq = calcL2Rsq(arr_obs, self.arr_est)
       # Used named tuple to track history and then select best
       iteration = len(history_dict[HIST_RSQ])
-      #ser_est = pd.Series(self.arr_est, index=self.times_est)
-      #rsq = util.calcRsq(self._df_mrna[self.mrna_name], ser_est)
       terms = [
           (HIST_ESTIMATE, copy.deepcopy(self.arr_est)),
           (HIST_PARAMETERS, copy.deepcopy(self.parameters)),
           (HIST_ITERATION, iteration),
-          (HIST_CRITERIA, abs_res),
+          (HIST_CRITERIA, rsq),
           (HIST_RSQ, rsq),
           ]
       # Update the history
@@ -263,7 +266,7 @@ class GeneAnalyzer(object):
       if (rsq >= min_rsq) or (iteration > max_iteration):
         self.parameters = parameters
         raise RuntimeError
-      return abs_res
+      return rsq
     #
     # Do the fits
     try:
