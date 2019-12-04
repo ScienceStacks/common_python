@@ -2,6 +2,7 @@ from common_python.util import util
 util.addPath("common_python", 
     sub_dirs=["common_python", "tellurium"])
 
+import common_python.tellurium.constants as cn
 from common_python.tellurium import modeling_game as mg
 from common_python.tellurium import gene_network as gn
 from common_python.tellurium.gene_network import  \
@@ -366,6 +367,20 @@ class TestGeneNetwork(unittest.TestCase):
     for value, constant in zip(VALUES, CONSTANTS):
       statement = "%s = %f" % (constant, value)
       self.assertTrue(statement in self.network.model)
+
+  def testMakeParameterInitializations(self):
+    COLA = "a"
+    VALUEA = 1
+    COLB = "b"
+    VALUEB = 2
+    COLUMNS = [COLA, COLB]
+    df = pd.DataFrame({
+      cn.NAME: [COLA, COLB],
+      cn.VALUE: [VALUEA, VALUEB],
+      })
+    result = gn.GeneNetwork.makeParameterInitializations(df)
+    trues = [c in result for c in COLUMNS]
+    self.assertTrue(all(trues))
 
 
 if __name__ == '__main__':

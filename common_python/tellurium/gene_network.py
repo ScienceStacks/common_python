@@ -553,3 +553,21 @@ class GeneNetwork(object):
 
   def __repr__(self):
     return "\n".join([str(r) for r in self._network.values()])
+
+  @classmethod
+  def makeParameterInitializations(cls, df):
+    """
+    Creates parameter initialization statements for parameter
+    values.
+    :param pd.DataFrame df:
+        name: name of the parameter
+        value: value of the parameter
+    :return str:
+    """
+    statements = ""
+    for idx in df.index:
+      row = df.loc[idx, :]
+      statement = "%s = %f;\n" % (row[cn.NAME], row[cn.VALUE])
+      statements += statement
+    return statements
+    

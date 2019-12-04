@@ -49,8 +49,6 @@ HIST_CRITERIA = "criteria"
 HIST_RSQ = "rsq"
 HIST_KWS = [HIST_ESTIMATE, HIST_PARAMETERS, HIST_ITERATION,
     HIST_CRITERIA, HIST_RSQ]
-# Column names
-SORT = 'sort'
 
 
 class GeneAnalyzer(object):
@@ -281,9 +279,9 @@ class GeneAnalyzer(object):
       pass
     # Find the best fits
     df_history = pd.DataFrame(history_dict)
-    df_history[SORT] = 1 - df_history[HIST_RSQ]
-    df_history = df_history.sort_values(SORT)
-    del df_history[SORT]
+    df_history[cn.SORT] = 1 - df_history[HIST_RSQ]
+    df_history = df_history.sort_values(cn.SORT)
+    del df_history[cn.SORT]
     df_history = df_history.reset_index()
     self.parameters = df_history.loc[0, HIST_PARAMETERS]
     self.arr_est = df_history.loc[0, HIST_ESTIMATE]
@@ -422,6 +420,19 @@ class GeneAnalyzer(object):
     plt.xlabel("Time")
     plt.ylabel("Concentration")
     plt.legend(["Observed", "Predicted"])
+
+  def makeParameterDF(self):
+    """
+    Creates a dataframe of parameter values.
+    :return pd.DataFrame: 'name', 'value'
+    """
+    param_dict = {cn.NAME: [], cn.VALUE: []}
+    values = [v for v in self.parameters.valuesdict().values()]
+    for idx, key in enumerate(self.parameters.valuesdict().keys()):
+      param_dict[cn.NAME].append(key)
+      param_dict[cn.VALUE].append(values[idx])
+    df = pd.DataFrame(param_dict)
+    return pd.DataFrame(param_dict)
   
 
 if __name__ == '__main__':

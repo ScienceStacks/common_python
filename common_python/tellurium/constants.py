@@ -24,4 +24,9 @@ for part in PARTS:
   filename = "model_%s.txt" % part
   PATH_DICT[part] = os.path.join(CUR_DIR, filename)
 
+# Column names
+NAME = "name"
+SORT = "sort"
+VALUE = "value"
+
 # Paths

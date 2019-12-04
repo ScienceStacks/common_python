@@ -163,6 +163,16 @@ class TestGeneAnalyzer(unittest.TestCase):
     analyzer.do("7", end_time=100)
     analyzer.plot()
 
+  def testMakeParameterDF(self):
+    if IGNORE_TEST:
+      return
+    analyzer = ga.GeneAnalyzer()
+    analyzer.do("7-8", end_time=100)
+    df = analyzer.makeParameterDF()
+    expecteds = set(['Vm7', 'K1_7', 'H7'])
+    self.assertEqual(len(expecteds.symmetric_difference(
+        analyzer.parameters.valuesdict().keys())), 0)
+    
 
 if __name__ == '__main__':
   unittest.main()
