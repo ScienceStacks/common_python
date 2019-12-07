@@ -85,10 +85,7 @@ def runModel(model_path=MODEL_PATH, parameters_path=PARAM_PATH,
   :param str parameters_path: path to the parameter file
   """
   # Initializations
-  with open(MODEL_PATH, "r") as fd:
-    model = fd.readlines()
-  model = "".join(model)
-  #
+  model = getModel(model_path=model_path)
   df_params = pd.read_csv(parameters_path)
   parameters = mg.makeParameters(df_params[cn.NAME],
       df_params[cn.VALUE])
@@ -103,3 +100,12 @@ def runModel(model_path=MODEL_PATH, parameters_path=PARAM_PATH,
   mg.plotSimulation(df_mrna, model, parameters=fitted_parameters,
       is_plot_observations=True, is_plot_model=True,
       is_plot_residuals=True, title=None)
+
+def getModel(model_path=MODEL_PATH):
+  """
+  :return str: model in the model file
+  """
+  # Initializations
+  with open(MODEL_PATH, "r") as fd:
+    model = fd.readlines()
+  return "".join(model)
