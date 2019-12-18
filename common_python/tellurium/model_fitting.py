@@ -5,14 +5,30 @@ kwargs: keyword arguments to runSimulation
 order of positional arguments: obs_data, model, parameters
 """
 
+from collections import namedtuple
 import lmfit   # Fitting lib
 import matplotlib.pyplot as plt
-import numpy as np
 import math
+import numpy as np
+import pandas as pd
 import random 
 import tellurium as te
 
+TIME = "time"
+ME_LEASTSQ = "leastsq"
+ME_DIFFERENTIAL_EVOLUTION = "differential_evolution"
+ME_BOTH = "both"
+PER05 = 0.05
+PER95 = 0.95
+TIME_INTERVAL = 10
 
+# data - named_array result
+# road_runner - road_runner instance created
+SimulationResult = namedtuple("SimulationResult",
+    "data road_runner")
+ResidualCalculation = namedtuple("ResidualCalculation",
+    "residuals road_runner")
+Statistic = namedtuple("Statistic", "mean std ci_low ci_high")
 
 ############## CONSTANTS ######################
 # Default simulation model
@@ -44,6 +60,67 @@ DF_METHOD = "least_squares"
 
 
 ############## FUNCTIONS ######################
+def cleanColumns(df_data, is_force_time=True):
+  """
+  Cleans the column names in the dataframe,
+  removing "[", "]". Makes time index.
+  :param pd.DataFrame df_data: Simulation data output.
+  :param bool is_force_time: force time to factors of 10
+  """
+  df = df_data.copy()
+  columns = []
+  for col in df_data.columns:
+    new_col = str(col)
+    new_col = new_col.replace("[", "")
+    new_col = new_col.replace("]", "")
+    columns.append(new_col)
+  df.columns = columns
+  if TIME in df.columns:
+    df = df.set_index(TIME)
+  if df.index.name == TIME:
+    if is_force_time:
+      df.index = [float(v*TIME_INTERVAL) for v in range(len(df))]
+      df.index.name = TIME
+  return df
+
+def matrixToDF(matrix, columns=None, index=None):
+  """
+  Converts an array to a dataframe. If the index is
+  time, then rounds to a tenth.
+  :param np.arrayy matrix:
+         pd.DataFrame    : already converted
+  :param list index: index for dataframe
+  :return pd.DataFrame: Columns are variables w/o [, ].
+                        index is time.
+  """
+  if isinstance(matrix, pd.DataFrame):
+    df = cleanColumns(matrix)
+  else:
+    df = pd.DataFrame(matrix)
+    if columns is None:
+      try:
+        columns = matrix.colnames
+      except:
+        pass
+  if columns is not None:
+    df.columns = columns
+  return cleanColumns(df)
+
+def matrixToDFWithoutTime(matrix, columns=None):
+  """
+  Converts an array to a dataframe, deleting time as a column.
+  :param np.arrayy matrix:
+         pd.DataFrame    : already converted
+  :return pd.DataFrame:
+  """
+  if isinstance(matrix, pd.DataFrame):
+    df = matrix.copy()
+  else:
+    df = matrixToDF(matrix, columns=columns)
+  if TIME != df.index.name:
+    df = df[df.columns.tolist()[1:]]
+  return df
+
 def reshapeData(matrix, indices=None):
   """
   Re-structures matrix as an array for just the rows
@@ -67,18 +144,54 @@ def arrayDifference(matrix1, matrix2, indices=None):
   array2 = reshapeData(matrix2, indices=indices)
   return (array1 - array2)
 
+def makeArrayFromMatrix(df_mat, indices):
+  """
+  Returns an constructured from specified rows
+  organized in sequence by columns.
+  :param pd.DataFrame df_mat:
+  :param list-int indices:
+  :return np.array:
+  """
+  df = df_mat.loc[df_mat.index[indices], :]
+  array = df.T.values
+  return np.reshape(array, len(indices)*len(df.columns))
+
+def makeDFWithCommonColumns(df1, df2):
+  """
+  Returns dataframes that have columns in common.
+  """
+  columns = set(df1.columns).intersection(df2.columns)
+  df1_sub = df1.copy()
+  df2_sub = df2.copy()
+  df1_sub = df1_sub[columns]
+  df2_sub = df2_sub[columns]
+  return df1_sub, df2_sub
+
 def calcRsq(observations, estimates, indices=None):
   """
   Computes RSQ for simulation results.
-  :param 2d-np.array observations: non-time values
-  :param 2d-np.array estimates: non-time values
+  :param matrix observations: non-time values
+  :      pd.DataFrame       : no time column
+  :param matrix estimates: non-time values
+  :      pd.DataFrame       : no time column
   :param list-int indices:
   :return float:
   """
-  array_residuals = arrayDifference(observations, estimates,
-      indices=indices)
-  array_observations = reshapeData(observations, indices=indices)
-  return 1 - np.var(array_residuals)/np.var(array_observations)
+  df_obs = matrixToDF(observations)
+  df_est = matrixToDF(estimates)
+  if indices is None:
+    indices = range(len(df_obs))
+  #
+  df_obs_sub, df_est_sub = makeDFWithCommonColumns(df_obs, df_est)
+  arr_obs = makeArrayFromMatrix(df_obs_sub, indices)
+  arr_est = makeArrayFromMatrix(df_est_sub, indices)
+  try:
+    arr_rsq = arr_obs - arr_est
+  except:
+    import pdb; pdb.set_trace()
+  arr_rsq = arr_rsq*arr_rsq
+  rsq = 1 - sum(arr_rsq) / np.var(arr_obs)
+  return rsq
 
 def makeParameters(constants=CONSTANTS, values=1, mins=0, maxs=10):
   """
@@ -110,43 +223,55 @@ def makeAverageParameters(list_parameters):
   """
   Averages the values of parameters in a list.
   :param list-lmfit.Parameters list_parameters:
-  :return lmfit.Parameters:
+  :return lmfit.Parameters: sets min, max to extremes of list
   """
   result_parameters = lmfit.Parameters()
   names = list_parameters[0].valuesdict().keys()
   for name in names:
     values = []
+    mins = []
+    maxs = []
     for parameters in list_parameters:
       values.append(parameters.valuesdict()[name])
-    result_parameters.add(name, value=np.mean(values))
+      mins.append(parameters.get(name).min)
+      maxs.append(parameters.get(name).max)
+    value = np.mean(values)
+    min_val = min(mins)
+    max_val = min(maxs)
+    result_parameters.add(name, value=value, 
+        min=min_val, max=max_val)
   return result_parameters
 
 def runSimulation(sim_time=SIM_TIME, 
-    num_points=NUM_POINTS, road_runner=ROAD_RUNNER,
+    num_points=NUM_POINTS, road_runner=ROAD_RUNNER, parameters=None,
     **kwargs):
   """
   Runs the simulation model rr for the parameters.
   :param int sim_time: time to run the simulation
   :param int num_points: number of timepoints simulated
   :param ExtendedRoadRunner road_runner:
+  :param lmfit.Parameters parameters:
   :param dict kwargs: parameters used in makeSimulation
-  :return named_array:
+  :return SimulationResult:
   """
   if road_runner is None:
-     road_runner = makeSimulation(**kwargs)
+    road_runner = makeSimulation(parameters=parameters, **kwargs)
   else:
     road_runner.reset()
-  return road_runner.simulate (0, sim_time, num_points)
+    setSimulationParameters(road_runner, parameters)
+  data = road_runner.simulate (0, sim_time, num_points)
+  simulation_result = SimulationResult(
+      data=data,
+      road_runner=road_runner,
+      )
+  return simulation_result
 
-def makeSimulation(parameters=None, model=MODEL):
+def setSimulationParameters(road_runner, parameters=None):
   """
-  Creates an road runner instance for the simulation.
+  Sets parameter values in a road runner instance.
+  :param ExtendedRoadRunner road_runner:
   :param lmfit.Parameters parameters:
-  :param str model:
-  :return ExtendedRoadRunner:
   """
-  road_runner = te.loada(model)
-  road_runner.reset()
   if parameters is not None:
     parameter_dict = parameters.valuesdict()
     # Set the simulation constants for all parameters
@@ -157,6 +282,16 @@ def makeSimulation(parameters=None, model=MODEL):
         exec(stmt)
       except:
         import pdb; pdb.set_trace()
+
+def makeSimulation(parameters=None, model=MODEL):
+  """
+  Creates an road runner instance for the simulation.
+  :param lmfit.Parameters parameters:
+  :param str model:
+  :return ExtendedRoadRunner:
+  """
+  road_runner = te.loada(model)
+  setSimulationParameters(road_runner, parameters)
   return road_runner
 
 def plotTimeSeries(data, is_scatter=False, title="", 
@@ -167,10 +302,16 @@ def plotTimeSeries(data, is_scatter=False, title="",
   :param bool is_scatter: do a scatter plot
   :param str title: plot title
   """
-  if is_scatter:
-    plt.plot (data[:, 0], data[:, 1:], marker='*', linestyle='None')
+  if not isinstance(data, pd.DataFrame):
+    df = pd.DataFrame(data)
   else:
-    plt.plot (data[:, 0], data[:, 1:])
+    df = data
+  columns = df.columns.tolist()
+  xv = df[columns[0]]
+  if is_scatter:
+    plt.plot (xv, df[columns[1:]], marker='*', linestyle='None')
+  else:
+    plt.plot (xv, df[columns[1:]])
   plt.title(title)
   plt.xlabel("Time")
   plt.ylabel("Concentration")
@@ -208,58 +349,88 @@ def makeObservations(sim_time=SIM_TIME, num_points=NUM_POINTS,
   :param int num_points: number of timepoints simulated
   :param float noise_std: Standard deviation for random noise
   :param dict kwargs: keyword parameters used by runSimulation
-  :return namedarray: simulation results with randomness
+  :return pd.DataFrame: simulation results with randomness
   """
   # Create true values
-  data = runSimulation(sim_time=sim_time, num_points=num_points,
+  simulation_result = runSimulation(sim_time=sim_time,
+      num_points=num_points,
       **kwargs)
+  data = simulation_result.data
   num_cols = len(data.colnames)
   # Add randomness
   for i in range (num_points):
     for j in range(1, num_cols):
       data[i, j] = max(data[i, j]  \
           + np.random.normal(0, noise_std, 1), 0)
-  return data
+  return matrixToDF(data)
 
-def calcSimulationResiduals(obs_data, parameters, indices=None, **kwargs):
+def calcSimulationResiduals(obs_data, parameters,
+    indices=None, **kwargs):
   """
   Runs a simulation with the specified parameters and calculates residuals
   for the train_indices.
   :param array obs_data: matrix of data, first col is time.
+         pd.DataFrame  : index is time
   :param lmfit.Parameters parameters:
   :param list-int indices: indices for which calculation is done
                            if None, then all.
   :param dict kwargs: optional parameters passed to simulation
+  :return ResidualCalculation:
   """
+  df_obs = matrixToDFWithoutTime(obs_data)
+  if indices is None:
+    indices = range(len(df_obs))
   if not KWARGS_NUM_POINTS in kwargs.keys():
-    kwargs[KWARGS_NUM_POINTS] = np.shape(obs_data)[0]
-  sim_data = runSimulation(parameters=parameters,
+    kwargs[KWARGS_NUM_POINTS] = len(df_obs)
+  simulation_result = runSimulation(parameters=parameters,
       **kwargs)
-  length = np.shape(sim_data)[0]
-  residuals = arrayDifference(obs_data[:, 1:], sim_data[:, 1:],
-      indices=indices)
-  return residuals
+  df_sim = matrixToDFWithoutTime(simulation_result.data)
+  # Compute differences
+  df_obs, df_sim = makeDFWithCommonColumns(df_obs, df_sim)
+  arr_obs = makeArrayFromMatrix(df_obs, indices)
+  arr_sim = makeArrayFromMatrix(df_sim, indices)
+  residuals = arr_obs - arr_sim
+  residual_calculation = ResidualCalculation(residuals=residuals,
+      road_runner=simulation_result.road_runner)
+  return residual_calculation
 
-def fit(obs_data, indices=None, parameters=PARAMETERS, method='leastsq',
-    **kwargs):
+# TODO: Fix handling of obs_data columns. May not be
+#       a named array, as in bootstrap.
+def fit(obs_data, indices=None, parameters=PARAMETERS, 
+    method=ME_LEASTSQ, **kwargs):
   """
   Does a fit of the model to the observations.
   :param ndarray obs_data: matrix of observed values with time
                            as the first column
+         pd.DataFrame    : time is index
   :param list-int indices: indices on which fit is performed
   :param lmfit.Parameters parameters: parameters fit
-  :param str method: optimization method
+  :param str method: optimization method; both means
+                     differential_evolution followed by leastsq
   :param dict kwargs: optional parameters passed to runSimulation
   :return lmfit.Parameters:
   """
+  global road_runner
+  road_runner = ROAD_RUNNER
   def calcLmfitResiduals(parameters):
-    return calcSimulationResiduals(obs_data, parameters,
-        indices, **kwargs)
+    global road_runner
+    residual_calculation = calcSimulationResiduals(obs_data,
+        parameters, indices, road_runner=road_runner, **kwargs)
+    road_runner = residual_calculation.road_runner
+    return residual_calculation.residuals
   #
-  # Estimate the parameters for this fold
-  fitter = lmfit.Minimizer(calcLmfitResiduals, parameters)
-  fitter_result = fitter.minimize(method=method)
-  return fitter_result.params
+  def estimateParameters(method, parameters):
+    # Estimate the parameters for this fold
+    fitter = lmfit.Minimizer(calcLmfitResiduals, parameters)
+    fitter_result = fitter.minimize(method=method)
+    return fitter_result.params
+  #
+  if method == ME_BOTH:
+    parameters = estimateParameters(ME_DIFFERENTIAL_EVOLUTION,
+        parameters)
+    return estimateParameters(ME_LEASTSQ, parameters)
+  else:
+    return estimateParameters(method, parameters)
 
 def crossValidate(obs_data, method=DF_METHOD,
     sim_time=SIM_TIME,
@@ -271,105 +442,137 @@ def crossValidate(obs_data, method=DF_METHOD,
                            columns are species; 
                            rows are time instances
                            first column is time
+        pd.DataFrame    : time is index
   :param int sim_time: length of simulation run
   :param int num_points: number of time points produced.
   :param lmfit.Parameters: parameters to be estimated
   :param dict kwargs: optional arguments used in simulation
   :return list-lmfit.Parameters, list-float: parameters and RSQ from folds
   """
+  df_obs = matrixToDF(obs_data)
   if num_points is None:
-    num_points = np.shape(obs_data)[0]
+    num_points = len(df_obs)
   # Iterate for for folds
   fold_generator = foldGenerator(num_points, num_folds)
   result_parameters = []
   result_rsqs = []
+  road_runner = ROAD_RUNNER
   for train_indices, test_indices in fold_generator:
     # This function is defined inside the loop because it references a loop variable
     new_parameters = parameters.copy()
-    fitted_parameters = fit(obs_data, method=method,
+    fitted_parameters = fit(df_obs, method=method,
       indices=train_indices, parameters=new_parameters,
-      sim_time=SIM_TIME, num_points=num_points,
+      sim_time=sim_time, num_points=num_points,
       **kwargs)
     result_parameters.append(fitted_parameters)
     # Run the simulation using
     # the parameters estimated using the training data.
-    test_estimates = runSimulation(sim_time=sim_time,
-        num_points=num_points,
+    simulation_result = runSimulation(road_runner=road_runner,
+        sim_time=sim_time, num_points=num_points,
         parameters=fitted_parameters, **kwargs)
+    road_runner = simulation_result.road_runner
+    df_est = matrixToDF(simulation_result.data)
     # Calculate RSQ
-    rsq = calcRsq(obs_data[:, 1:], test_estimates[:, 1:],
-        indices=test_indices)
+    rsq = calcRsq(df_obs, df_est, test_indices)
     result_rsqs.append(rsq)
   return result_parameters, result_rsqs
 
-def makeResidualsMatrix(obs_data, model, parameters, **kwargs):
+def makeResidualDF(obs_data, model, parameters,
+    road_runner=ROAD_RUNNER,
+    **kwargs):
   """
   Calculate residuals for each chemical species.
-  :param np.array obs_data: matrix of observations; first column is time; number of rows is num_points
+  :param named_array/pd.DataFrame obs_data: matrix of observations; first column is time; number of rows is num_points
   :param lmfit.Parameters parameters:
   :param dict kwargs: optional arguments to runSimulation
-  :return np.array: matrix of residuals; columns are chemical species
+  :return pd.DataFrame: matrix of residuals; columns are chemical species
   """
-  data = runSimulation(parameters=parameters, model=model, **kwargs)
-  residuals = calcSimulationResiduals(obs_data, parameters,
-      model=model, **kwargs)
+  df_obs = matrixToDF(obs_data)
+  if df_obs.index.name != TIME:
+    import pdb; pdb.set_trace()
+    raise ValueError("Invalid observational data")
+  residual_calculation = calcSimulationResiduals(df_obs, parameters,
+      model=model, road_runner=road_runner, **kwargs)
+  road_runnder = residual_calculation.road_runner
+  residuals = residual_calculation.residuals
   # Reshape the residuals by species
-  rr = te.loada(model)
-  num_species = rr.getNumFloatingSpecies()
+  num_species = len(df_obs.columns)
   nrows = int(len(residuals) / num_species)
-  return np.reshape(residuals, (nrows, num_species))
+  result = np.reshape(residuals, (nrows, num_species))
+  df_res = pd.DataFrame(result)
+  df_res.columns = df_obs.columns
+  return df_res
 
-def makeSyntheticObservations(residual_matrix, **kwargs):
+def makeSyntheticObservations(df_res, **kwargs):
   """
   Constructs synthetic observations for the model.
-  :param np.array residual_matrix: matrix of residuals; columns are species; number of rows is num_points
+  :param pd.DataFrame df_res: matrix of residuals; columns are species; number of rows is num_points
   :param dict kwargs: optional arguments to runSimulation
-  :return np.array: matrix; first column is time
+  :return pd.DataFrame: index is time
   """
-  model_data = runSimulation(**kwargs)
-  data = model_data.copy()
-  nrows, ncols = np.shape(data)
-  for icol in range(1, ncols):  # Avoid the time column
-    indices = np.random.randint(0, nrows, nrows)
-    for irow in range(nrows):
-      data[irow, icol] = max(data[irow, icol] + residual_matrix[indices[irow], icol-1], 0)
-  return data
+  simulation_result = runSimulation(**kwargs)
+  df_data = matrixToDF(simulation_result.data)
+  df_data, df_res = makeDFWithCommonColumns(df_data, df_res)
+  df_res.columns = df_data.columns
+  nrows = len(df_data)
+  ncols = len(df_data.columns)
+  for col in df_data.columns:
+    for idx in df_data.index:
+      random_index = df_res.index[np.random.randint(0, nrows)]
+      df_data.loc[idx, col] = df_data.loc[idx, col]  \
+          + df_res.loc[random_index, col]
+  df_data = df_data.applymap(lambda v: max(v, 0))
+  return df_data
 
-def doBootstrapWithResiduals(residuals_matrix, 
+def doBootstrapWithResiduals(df_res,
     method=DF_METHOD, count=DF_BOOTSTRAP_COUNT, **kwargs):
   """
   Performs bootstrapping by repeatedly generating synthetic observations.
-  :param np.array residuals_matrix: no time col
+  :param pd.DataFrame residuals_matrix:
   :param int count: number of iterations in bootstrap
   :param dict kwargs: optional arguments to runSimulation
   """
   list_parameters = []
   for _ in range(count):
-      obs_data = makeSyntheticObservations(residuals_matrix, **kwargs)
-      parameters = fit(obs_data, method=method, **kwargs)
+      df_data = makeSyntheticObservations(df_res, **kwargs)
+      parameters = fit(df_data, method=method, **kwargs)
       list_parameters.append(parameters)
   return list_parameters
 
-def doBootstrap(obs_data, model, parameters, 
+def doBootstrap(df_data, model, parameters, 
     method=DF_METHOD, count=DF_BOOTSTRAP_COUNT,
     confidence_limits=DF_CONFIDENCE_INTERVAL, **kwargs):
   """
   Performs bootstrapping by repeatedly generating synthetic observations,
   calculating the residuals as well.
-  :param array obs_data: matrix of data, first col is time.
+  :param pd.DataFrame df_data: index is time
   :param str model:
   :param lmfit.Parameters parameters:
   :param int count: number of iterations in bootstrap
   :param dict kwargs: optional arguments to runSimulation
   :return dict: confidence limits
   """
-  residual_matrix = makeResidualsMatrix(obs_data, model,
+  df_res = makeResidualDF(df_data, model,
       parameters, **kwargs)
-  list_parameters = doBootstrapWithResiduals(residual_matrix,
+  list_parameters = doBootstrapWithResiduals(df_res,
       method=method,
       count=count, model=model, parameters=parameters, **kwargs)
   return makeParameterStatistics(list_parameters,
       confidence_limits=confidence_limits)
+
+def calcStatistic(values, confidence_limits=[PER05, PER95]):
+  """
+  Calculates Statistic
+  :param list-float values:
+  :return Statistic:
+  """
+  quantiles = np.quantile(values, confidence_limits)
+  return Statistic(
+      mean  =np.mean(values),
+      std = np.std(values),
+      ci_low = quantiles[0],
+      ci_high = quantiles[1],
+      )
 
 def makeParameterStatistics(list_parameters,
     confidence_limits=DF_CONFIDENCE_INTERVAL):
@@ -377,21 +580,15 @@ def makeParameterStatistics(list_parameters,
   Computes the mean and standard deviation of the parameters in a list of parameters.
   :param list-lmfit.Parameters
   :param (float, float) confidence_limits: if none, report mean and variance
-  :return dict: key is the parameter name; value is the tuple (mean, stddev) or confidence limits
+  :return dict: key is the parameter name; value is ParameterStatistic
   """
-  parameter_statistics = {}  # This is a dictionary that will have the parameter name as key, and mean, std as values
+  statistic_dict = {}
   parameter_names = list(list_parameters[0].valuesdict().keys())
   for name in parameter_names:
-    parameter_statistics[name] = []  # We will accumulate values in this list
+    statistic_dict[name] = []
     for parameters in list_parameters:
-      parameter_statistics[name].append(parameters.valuesdict()[name])
+      statistic_dict[name].append(parameters.valuesdict()[name])
   # Calculate the statistics
-  for name in parameter_statistics.keys():
-    if confidence_limits is not None:
-      parameter_statistics[name] = np.percentile(parameter_statistics[name], confidence_limits)
-    else:
-      mean = np.mean(parameter_statistics[name])
-      std = np.std(parameter_statistics[name])
-      std = std/np.sqrt(len(list_parameters))  # adjustments for the standard deviation of the mean
-      parameter_statistics[name] = (mean, std)
-  return parameter_statistics
+  for name in statistic_dict.keys():
+    statistic_dict[name] = calcStatistic(statistic_dict[name])
+  return statistic_dict

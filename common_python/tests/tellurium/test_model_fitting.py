@@ -16,6 +16,7 @@ INDICES = range(NROWS)
 TEST_PARAMETERS = lmfit.Parameters()
 TEST_PARAMETERS.add('k1', value=0.1, min=0, max=10)
 TEST_PARAMETERS.add('k2', value=0.2, min=0, max=10)
+CSV_FILE = "wild.csv"
 
 def makeData(nrows, ncols, valFunc=None):
   """
@@ -48,14 +49,15 @@ def testArrayDifference():
 
 def testCalcRsq():
   std = 0.5
-  residuals = np.reshape(np.random.normal(0, std, LENGTH),
+  matrix = np.reshape(np.random.normal(0, std, LENGTH),
       (NROWS, NCOLS))
-  matrix1 =  makeData(NROWS, NCOLS)
-  matrix2 = matrix1 + residuals
-  rsq = mf.calcRsq(matrix2, matrix1)
-  var_est = (1 - rsq)*np.var(matrix1)
-  var_exp = std*std
-  assert(np.abs(var_est - var_exp) < 0.5)
+  rsq = mf.calcRsq(matrix, matrix)
+  assert(np.isclose(rsq, 1))
+  #
+  matrix2 = np.reshape(np.random.normal(0, std, LENGTH),
+      (NROWS, NCOLS))
+  rsq = mf.calcRsq(matrix, matrix2)
+  assert(rsq < 0.01)
 
 def testMakeParameters():
   constants =  ['k1', 'k2', 'k3']
@@ -75,67 +77,84 @@ def testMakeAverageParameters():
     assert(test_dict[name] == result_dict[name])
 
 def testRunSimulation():
-  data1 = mf.runSimulation() 
-  assert(data1[-1, 0] == mf.SIM_TIME)
-  data2 = mf.runSimulation(
-      parameters=TEST_PARAMETERS) 
-  nrows, ncols = np.shape(data1)
+  simulation_result1 = mf.runSimulation() 
+  assert(simulation_result1.data[-1, 0] == mf.SIM_TIME)
+  simulation_result2 = mf.runSimulation(parameters=TEST_PARAMETERS) 
+  nrows, ncols = np.shape(simulation_result1.data)
   for i in range(nrows):
     for j in range(ncols):
-      assert(np.isclose(data1[i,j], data2[i,j]))
+      assert(np.isclose(simulation_result1.data[i,j],
+           simulation_result2.data[i,j]))
 
 def testPlotTimeSeries():
   # Smoke test only
-  data = mf.runSimulation() 
-  mf.plotTimeSeries(data, is_plot=IS_PLOT)
-  mf.plotTimeSeries(data, is_scatter=True, is_plot=IS_PLOT)
+  simulation_result = mf.runSimulation() 
+  mf.plotTimeSeries(simulation_result.data, is_plot=IS_PLOT)
+  mf.plotTimeSeries(simulation_result.data, 
+      is_scatter=True, is_plot=IS_PLOT)
   
 
 def testMakeObservations():
   def test(num_points):
-    obs_data = mf.makeObservations(
+    df_obs = mf.makeObservations(
         num_points=num_points,
         road_runner=mf.ROAD_RUNNER)
-    data = mf.runSimulation(
+    simulation_result  = mf.runSimulation(
         num_points=num_points,
         road_runner=mf.ROAD_RUNNER)
-    data = data[:, 1:]
-    nrows, _ = np.shape(data)
-    assert(nrows == num_points)
-    std = np.sqrt(np.var(mf.arrayDifference(
-        obs_data[:, 1:], data)))
-    assert(std < 3*mf.NOISE_STD)
-    assert(std > mf.NOISE_STD/3.0)
+    df_sim = mf.matrixToDF(simulation_result.data)
+    assert(len(df_obs) == len(df_sim))
+    df_res = df_obs - df_sim
+    ser_std = df_res.std()
+    trues = [v < 3*mf.NOISE_STD for v in ser_std.values]
+    assert(all(trues))
+  #
   test(mf.NUM_POINTS)
   test(2*mf.NUM_POINTS)
 
 def testCalcSimulationResiduals():
-  obs_data = mf.runSimulation(
-      parameters=TEST_PARAMETERS)
-  residuals = mf.calcSimulationResiduals(obs_data,
-      TEST_PARAMETERS)
-  assert(sum(residuals*residuals) == 0)
+  def test(data):
+    residual_calculation = mf.calcSimulationResiduals(data,
+        TEST_PARAMETERS)
+    residuals = residual_calculation.residuals
+    assert(sum(residuals*residuals) == 0)
+  #
+  simulation_result = mf.runSimulation(parameters=TEST_PARAMETERS)
+  matrix = simulation_result.data
+  test(matrix)
+  df = mf.matrixToDF(matrix)
+  test(df)
 
 def testFit():
   obs_data = mf.makeObservations()
-  parameters = mf.fit(obs_data)
-  param_dict = dict(parameters.valuesdict())
-  expected_param_dict = dict(mf.PARAMETERS.valuesdict())
-  diff = set(param_dict.keys()).symmetric_difference(
-      expected_param_dict.keys())
-  assert(len(diff) == 0)
+  def test(method=mf.ME_LEASTSQ):
+    parameters = mf.fit(obs_data, method=method)
+    param_dict = dict(parameters.valuesdict())
+    expected_param_dict = dict(mf.PARAMETERS.valuesdict())
+    diff = set(param_dict.keys()).symmetric_difference(
+        expected_param_dict.keys())
+    assert(len(diff) == 0)
+  #
+  test()
+  test(mf.ME_BOTH)
 
 def testCrossValidate():
-  obs_data = mf.makeObservations(
-      parameters=TEST_PARAMETERS)
-  results_parameters, results_rsqs = mf.crossValidate(
-      obs_data)
-  parameters_avg = mf.makeAverageParameters(
-      results_parameters)
-  params_dict = parameters_avg.valuesdict()
-  for name in params_dict.keys():
-    assert(np.abs(params_dict[name]  \
-    - TEST_PARAMETERS.valuesdict()[name]) < 2*params_dict[name])
+  def test(data, min_rsq):
+    results_parameters, results_rsqs = mf.crossValidate(data)
+    parameters_avg = mf.makeAverageParameters(
+        results_parameters)
+    params_dict = parameters_avg.valuesdict()
+    for name in params_dict.keys():
+      assert(np.abs(params_dict[name]  \
+      - TEST_PARAMETERS.valuesdict()[name]) < 2*params_dict[name])
+    for rsq in results_rsqs:
+      assert(rsq >= min_rsq)
+  #
+  obs_data = mf.makeObservations(model=mf.MODEL, noise_std=0)
+  test(obs_data, 1)
+  test(mf.matrixToDF(obs_data), 1)
+  obs_data = mf.makeObservations(model=mf.MODEL, noise_std=0.1)
+  test(obs_data, 0.7)
 
 def testCrossValidate2():
   num_points = 20
@@ -150,57 +169,58 @@ def testCrossValidate2():
     assert(np.abs(params_dict[name]  \
     - TEST_PARAMETERS.valuesdict()[name]) < 2*params_dict[name])
 
-def testMakeResidualsBySpecies():
+def testMakeResidualDF():
   num_points = 20
   max_val = 10 
-  residual_matrix = _getResiduals(num_points)
-  assert(np.shape(residual_matrix)[0] == num_points)
-  assert(sum(sum(residual_matrix)) < max_val)
+  df_res = _getResiduals(num_points)
+  assert(len(df_res) == num_points)
+  assert(df_res.sum().sum() < max_val)
 
 def testMakeSyntheticObservations():
   num_points = 20
   kwargs = {'model': mf.MODEL,
             'num_points': num_points,
            }
-  residual_matrix = _getResiduals(num_points, model=kwargs['model'])
-  syn_data = mf.makeSyntheticObservations(residual_matrix, **kwargs)
-  assert(np.shape(syn_data)[0] == num_points)
+  df_res = _getResiduals(num_points, model=kwargs['model'])
+  df_syn = mf.makeSyntheticObservations(df_res, **kwargs)
+  assert(len(df_syn) == num_points)
+  assert(len(set(df_syn.columns).symmetric_difference(
+       df_res.columns)) == 0)
 
-def _makeParameterList(num_points, count, **kwargs):
+def _makeParameterList(count, num_points=mf.NUM_POINTS, **kwargs):
   residual_matrix = _getResiduals(num_points, model=kwargs['model'])
   return mf.doBootstrapWithResiduals(residual_matrix, count=count,
+      num_points=num_points,
       **kwargs)
 
 def testDoBootstrapWithResiduals():
   num_points = 20
   count = 3
-  list_parameters = _makeParameterList(num_points, count,
+  list_parameters = _makeParameterList(count, num_points,
       model=mf.MODEL)
   assert(len(list_parameters) == count)
   for parameters in list_parameters:
     assert(isinstance(parameters, lmfit.Parameters))
 
 def _getResiduals(num_points, model=mf.MODEL):
-  obs_data = mf.makeObservations(model=model,
+  df_obs = mf.makeObservations(model=model,
       parameters=TEST_PARAMETERS, num_points=num_points)
-  return mf.makeResidualsMatrix(obs_data, model,
+  return mf.makeResidualDF(df_obs, model,
       TEST_PARAMETERS, num_points=num_points)
 
 def testDoBootstrap():
   num_points = 20
   count = 3
   model = mf.MODEL
-  obs_data = mf.makeObservations(model=model,
+  df_obs = mf.makeObservations(model=model,
       parameters=TEST_PARAMETERS, num_points=num_points)
-  confidence_dict = mf.doBootstrap(obs_data, model,
+  statistic_dict = mf.doBootstrap(df_obs, model,
       TEST_PARAMETERS, count=count,
       num_points=num_points)
   params_dict = TEST_PARAMETERS.valuesdict()
   diff = set(params_dict.keys()).symmetric_difference(
-      confidence_dict.keys())
+      statistic_dict.keys())
   assert(len(diff) == 0)
-  for value in confidence_dict.values():
-    assert(len(value) == 2)
 
 def testDoBootstrap2():
   model0 = """
@@ -221,30 +241,70 @@ def testDoBootstrap2():
   sim_time = 20
   unfitted_parameters = mf.makeParameters(
       constants=['k1', 'k2', 'k3'])
-  full_obs_data = mf.makeObservations(model=model0, 
+  df_full_obs = mf.makeObservations(model=model0, 
       noise_std=0.3, num_points=num_points, sim_time=sim_time)
-  result = mf.doBootstrap(full_obs_data, 
+  result = mf.doBootstrap(df_full_obs, 
       model=model0, parameters=unfitted_parameters, 
       num_points=num_points, sim_time=sim_time, count=5)
-  
  
 def testMakeParameterStatistics():
   num_points = 20
   count = 3
-  list_parameters = _makeParameterList(num_points, count,
+  list_parameters = _makeParameterList(count, num_points,
       model=mf.MODEL)
   def test(confidence_limits):
-    statistics = mf.makeParameterStatistics(list_parameters,
+    statistic_dict = mf.makeParameterStatistics(list_parameters,
         confidence_limits)
-    for key in statistics.keys():
-      assert(len(statistics[key]) == 2)
+    for key in statistic_dict.keys():
+      assert(isinstance(statistic_dict[key], mf.Statistic))
   #
   test((5, 95))
   test(None)
-  
+
+def testMatrixToDF():
+  size = 10
+  ncol = 2
+  colnames = [mf.TIME, 'B']
+  def test(columns=None):
+    matrix = np.reshape(list(range(size)), (int(size/ncol), ncol))
+    df = mf.matrixToDF(matrix, columns=colnames)
+    assert(len(df) == int(size/ncol))
+    if columns is not None:
+      columns = list(set(columns).difference([mf.TIME]))
+      try:
+        assert(len(
+          set(columns).symmetric_difference(df.columns)) == 0)
+      except:
+        import pdb; pdb.set_trace()
+  #
+  test()
+  test(columns=colnames)
+
+def testMatrixToDFWithoutTime():
+  size = 10
+  ncol = 2
+  colnames = [mf.TIME, 'B']
+  def test(columns=None):
+    matrix = np.reshape(list(range(size)), (int(size/ncol), ncol))
+    df = mf.matrixToDFWithoutTime(matrix, columns=columns)
+    assert(len(df) == int(size/ncol))
+    assert(len(df.columns) == ncol - 1)
+    if columns is not None:
+      assert(len(
+          set(columns).symmetric_difference(df.columns)) == 1)
+  #
+  test(columns=colnames)
+  test()
+
+def testCalcStatistic():
+  values = range(100)
+  statistic = mf.calcStatistic(values)
+  assert((statistic.ci_low < statistic.mean)  
+      and (statistic.mean < statistic.ci_high))
    
   
 if __name__ == '__main__':
+  testMakeResidualDF()
   if True:
     testReshapeData() 
     testArrayDifference() 
@@ -258,10 +318,13 @@ if __name__ == '__main__':
     testCrossValidate()
     testMakeObservations()
     testCrossValidate2()
-    testMakeResidualsBySpecies()
+    testMakeResidualDF()
     testMakeSyntheticObservations()
     testDoBootstrapWithResiduals()
     testDoBootstrap()
     testDoBootstrap2()
     testMakeParameterStatistics()
+    testMatrixToDF()
+    testMatrixToDFWithoutTime()
+    testCalcStatistic()
   print("OK")

@@ -1,8 +1,11 @@
 '''Utility routines.'''
 
+import os
 import random
 import string
-import os
+import sys
+import pandas as pd
+import numpy as np
 
 LETTERS = 'abcdefghijklmnopqrstuvwxyz'
 
@@ -139,3 +142,88 @@ def setList(value):
     return []
   else:
     return value
+
+def addPath(repo_name, sub_dirs=None):
+  """
+  Adds a path relative to the repository root.
+  :param str repo_name:
+  :param list-str sub_dirs:
+  """
+  if sub_dirs is None:
+    sub_dirs = []
+  path = os.path.dirname(os.path.abspath(__file__))
+  done = False
+  found_first_folder = False
+  while not done:
+    new_path, cur_folder  = os.path.split(path)
+    if len(path) == 0:
+      raise ValueError("Repo %s not found." % repo_name)
+    if cur_folder == repo_name:
+      if found_first_folder:
+        root_folder = path
+        done = True
+        break
+      else:
+        found_first_folder = True
+    path = new_path
+  if not done:
+    raise ValueError("Repository root of %s not found" % repo_name)
+  for folder in sub_dirs:
+    path = os.path.join(path, folder)
+  sys.path.insert(0, path)
+
+def interpolateTime(ser, time):
+  """
+  Interpolates a values between two times.
+  :param pd.Series ser: index is time
+  :param float time:
+  :return float:
+  """
+  def findTime(a_list, func):
+    if len(a_list) == 0:
+      return np.nan
+    else:
+      return func(a_list)
+  def findValue(time):
+    if np.isnan(time):
+      return np.nan
+    else:
+      return ser[time]
+  #
+  time_lb = findTime([t for t in ser.index if t <= time], max)
+  time_ub = findTime([t for t in ser.index if t >= time], min)
+  value_lb = findValue(time_lb)
+  value_ub = findValue(time_ub)
+  if np.isnan(value_lb):
+    return value_ub
+  if np.isnan(value_ub):
+    return value_lb
+  if time_ub == time_lb:
+    return value_ub
+  frac = (time - time_lb)/(time_ub - time_lb)
+  return (1 - frac)*value_lb + frac*value_ub
+
+def makeTimeInterpolatedMatrix(df, num_interpolation=10):
+  """
+  Does linear interpolations of values based on time.
+  :param pd.DataFrame df: index is time
+  :param int num_interpolation: number of interpolations between time
+  :return np.array: first column is time
+  Assumes that index is sorted ascending
+  """
+  times = df.index.tolist()
+  time_last = times[0]
+  matrix = []
+  # For each pair of times
+  for time in times[1:]:
+    time_incr = (time - time_last)/num_interpolation
+    arr_last = np.array(df.loc[time_last, :])
+    arr_cur = np.array(df.loc[time, :])
+    arr_incr = (arr_cur - arr_last)/num_interpolation
+    # For each interpolation
+    for idx in range(num_interpolation):
+      arr = arr_last + idx*arr_incr
+      arr = np.insert(arr, 0, time_last + idx*time_incr)
+      matrix.append(arr)
+    time_last = time
+  return np.array(matrix)
