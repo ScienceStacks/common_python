@@ -10,6 +10,7 @@ from sklearn import svm
 import unittest
 
 IGNORE_TEST = False
+IS_PLOT = True
 
 
 class TestExperimentHypergrid(unittest.TestCase):
@@ -18,8 +19,17 @@ class TestExperimentHypergrid(unittest.TestCase):
     self.experiment = ExperimentHypergrid()
 
   def testConstructor(self):
+    if IGNORE_TEST:
+      return
     self.assertEqual(len(self.experiment.grid), 2)
-    import pdb; pdb.set_trace()
+    self.assertLess(len(self.experiment.pos_vecs)
+        + len(self.experiment.neg_vecs),
+        np.size(self.experiment.grid) / 2)
+
+  def testPlotGrid(self):
+    # Smoke test
+    self.experiment.plotGrid(is_plot=IS_PLOT)
+
   
 
 
