@@ -27,8 +27,21 @@ class TestExperimentHypergrid(unittest.TestCase):
         np.size(self.experiment.grid) / 2)
 
   def testPlotGrid(self):
+    if IGNORE_TEST:
+      return
     # Smoke test
     self.experiment.plotGrid(is_plot=IS_PLOT)
+
+  def testMakePlotValues(self):
+    if IGNORE_TEST:
+      return
+    xlim = [-1, 1]
+    ylim = xlim
+    vector = np.array([2, 1])
+    xv, yv = self.experiment._makePlotValues(vector, xlim, ylim)
+    for nn in range(len(vector)):
+      vec = np.array([xv[nn], yv[nn]])
+      self.assertEqual(vector.dot(vec), 0)
 
   
 

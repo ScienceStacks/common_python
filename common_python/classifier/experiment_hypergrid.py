@@ -59,6 +59,21 @@ class ExperimentHypergrid(object):
     neg_vecs = np.array([v for v in vectors
         if np.dot(v, self._classification_vec) < 0])
     return pos_vecs, neg_vecs
+
+  def _makePlotValues(self, vector, xlim, ylim):
+    """
+    Construct the x-values and y-values for a plot.
+    a*x + b*y = 0; so y = a/b*x
+    :param array vector: equation for a line
+        (or the vector orthogonal to the line)
+    :param tuple-float xlim: lower, upper x values
+    :param tuple-float ylim: lower, upper y values
+    :return array-float, array-float: x-values, y-values
+    """
+    xv = np.array(xlim)
+    factor = -vector[0] / vector[1]
+    yv = xv*factor
+    return xv, yv
     
   def plotGrid(self, pos_vecs=None, neg_vecs=None,
       fitted_plane=None, is_plot=True):
@@ -80,4 +95,6 @@ class ExperimentHypergrid(object):
       neg_vecs = self.neg_vecs
     plot(self.pos_vecs, "blue")
     plot(self.neg_vecs, "red")
+    # Add the line for the hyper plane
+    # Do the plot
     plotter.do(title="Hypergrid", is_plot=is_plot)
