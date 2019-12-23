@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import common_python.constants as cn
+import common_python.util.util as util
 from common_python.plots.plotter import Plotter
 
 DEF_NUM_DIM = 2
@@ -12,6 +13,40 @@ DEF_VECTOR = np.repeat(1, DEF_NUM_DIM)
 DEF_DENSITY = 10
 SMALL = 1e-5
 
+
+class TrinaryClassification(object):
+  """
+  Classification of instances into:
+     positive class, negative class, other (fall on boundary)
+  """
+  
+  def __init__(self, 
+      pos_arrs=None, neg_arrs=None, other_arrs=None):
+    """
+    :param list-array pos_arrs:
+    :param list-array neg_arrs:
+    :param list-array other_arrs: neither pos nor neg
+    """
+    self.pos_arrs = util.setList(pos_arrs)
+    self.neg_arrs = util.setList(neg_arrs)
+    self.other_arrs = util.setList(other_arrs)
+    self.dim = len(self.pos_arrs[0])
+
+  def perturb(self, sigma):
+    """
+    Adds a N(0, sigma) to each value
+    :param float sigma: standard deviation
+    :return TrinaryClassification:
+    """
+    def adjust(arrs):
+      return [np.random.normal(0, sigma, self.dim) + v
+          for v in arrs]
+    #
+    return TrinaryClassification(
+        pos_arrs=adjust(self.pos_arrs),
+        neg_arrs=adjust(self.neg_arrs),
+        other_arrs=adjust(self.other_arrs))
+    
 
 class ExperimentHypergrid(object):
 
@@ -34,8 +69,7 @@ class ExperimentHypergrid(object):
     self._ylim = [self._min_val, self._max_val]
     # Computed
     self.grid = self._makeGrid()
-    # list of positive and negative arrays
-    self.pos_arrs, self.neg_arrs, self.other_arrs = self._makeLabels()
+    self.trinary = self._makeTrinary()
 
   def _makeGrid(self):
     """
@@ -47,10 +81,10 @@ class ExperimentHypergrid(object):
         for _ in range(self._num_dim)]
     return np.meshgrid(*coords)
 
-  def _makeLabels(self):
+  def _makeTrinary(self):
     """
     Creates the labels for the grid based on the classification vector.
-    :return N X 2 matrix, N X 2 matrix: positive, negative labelled vectors
+    :return TrinaryClassification:
     """
     num_rows = (self._density  \
         * (self._max_val - self._min_val))**self._num_dim
@@ -64,7 +98,10 @@ class ExperimentHypergrid(object):
         if np.dot(v, self._coef_arr) < -SMALL])
     other_arrs = np.array([v for v in vectors
         if np.abs(np.dot(v, self._coef_arr)) <= SMALL])
-    return pos_arrs, neg_arrs, other_arrs
+    return TrinaryClassification(
+        pos_arrs=pos_arrs,
+        neg_arrs=neg_arrs,
+        other_arrs=other_arrs)
 
   @staticmethod
   def _makePlotValues(coef_arr, xlim, ylim):
@@ -81,13 +118,20 @@ class ExperimentHypergrid(object):
     factor = -coef_arr[0] / coef_arr[1]
     y_arr = x_arr*factor
     return x_arr, y_arr
+
+  def perturb(self, sigma):
+    """
+    Perturb the ground truth.
+    :param float sigma: standard deviation for perturbation
+    :return TrinaryClassification:
+    """
+    return self.trinary.perturb(sigma)
     
-  def plotGrid(self, pos_arrs=None, neg_arrs=None,
-      coef_arr=None, is_plot=True):
+  def plotGrid(self, trinary=None, coef_arr=None,
+      is_plot=True):
     """
     Plots classes on a grid.
-    :param list-np.array pos_arrs: vector of positive classes
-    :param list-np.array neg_arrs: vector of negative classes
+    :param TrinaryClassification trinary:
     :param np.array coef_arr: vector orthogonal to plan
     :param bool is_plot: do the plot
     """
@@ -96,14 +140,12 @@ class ExperimentHypergrid(object):
       xv, yv = zip(*vectors)
       plotter.ax.scatter(xv, yv, color=color)
     #
-    if pos_arrs is None:
-      pos_arrs = self.pos_arrs
-    if neg_arrs is None:
-      neg_arrs = self.neg_arrs
+    if trinary is None:
+      trinary = self.trinary
     if coef_arr is None:
       coef_arr = self._coef_arr
-    plot(self.pos_arrs, "blue")
-    plot(self.neg_arrs, "red")
+    plot(trinary.pos_arrs, "blue")
+    plot(trinary.neg_arrs, "red")
     # Add the line for the hyper plane
     x_arr, y_arr = ExperimentHypergrid._makePlotValues(
         coef_arr, self._xlim, self._ylim)
