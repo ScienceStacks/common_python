@@ -29,5 +29,9 @@ class Plotter(object):
       self.ax.set_xlabel(kwargs[cn.PLT_XLABEL])
     if  cn.PLT_YLABEL in kwargs.keys():
       self.ax.set_ylabel(kwargs[cn.PLT_XLABEL])
+    if  cn.PLT_XLIM in kwargs.keys():
+      self.ax.set_xlim(kwargs[cn.PLT_XLIM])
+    if  cn.PLT_YLIM in kwargs.keys():
+      self.ax.set_ylim(kwargs[cn.PLT_YLIM])
     if is_plot:
       plt.show()

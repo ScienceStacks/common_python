@@ -10,7 +10,7 @@ from sklearn import svm
 import unittest
 
 IGNORE_TEST = False
-IS_PLOT = True
+IS_PLOT = False
 
 
 class TestExperimentHypergrid(unittest.TestCase):
@@ -21,10 +21,11 @@ class TestExperimentHypergrid(unittest.TestCase):
   def testConstructor(self):
     if IGNORE_TEST:
       return
+    tot = sum([len(v) for v in 
+        [self.experiment.neg_arrs, self.experiment.pos_arrs,
+        self.experiment.other_arrs]])*self.experiment._num_dim
     self.assertEqual(len(self.experiment.grid), 2)
-    self.assertLess(len(self.experiment.pos_vecs)
-        + len(self.experiment.neg_vecs),
-        np.size(self.experiment.grid) / 2)
+    self.assertEqual(np.size(self.experiment.grid), tot)
 
   def testPlotGrid(self):
     if IGNORE_TEST:
@@ -42,8 +43,6 @@ class TestExperimentHypergrid(unittest.TestCase):
     for nn in range(len(vector)):
       vec = np.array([xv[nn], yv[nn]])
       self.assertEqual(vector.dot(vec), 0)
-
-  
 
 
 if __name__ == '__main__':
