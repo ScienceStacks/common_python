@@ -1,5 +1,5 @@
 from common_python.classifier.experiment_hypergrid  \
-    import ExperimentHypergrid, TrinaryClassification
+    import ExperimentHypergrid, TrinaryClassification, Plane
 from common_python.testing import helpers
 import common_python.constants as cn
 from common_python.tests.classifier import helpers as test_helpers
@@ -14,6 +14,31 @@ IS_PLOT = False
 POS_ARRS = np.array([ [1, 1], [1, 0], [0, 1] ])
 NEG_ARRS = np.array([ [-1, -1], [-1, 0], [0, -1] ])
 OTHER_ARRS = np.array([ [0, 0] ])
+
+
+class TestPlane(unittest.TestCase):
+
+  def setUp(self):
+    self.coef_arr = np.array([1, 1])
+    self.offset = 1
+    self.plane = Plane(self.coef_arr, offset=self.offset)
+
+  def testComparisons(self):
+    if IGNORE_TEST:
+      return
+    self.assertTrue(self.plane.isLess(np.array([-1, -1])))
+    self.assertTrue(self.plane.isGreater(np.array([2, 2])))
+    self.assertTrue(self.plane.isNear(np.array([2, -1])))
+
+  def testMakeCordinates(self):
+    if IGNORE_TEST:
+      return
+    xlim = [-1, 1]
+    ylim = xlim
+    xv, yv = self.plane.makeCoordinates(xlim, ylim)
+    for nn in range(len(self.coef_arr)):
+      vec = np.array([xv[nn], yv[nn]])
+      self.assertEqual(self.coef_arr.dot(vec), self.offset)
 
 
 class TestTrinaryClassification(unittest.TestCase):
@@ -83,17 +108,6 @@ class TestExperimentHypergrid(unittest.TestCase):
     # With perturbation
     trinary = self.experiment.perturb(0.5)
     self.experiment.plotGrid(trinary=trinary, is_plot=IS_PLOT)
-
-  def testMakePlotValues(self):
-    if IGNORE_TEST:
-      return
-    xlim = [-1, 1]
-    ylim = xlim
-    vector = np.array([2, 1])
-    xv, yv = self.experiment._makePlotValues(vector, xlim, ylim)
-    for nn in range(len(vector)):
-      vec = np.array([xv[nn], yv[nn]])
-      self.assertEqual(vector.dot(vec), 0)
 
   def testPlotSVM(self):
     linear_svm = svm.LinearSVC()
