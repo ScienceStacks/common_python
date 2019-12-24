@@ -12,6 +12,8 @@ DEF_NUM_DIM = 2
 DEF_VECTOR = np.repeat(1, DEF_NUM_DIM)
 DEF_DENSITY = 10
 SMALL = 1e-5
+POS = 1
+NEG = -1
 
 
 class TrinaryClassification(object):
@@ -21,16 +23,30 @@ class TrinaryClassification(object):
   """
   
   def __init__(self, 
-      pos_arrs=None, neg_arrs=None, other_arrs=None):
+      pos_arr=None, neg_arr=None, other_arr=None):
     """
-    :param list-array pos_arrs:
-    :param list-array neg_arrs:
-    :param list-array other_arrs: neither pos nor neg
+    :param list-array pos_arr:
+    :param list-array neg_arr:
+    :param list-array other_arr: neither pos nor neg
     """
-    self.pos_arrs = util.setList(pos_arrs)
-    self.neg_arrs = util.setList(neg_arrs)
-    self.other_arrs = util.setList(other_arrs)
-    self.dim = len(self.pos_arrs[0])
+    self.pos_arr = np.array(util.setList(pos_arr))
+    self.neg_arr = np.array(util.setList(neg_arr))
+    self.other_arr = np.array(util.setList(other_arr))
+    self.dim = len(self.pos_arr[0])
+    self._df_feature = None
+    self._ser_label = None
+
+  @property
+  def df_feature(self):
+    if self._df_feature is None:
+      self._df_feature, self._ser_label = self.makeMatrices()
+    return self._df_feature
+
+  @property
+  def ser_label(self):
+    if self._ser_label is None:
+      self._df_feature, self._ser_label = self.makeMatrices()
+    return self._ser_label
 
   def perturb(self, sigma):
     """
@@ -43,9 +59,27 @@ class TrinaryClassification(object):
           for v in arrs]
     #
     return TrinaryClassification(
-        pos_arrs=adjust(self.pos_arrs),
-        neg_arrs=adjust(self.neg_arrs),
-        other_arrs=adjust(self.other_arrs))
+        pos_arr=adjust(self.pos_arr),
+        neg_arr=adjust(self.neg_arr),
+        other_arr=adjust(self.other_arr))
+
+  def makeMatrices(self):
+    """
+    Makes feature and label matrices.
+    Only includes pos and neg labels.
+    :param TrinaryData trinary:
+    :return pd.DataFrame, pd.Series:
+    """
+    df = pd.concat([pd.DataFrame(self.pos_arr),
+        pd.DataFrame(self.neg_arr)])
+    ser = pd.concat([
+        pd.Series(np.repeat(POS, len(self.pos_arr))),
+        pd.Series(np.repeat(NEG, len(self.neg_arr))),
+        ])
+    indices = range(len(df))
+    df.index = indices
+    ser.index = indices
+    return df, ser
     
 
 class ExperimentHypergrid(object):
@@ -92,16 +126,16 @@ class ExperimentHypergrid(object):
         for n in range(len(self.grid))]
     vectors = [np.array([x[0],y[0]])
         for x,y in zip(coords[0], coords[1])]
-    pos_arrs = np.array([v for v in vectors
+    pos_arr = np.array([v for v in vectors
         if np.dot(v, self._coef_arr) > SMALL])
-    neg_arrs = np.array([v for v in vectors
+    neg_arr = np.array([v for v in vectors
         if np.dot(v, self._coef_arr) < -SMALL])
-    other_arrs = np.array([v for v in vectors
+    other_arr = np.array([v for v in vectors
         if np.abs(np.dot(v, self._coef_arr)) <= SMALL])
     return TrinaryClassification(
-        pos_arrs=pos_arrs,
-        neg_arrs=neg_arrs,
-        other_arrs=other_arrs)
+        pos_arr=pos_arr,
+        neg_arr=neg_arr,
+        other_arr=other_arr)
 
   @staticmethod
   def _makePlotValues(coef_arr, xlim, ylim):
@@ -144,8 +178,8 @@ class ExperimentHypergrid(object):
       trinary = self.trinary
     if coef_arr is None:
       coef_arr = self._coef_arr
-    plot(trinary.pos_arrs, "blue")
-    plot(trinary.neg_arrs, "red")
+    plot(trinary.pos_arr, "blue")
+    plot(trinary.neg_arr, "red")
     # Add the line for the hyper plane
     x_arr, y_arr = ExperimentHypergrid._makePlotValues(
         coef_arr, self._xlim, self._ylim)
