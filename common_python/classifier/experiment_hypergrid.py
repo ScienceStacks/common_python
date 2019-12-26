@@ -1,14 +1,30 @@
 """Experiments for evaluating classifiers in a grid."""
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-
 import common_python.constants as cn
 import common_python.util.util as util
 from common_python.plots.plotter import Plotter
 
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn import svm
 
+# Place holder
+class Vector(object):
+  def __init__(self, _):
+    pass
+
+DEF_NUM_DIM = 2
+DEF_ARR = np.repeat(1, DEF_NUM_DIM)
+DEF_OFFSET = 0
+DEF_DENSITY = 10
+SMALL = 1e-5
+POS = 1
+NEG = -1
+NEG = -1
+
+
+#################### CLASSES ######################
 class Vector(object):
   """
   Representation of a vector
@@ -16,7 +32,7 @@ class Vector(object):
 
   def __init__(self, coef_arr):
     self.coef_arr = np.array(coef_arr)
-    self.dim = len(self.coef_arr)
+    self.dim_int = len(self.coef_arr)
 
   def dot(self, vector):
     return self.coef_arr.dot(vector.coef_arr)
@@ -26,16 +42,6 @@ class Vector(object):
       return vector.coef_arr
     else:
       return vector
-
-
-DEF_NUM_DIM = 2
-DEF_VECTOR = Vector(np.repeat(1, DEF_NUM_DIM))
-DEF_OFFSET = 0
-DEF_DENSITY = 10
-SMALL = 1e-5
-POS = 1
-NEG = -1
-NEG = -1
 
 
 class Plane(object):
@@ -51,6 +57,10 @@ class Plane(object):
     self.vector = vector
     self.offset = offset
     self._coordinates = None
+
+  @property
+  def dim_int(self):
+    return self.vector.dim_int
 
   def makeCoordinates(self, xlim, ylim):
     """
@@ -83,10 +93,7 @@ class Plane(object):
     :param Vector vector: vector whose position is evaluated
     """
     arr = Vector.toArray(vector)
-    try:
-      result = self.vector.coef_arr.dot(arr) - self.offset > SMALL
-    except:
-      import pdb; pdb.set_trace()
+    result = self.vector.coef_arr.dot(arr) - self.offset > SMALL
     return result
 
   def isNear(self, vector):
@@ -114,7 +121,7 @@ class TrinaryClassification(object):
     self.pos_arr = np.array(util.setList(pos_arr))
     self.neg_arr = np.array(util.setList(neg_arr))
     self.other_arr = np.array(util.setList(other_arr))
-    self.dim = len(self.pos_arr[0])
+    self.dim_int = len(self.pos_arr[0])
     self._df_feature = None
     self._ser_label = None
 
@@ -130,20 +137,24 @@ class TrinaryClassification(object):
       self._df_feature, self._ser_label = self.makeMatrices()
     return self._ser_label
 
-  def perturb(self, sigma):
+  def perturb(self, sigma=0, repl_int=1):
     """
     Adds a N(0, sigma) to each value
     :param float sigma: standard deviation
-    :return TrinaryClassification:
+    :param int repl_int: number of replications
+    :return list-TrinaryClassification:
     """
     def adjust(arrs):
-      return [np.random.normal(0, sigma, self.dim) + v
+      return [np.random.normal(0, sigma, self.dim_int) + v
           for v in arrs]
     #
-    return TrinaryClassification(
-        pos_arr=adjust(self.pos_arr),
-        neg_arr=adjust(self.neg_arr),
-        other_arr=adjust(self.other_arr))
+    trinarys = []
+    for _ in range(repl_int):
+      trinarys.append(TrinaryClassification(
+          pos_arr=adjust(self.pos_arr),
+          neg_arr=adjust(self.neg_arr),
+          other_arr=adjust(self.other_arr)))
+    return trinarys
 
   def makeMatrices(self):
     """
@@ -167,27 +178,29 @@ class TrinaryClassification(object):
 class ExperimentHypergrid(object):
 
   def __init__(self, density=DEF_DENSITY,
-      num_dim=2, min_val=-1, max_val=1, plane=None):
+      min_val=-1, max_val=1, plane=None):
     """
-    :param int num_dim: number of dimensions
     :param float density: number of coordinates along a unit
                         distance for an axis
     :param float min_val: minimum value for an axis
     :param float max_val: maximum value for an axis
     :param Plane plane: separating hyperplane
     """
-    self._num_dim = num_dim
     self._density = density
     self._min_val = min_val
     self._max_val = max_val
     if plane is None:
-      plane = Plane(DEF_VECTOR, DEF_OFFSET)
+      plane = Plane(Vector(DEF_ARR), DEF_OFFSET)
     self._plane = plane
     self._xlim = [self._min_val, self._max_val]
     self._ylim = [self._min_val, self._max_val]
     # Computed
     self.grid = self._makeGrid()
     self.trinary = self._makeTrinary()
+
+  @property
+  def dim_int(self):
+    return self._plane.dim_int
 
   def _makeGrid(self):
     """
@@ -196,7 +209,7 @@ class ExperimentHypergrid(object):
     """
     coords = [np.linspace(self._min_val, self._max_val,
         self._density*(self._max_val - self._min_val))
-        for _ in range(self._num_dim)]
+        for _ in range(self.dim_int)]
     # The grid is structured as:
     #  coordinate (e.g., x, y)
     #  row
@@ -209,11 +222,11 @@ class ExperimentHypergrid(object):
     Creates the labels for the grid based on the classification vector.
     :return TrinaryClassification:
     """
-    num_rows = (self._density  \
-        * (self._max_val - self._min_val))**self._num_dim
-    coords = np.reshape(self.grid, (self._num_dim, num_rows))
+    rows_int = (self._density  \
+        * (self._max_val - self._min_val))**self.dim_int
+    coords = np.reshape(self.grid, (self.dim_int, rows_int))
     coords = np.transpose(coords)
-    #coords = [np.reshape(self.grid[n], (num_rows, 1))
+    #coords = [np.reshape(self.grid[n], (rows_int, 1))
     #    for n in range(len(self.grid))]
     # TODO: Generalize so works for n-dimensions
     pos_arr = np.array([v for v in coords
@@ -227,13 +240,13 @@ class ExperimentHypergrid(object):
         neg_arr=neg_arr,
         other_arr=other_arr)
 
-  def perturb(self, sigma):
+  def perturb(self, **kwargs):
     """
     Perturb the ground truth.
-    :param float sigma: standard deviation for perturbation
-    :return TrinaryClassification:
+    :param dict kwargs: arguments for Trinary.perturb
+    :return list-TrinaryClassification:
     """
-    return self.trinary.perturb(sigma)
+    return self.trinary.perturb(**kwargs)
     
   def plotGrid(self, trinary=None, plane=None,
       is_plot=True):
@@ -242,6 +255,7 @@ class ExperimentHypergrid(object):
     :param TrinaryClassification trinary:
     :param np.array vector: vector orthogonal to plan
     :param bool is_plot: do the plot
+    :return Plotter:
     """
     plotter = Plotter()
     def plot(vectors, color):
@@ -260,3 +274,26 @@ class ExperimentHypergrid(object):
     # Do the plot
     plotter.do(title="Hypergrid", xlim=self._xlim,
         ylim=self._ylim, is_plot=is_plot)
+    #
+    return plotter
+
+  def evaluateSVM(self, clf=None, sigma=0, is_plot=True):
+    """
+    Evaluates the classification accuracy of an svm.
+    Assumes dim_int === 2.
+    :param svm.SVC clf:
+    :param float sigma:
+    :return float, plane: accuracy measure, separating hyperplane
+    """
+    if self.dim_int != 2:
+      raise ValueError("Must have a 2-dimensional grid")
+    if clf is None:
+      clf = svm.LinearSVC()
+    trinary = self.trinary.perturb(sigma=sigma)[0]
+    clf.fit(trinary.df_feature, trinary.ser_label)
+    # Construct the separating hyperplane
+    vector = Vector(clf.coef_)
+    offset = -clf.intercept_ / (clf.coef_[0][0])
+    plane = Plane(vector, offset=offset)
+    #
+    return clf.score(trinary.df_feature, trinary.ser_label), plane
