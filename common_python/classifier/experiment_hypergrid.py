@@ -4,6 +4,7 @@ import common_python.constants as cn
 import common_python.util.util as util
 from common_python.plots.plotter import Plotter
 
+import copy
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -173,7 +174,27 @@ class TrinaryClassification(object):
     df.index = indices
     ser.index = indices
     return df, ser
-    
+
+  @classmethod
+  def concat(cls, trinarys):
+    """
+    Concatenates TrinaryClassifications
+    :param list-TrinaryClassification trinarys:
+    :return TrinaryClassification:
+    """
+    trinary = copy.deepcopy(trinarys[0])
+    dim_int = trinary.dim_int
+    for tri in trinarys[1:]:
+      if tri.dim_int != dim_int:
+        raise ValueError(
+            "All TrinaryClassification must have the same dimension")
+      trinary.pos_arr = np.concatenate([trinary.pos_arr,
+          tri.pos_arr])
+      trinary.neg_arr = np.concatenate([trinary.neg_arr,
+          tri.neg_arr])
+      trinary.other_arr = np.concatenate([trinary.other_arr,
+          tri.other_arr])
+    return trinary
 
 class ExperimentHypergrid(object):
 

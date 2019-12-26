@@ -9,7 +9,7 @@ import numpy as np
 from sklearn import svm
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 IS_PLOT = False
 POS_ARRS = np.array([ [1, 1], [1, 0], [0, 1] ])
 NEG_ARRS = np.array([ [-1, -1], [-1, 0], [0, -1] ])
@@ -88,6 +88,21 @@ class TestTrinaryClassification(unittest.TestCase):
     ser_test = df.sum(axis=1) * ser
     ser_test = ser_test.map(lambda v: v > 0)
     self.assertEqual(len(ser_test), ser_test.sum())
+
+  def testConcat(self):
+    # TESTING
+    def test(arr1, arr2, repl_int):
+      # Count occurrence of members of arr1 in arr2
+      for arr in arr1:
+        count = len([v for v in arr2 if all(v == arr)])
+        self.assertEqual(count, repl_int)
+    #
+    SIZE =3
+    trinary = TrinaryClassification.concat(
+        np.repeat(self.trinary, SIZE))
+    test(self.trinary.pos_arr, trinary.pos_arr, SIZE)
+    test(self.trinary.neg_arr, trinary.neg_arr, SIZE)
+    test(self.trinary.other_arr, trinary.other_arr, SIZE)
 
 
 class TestExperimentHypergrid(unittest.TestCase):
