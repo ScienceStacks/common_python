@@ -1,5 +1,5 @@
 from common_python.classifier.experiment_hypergrid  \
-    import ExperimentHypergrid, TrinaryClassification, Plane
+    import ExperimentHypergrid, TrinaryClassification, Plane, Vector
 from common_python.testing import helpers
 import common_python.constants as cn
 from common_python.tests.classifier import helpers as test_helpers
@@ -21,7 +21,7 @@ class TestPlane(unittest.TestCase):
   def setUp(self):
     self.coef_arr = np.array([1, 1])
     self.offset = 1
-    self.plane = Plane(self.coef_arr, offset=self.offset)
+    self.plane = Plane(Vector(self.coef_arr), offset=self.offset)
 
   def testComparisons(self):
     if IGNORE_TEST:
@@ -30,7 +30,7 @@ class TestPlane(unittest.TestCase):
     self.assertTrue(self.plane.isGreater(np.array([2, 2])))
     self.assertTrue(self.plane.isNear(np.array([2, -1])))
 
-  def testMakeCordinates(self):
+  def testMakeCoordinates(self):
     if IGNORE_TEST:
       return
     xlim = [-1, 1]
@@ -87,7 +87,8 @@ class TestTrinaryClassification(unittest.TestCase):
 class TestExperimentHypergrid(unittest.TestCase):
 
   def setUp(self):
-    self.experiment = ExperimentHypergrid()
+    self.experiment = ExperimentHypergrid(num_dim=2,
+        density= 4)
 
   def testConstructor(self):
     if IGNORE_TEST:
@@ -99,6 +100,19 @@ class TestExperimentHypergrid(unittest.TestCase):
         *self.experiment._num_dim
     self.assertEqual(len(self.experiment.grid), 2)
     self.assertEqual(np.size(self.experiment.grid), tot)
+    #
+    num_dim = 4
+    plane = Plane(Vector(np.repeat(1, num_dim)))
+    experiment = ExperimentHypergrid(num_dim=num_dim,
+        density= 2, plane=plane)
+    arr_lst = []
+    arr_lst.extend(experiment.trinary.pos_arr)
+    arr_lst.extend(experiment.trinary.neg_arr)
+    arr_lst.extend(experiment.trinary.other_arr)
+    arrs = [tuple(x) for x in arr_lst]
+    ser = pd.Series(arrs)
+    ser = ser.unique()
+    self.assertEqual(len(ser), len(arr_lst))
 
   def testPlotGrid(self):
     if IGNORE_TEST:

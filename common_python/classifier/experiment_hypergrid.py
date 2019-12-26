@@ -8,15 +8,6 @@ import common_python.constants as cn
 import common_python.util.util as util
 from common_python.plots.plotter import Plotter
 
-DEF_NUM_DIM = 2
-DEF_COEF = np.repeat(1, DEF_NUM_DIM)
-DEF_OFFSET = 0
-DEF_DENSITY = 10
-SMALL = 1e-5
-POS = 1
-NEG = -1
-NEG = -1
-
 
 class Vector(object):
   """
@@ -30,18 +21,34 @@ class Vector(object):
   def dot(self, vector):
     return self.coef_arr.dot(vector.coef_arr)
 
+  def toArray(vector):
+    if isinstance(vector, Vector):
+      return vector.coef_arr
+    else:
+      return vector
+
+
+DEF_NUM_DIM = 2
+DEF_VECTOR = Vector(np.repeat(1, DEF_NUM_DIM))
+DEF_OFFSET = 0
+DEF_DENSITY = 10
+SMALL = 1e-5
+POS = 1
+NEG = -1
+NEG = -1
+
 
 class Plane(object):
   """
   Representation of a hyperplane.
   """
 
-  def __init__(self, coef_arr, offset=DEF_OFFSET):
+  def __init__(self, vector, offset=DEF_OFFSET):
     """
-    :param np.array coef_arr: coefficients of the normal to the plane
+    :param Vector vector: vector normal to the plane
     :param float offset: offset from 0
     """
-    self.coef_arr = coef_arr
+    self.vector = vector
     self.offset = offset
     self._coordinates = None
 
@@ -56,32 +63,39 @@ class Plane(object):
     """
     if self._coordinates is None:
       x_arr = np.array(xlim)
-      slope = -self.coef_arr[0] / self.coef_arr[1]
-      offset = self.offset / self.coef_arr[1]
-      y_arr = x_arr*slope + self.offset / self.coef_arr[1]
+      slope = -self.vector.coef_arr[0] / self.vector.coef_arr[1]
+      offset = self.offset / self.vector.coef_arr[1]
+      y_arr = x_arr*slope + self.offset / self.vector.coef_arr[1]
       self._coordinates = x_arr, y_arr
     return self._coordinates
 
-  def isLess(self, coef_arr):
+  def isLess(self, vector):
     """
     The vector is at a negative angle to the plane.
-    :param float coef_arr: vector whose position is evaluated
+    :param Vector vector: vector whose position is evaluated
     """
-    return self.coef_arr.dot(coef_arr) - self.offset < -SMALL 
+    arr = Vector.toArray(vector)
+    return self.vector.coef_arr.dot(arr) - self.offset < -SMALL 
 
-  def isGreater(self, coef_arr):
+  def isGreater(self, vector):
     """
     The vector is at a positive angle to the plane.
-    :param float coef_arr: vector whose position is evaluated
+    :param Vector vector: vector whose position is evaluated
     """
-    return self.coef_arr.dot(coef_arr) - self.offset > SMALL
+    arr = Vector.toArray(vector)
+    try:
+      result = self.vector.coef_arr.dot(arr) - self.offset > SMALL
+    except:
+      import pdb; pdb.set_trace()
+    return result
 
-  def isNear(self, coef_arr):
+  def isNear(self, vector):
     """
     The vector is near the plane.
-    :param float coef_arr: vector whose position is evaluated
+    :param Vector vector: vector whose position is evaluated
     """
-    return np.abs(self.coef_arr.dot(coef_arr) - self.offset) <= SMALL
+    arr = Vector.toArray(vector)
+    return np.abs(self.vector.coef_arr.dot(arr) - self.offset) <= SMALL
 
 
 class TrinaryClassification(object):
@@ -160,14 +174,14 @@ class ExperimentHypergrid(object):
                         distance for an axis
     :param float min_val: minimum value for an axis
     :param float max_val: maximum value for an axis
-    :param array coef_arr: vector orthogonal to separating hyperplane
+    :param Plane plane: separating hyperplane
     """
     self._num_dim = num_dim
     self._density = density
     self._min_val = min_val
     self._max_val = max_val
     if plane is None:
-      plane = Plane(DEF_COEF, DEF_OFFSET)
+      plane = Plane(DEF_VECTOR, DEF_OFFSET)
     self._plane = plane
     self._xlim = [self._min_val, self._max_val]
     self._ylim = [self._min_val, self._max_val]
@@ -183,7 +197,12 @@ class ExperimentHypergrid(object):
     coords = [np.linspace(self._min_val, self._max_val,
         self._density*(self._max_val - self._min_val))
         for _ in range(self._num_dim)]
-    return np.meshgrid(*coords)
+    # The grid is structured as:
+    #  coordinate (e.g., x, y)
+    #  row
+    #  value
+    grid = np.meshgrid(*coords)
+    return grid
 
   def _makeTrinary(self):
     """
@@ -192,14 +211,16 @@ class ExperimentHypergrid(object):
     """
     num_rows = (self._density  \
         * (self._max_val - self._min_val))**self._num_dim
-    coords = [np.reshape(self.grid[n], (num_rows, 1))
-        for n in range(len(self.grid))]
-    vectors = [np.array([x[0],y[0]])
-        for x,y in zip(coords[0], coords[1])]
-    pos_arr = np.array([v for v in vectors 
+    coords = np.reshape(self.grid, (self._num_dim, num_rows))
+    coords = np.transpose(coords)
+    #coords = [np.reshape(self.grid[n], (num_rows, 1))
+    #    for n in range(len(self.grid))]
+    # TODO: Generalize so works for n-dimensions
+    pos_arr = np.array([v for v in coords
         if self._plane.isGreater(v)])
-    neg_arr = np.array([v for v in vectors if self._plane.isLess(v)])
-    other_arr = np.array([v for v in vectors
+    neg_arr = np.array([v for v in coords
+        if self._plane.isLess(v)])
+    other_arr = np.array([v for v in coords
         if self._plane.isNear(v)])
     return TrinaryClassification(
         pos_arr=pos_arr,
@@ -219,7 +240,7 @@ class ExperimentHypergrid(object):
     """
     Plots classes on a grid.
     :param TrinaryClassification trinary:
-    :param np.array coef_arr: vector orthogonal to plan
+    :param np.array vector: vector orthogonal to plan
     :param bool is_plot: do the plot
     """
     plotter = Plotter()
