@@ -304,23 +304,25 @@ class HypergridHarness(object):
     #
     return plotter
 
-  def evaluateSVM(self, clf=None, sigma=0, is_plot=True):
+  def evaluateSVM(self, mclf=None, sigma=0, repl_int=1, is_plot=True):
     """
     Evaluates the classification accuracy of an svm.
     Assumes dim_int === 2.
-    :param svm.SVC clf:
+    :param MetaClassifier mclf:
     :param float sigma:
     :return float, plane: accuracy measure, separating hyperplane
     """
-    if self.dim_int != 2:
-      raise ValueError("Must have a 2-dimensional grid")
     if clf is None:
       clf = svm.LinearSVC()
     trinary = self.trinary.perturb(sigma=sigma)[0]
     clf.fit(trinary.df_feature, trinary.ser_label)
-    # Construct the separating hyperplane
-    vector = Vector(clf.coef_)
-    offset = -clf.intercept_ / (clf.coef_[0][0])
-    plane = Plane(vector, offset=offset)
+    # Plot construction. 
+    if is_plot:
+      if self.dim_int != 2:
+        raise ValueError("Must have a 2-dimensional grid")
+      vector = Vector(clf.coef_)
+      offset = -clf.intercept_ / (clf.coef_[0][0])
+      plane = Plane(vector, offset=offset)
+      # TODO: Do the plot
     #
     return clf.score(trinary.df_feature, trinary.ser_label), plane
