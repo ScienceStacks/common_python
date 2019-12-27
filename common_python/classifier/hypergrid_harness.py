@@ -1,4 +1,10 @@
-"""Experiments for evaluating classifiers in a grid."""
+"""
+Experimental harness for evaluating classifiers in a multidimensional
+grid (hypergrid). Ground truth is a set of equally spaced
+observations in the grid with a separating hyperplane that
+determines positive (pos) and negative (neg) values. Values
+on the separating plane are "other".
+"""
 
 import common_python.constants as cn
 import common_python.util.util as util
@@ -196,7 +202,7 @@ class TrinaryClassification(object):
           tri.other_arr])
     return trinary
 
-class ExperimentHypergrid(object):
+class HypergridHarness(object):
 
   def __init__(self, density=DEF_DENSITY,
       min_val=-1, max_val=1, plane=None):

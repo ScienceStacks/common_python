@@ -1,5 +1,5 @@
-from common_python.classifier.experiment_hypergrid  \
-    import ExperimentHypergrid, TrinaryClassification, Plane, Vector
+from common_python.classifier.hypergrid_harness  \
+    import HypergridHarness, TrinaryClassification, Plane, Vector
 from common_python.testing import helpers
 import common_python.constants as cn
 from common_python.tests.classifier import helpers as test_helpers
@@ -9,7 +9,7 @@ import numpy as np
 from sklearn import svm
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_PLOT = False
 POS_ARRS = np.array([ [1, 1], [1, 0], [0, 1] ])
 NEG_ARRS = np.array([ [-1, -1], [-1, 0], [0, -1] ])
@@ -72,7 +72,7 @@ class TestTrinaryClassification(unittest.TestCase):
     #
     unperturb_sum = sum(sum(self.trinary.pos_arr))
     perturb_sum = 0
-    NUM_REPEATS = 30
+    NUM_REPEATS = 300
     SIGMA = 0.1
     for _ in range(NUM_REPEATS):
       trinary = self.trinary.perturb(sigma=SIGMA)[0]
@@ -90,7 +90,8 @@ class TestTrinaryClassification(unittest.TestCase):
     self.assertEqual(len(ser_test), ser_test.sum())
 
   def testConcat(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     def test(arr1, arr2, repl_int):
       # Count occurrence of members of arr1 in arr2
       for arr in arr1:
@@ -105,30 +106,30 @@ class TestTrinaryClassification(unittest.TestCase):
     test(self.trinary.other_arr, trinary.other_arr, SIZE)
 
 
-class TestExperimentHypergrid(unittest.TestCase):
+class TestHypergridHarness(unittest.TestCase):
 
   def setUp(self):
-    self.experiment = ExperimentHypergrid(density= 4)
+    self.harness = HypergridHarness(density= 4)
 
   def testConstructor(self):
     if IGNORE_TEST:
       return
     tot = sum([len(v) for v in 
-        [self.experiment.trinary.neg_arr,
-        self.experiment.trinary.pos_arr,
-        self.experiment.trinary.other_arr]])  \
-        *self.experiment.dim_int
-    self.assertEqual(len(self.experiment.grid), 2)
-    self.assertEqual(np.size(self.experiment.grid), tot)
+        [self.harness.trinary.neg_arr,
+        self.harness.trinary.pos_arr,
+        self.harness.trinary.other_arr]])  \
+        *self.harness.dim_int
+    self.assertEqual(len(self.harness.grid), 2)
+    self.assertEqual(np.size(self.harness.grid), tot)
     #
     dim_int = 4
     plane = Plane(Vector(np.repeat(1, dim_int)))
-    experiment = ExperimentHypergrid(
+    harness = HypergridHarness(
         density= 2, plane=plane)
     arr_lst = []
-    arr_lst.extend(experiment.trinary.pos_arr)
-    arr_lst.extend(experiment.trinary.neg_arr)
-    arr_lst.extend(experiment.trinary.other_arr)
+    arr_lst.extend(harness.trinary.pos_arr)
+    arr_lst.extend(harness.trinary.neg_arr)
+    arr_lst.extend(harness.trinary.other_arr)
     arrs = [tuple(x) for x in arr_lst]
     ser = pd.Series(arrs)
     ser = ser.unique()
@@ -138,10 +139,10 @@ class TestExperimentHypergrid(unittest.TestCase):
     if IGNORE_TEST:
       return
     # Smoke test
-    self.experiment.plotGrid(is_plot=IS_PLOT)
+    self.harness.plotGrid(is_plot=IS_PLOT)
     # With perturbation
-    trinary = self.experiment.perturb(sigma=0.5)[0]
-    self.experiment.plotGrid(trinary=trinary, is_plot=IS_PLOT)
+    trinary = self.harness.perturb(sigma=0.5)[0]
+    self.harness.plotGrid(trinary=trinary, is_plot=IS_PLOT)
 
   def testPlotSVM(self):
     if IGNORE_TEST:
@@ -149,10 +150,10 @@ class TestExperimentHypergrid(unittest.TestCase):
     DIM_INT = 2
     OFFSET = 1
     plane = Plane(Vector(np.repeat(1, DIM_INT)), offset=OFFSET)
-    experiment = ExperimentHypergrid(density=20,
+    harness = HypergridHarness(density=20,
         plane=plane)
     clf = svm.LinearSVC()
-    accuracy, plane = experiment.evaluateSVM(clf=clf, sigma=0)
+    accuracy, plane = harness.evaluateSVM(clf=clf, sigma=0)
     self.assertGreater(accuracy, 0.95)
     self.assertLess(np.abs(plane.offset - OFFSET), 0.1)
 
