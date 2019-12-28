@@ -26,6 +26,7 @@ KEGG_CMDS = [KEGG_CMD_LIST, KEGG_CMD_GET]
 
 # Plotting
 PLT_CMAP = "cmap"
+PLT_COLOR = "color"
 PLT_XLABEL = "xlabel"
 PLT_XLIM = "xlim"
 PLT_YLABEL = "ylabel"

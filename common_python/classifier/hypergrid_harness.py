@@ -14,7 +14,7 @@ import copy
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn import svm
+import sklearn
 
 # Place holder
 class Vector(object):
@@ -50,6 +50,16 @@ class Vector(object):
     else:
       return vector
 
+  def __str__(self):
+    stg = ""
+    for idx in range(self.dim_int):
+      coef = self.coef_arr[idx]
+      if len(stg) == 0:
+        stg = "%2.4f*x%d" % (coef, idx+1)
+      else:
+        stg = "%s + %2.4f*x%d" % (stg, coef, idx+1)
+    return stg
+
 
 class Plane(object):
   """
@@ -63,7 +73,9 @@ class Plane(object):
     """
     self.vector = vector
     self.offset = offset
-    self._coordinates = None
+
+  def __str__(self):
+    return "%s + %2.3f = 0" % (str(self.vector), -self.offset)
 
   @property
   def dim_int(self):
@@ -78,13 +90,11 @@ class Plane(object):
     :param tuple-float ylim: lower, upper y values
     :return array-float, array-float: x-values, y-values
     """
-    if self._coordinates is None:
-      x_arr = np.array(xlim)
-      slope = -self.vector.coef_arr[0] / self.vector.coef_arr[1]
-      offset = self.offset / self.vector.coef_arr[1]
-      y_arr = x_arr*slope + self.offset / self.vector.coef_arr[1]
-      self._coordinates = x_arr, y_arr
-    return self._coordinates
+    x_arr = np.array(xlim)
+    slope = -self.vector.coef_arr[0] / self.vector.coef_arr[1]
+    offset = self.offset / self.vector.coef_arr[1]
+    y_arr = x_arr*slope + self.offset / self.vector.coef_arr[1]
+    return x_arr, y_arr
 
   def isLess(self, vector):
     """
@@ -109,8 +119,21 @@ class Plane(object):
     :param Vector vector: vector whose position is evaluated
     """
     arr = Vector.toArray(vector)
-    return np.abs(self.vector.coef_arr.dot(arr) - self.offset) <= SMALL
+    return np.abs(
+        self.vector.coef_arr.dot(arr) - self.offset) <= SMALL
 
+  def plot(self, plotter, xlim, ylim, **kwargs):
+    """
+    For a two dimensional space, plots the line corresponding to
+    the hyperplane.
+    :param Plotter plotter:
+    :param dict kwargs: optional arguments for plot
+    """
+    if not cn.PLT_COLOR in kwargs:
+      kwargs[cn.PLT_COLOR] = "black"
+    x_arr, y_arr = self.makeCoordinates(xlim, ylim)
+    plotter.ax.plot(x_arr, y_arr, **kwargs)
+ 
 
 class TrinaryClassification(object):
   """
@@ -276,12 +299,13 @@ class HypergridHarness(object):
     return self.trinary.perturb(**kwargs)
     
   def plotGrid(self, trinary=None, plane=None,
-      is_plot=True):
+      is_plot=True, **kwargs):
     """
     Plots classes on a grid.
     :param TrinaryClassification trinary:
     :param np.array vector: vector orthogonal to plan
     :param bool is_plot: do the plot
+    :param dict kwargs: options for plotter
     :return Plotter:
     """
     plotter = Plotter()
@@ -295,11 +319,11 @@ class HypergridHarness(object):
       plane = self._plane
     plot(trinary.pos_arr, "blue")
     plot(trinary.neg_arr, "red")
-    # Add the line for the hyper plane
-    x_arr, y_arr = plane.makeCoordinates(self._xlim, self._ylim)
-    plotter.ax.plot(x_arr, y_arr, color="black")
+    plane.plot(plotter, self._xlim, self._ylim, color="black")
     # Do the plot
-    plotter.do(title="Hypergrid", xlim=self._xlim,
+    if not cn.PLT_TITLE in kwargs:
+      title = "Separating Hyperplane: %s" % str(self._plane)
+    plotter.do(title=title, xlim=self._xlim,
         ylim=self._ylim, is_plot=is_plot)
     #
     return plotter
@@ -312,17 +336,26 @@ class HypergridHarness(object):
     :param float sigma:
     :return float, plane: accuracy measure, separating hyperplane
     """
-    if clf is None:
-      clf = svm.LinearSVC()
     trinary = self.trinary.perturb(sigma=sigma)[0]
-    clf.fit(trinary.df_feature, trinary.ser_label)
+    if mclf is None:
+      mclf = sklearn.svm.LinearSVC()
+      cv_result = sklearn.model_selection.cross_validate(
+          mclf, trinary.df_feature, trinary.ser_label, cv=3)
+      #mclf.fit(trinary.df_feature, trinary.ser_label)
+    else:
+      trinarys = self.trinary.perturb(sigma=sigma, repl_int=repl_int)
+      dfs_feature = [trinary.df_feature for trinary in trinarys]
+      ser_label = trinarys[0].ser_label
+      cv_results = mclf.cross_validate(dfs_feature, ser_label)
     # Plot construction. 
     if is_plot:
       if self.dim_int != 2:
         raise ValueError("Must have a 2-dimensional grid")
-      vector = Vector(clf.coef_)
-      offset = -clf.intercept_ / (clf.coef_[0][0])
+      mclf.fit(trinary.df_feature, trinary.ser_label)
+      vector = Vector(mclf.coef_)
+      offset = -mclf.intercept_ / (mclf.coef_[0][0])
       plane = Plane(vector, offset=offset)
       # TODO: Do the plot
     #
-    return clf.score(trinary.df_feature, trinary.ser_label), plane
+    return np.mean(cv_result['test_score']), plane
+    #return mclf.score(trinary.df_feature, trinary.ser_label), plane
