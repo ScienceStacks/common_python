@@ -14,3 +14,6 @@ Some modules are for evaluating classifiers.
 
 ## Meta-classifier for features
 - meta\_classifier provides various techniques for reducing noise including feature replicas and thresholds.
+
+## Special classifiers
+- plurality\_classifier predicts the most frequently occurring class in the training data

@@ -1,4 +1,4 @@
-from common_python.classifier import majority_classifier
+from common_python.classifier import plurality_classifier
 from common_python.testing import helpers
 import common_python.constants as cn
 from common_python.tests.classifier import helpers as test_helpers
@@ -28,22 +28,22 @@ SER = pd.Series(np.concatenate([
     ]))
 
 
-class TestMajorityClassifier(unittest.TestCase):
+class TestPluralityClassifier(unittest.TestCase):
 
   def setUp(self):
-    self.clf = majority_classifier.MajorityClassifier()
+    self.clf = plurality_classifier.PluralityClassifier()
 
   def testConstructor(self):
     if IGNORE_TEST:
       return
-    self.assertIsNone(self.clf.majority)
+    self.assertIsNone(self.clf.plurality)
 
   def testFit(self):
     if IGNORE_TEST:
       return
     self.clf.fit(DF, SER)
-    self.assertEqual(self.clf.majority, LABEL_Z)
-    self.assertEqual(str(self.clf.majority), LABEL_Z)
+    self.assertEqual(self.clf.plurality, LABEL_Z)
+    self.assertEqual(str(self.clf.plurality), LABEL_Z)
 
   def testPredict(self):
     if IGNORE_TEST:

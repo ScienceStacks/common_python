@@ -57,6 +57,14 @@ class TestMetaClassifier(unittest.TestCase):
       accuracys.append(cv_result[0])
     self.assertGreater(accuracys[0], accuracys[1])
 
+  def testScore(self):
+    if IGNORE_TEST:
+      return
+    self.mclf.fit(self.dfs, self.ser)
+    score_abs, score_rel = self.mclf.score(self.df, self.ser)
+    self.assertEqual(score_abs, 1.0)
+    self.assertEqual(score_rel, 1.0)
+
 class TestMetaClassifierDefault(unittest.TestCase):
 
   def setUp(self):
@@ -72,6 +80,32 @@ class TestMetaClassifierDefault(unittest.TestCase):
     df, ser = self.mclf._makeTrainingData(dfs, self.ser)
     self.assertTrue(df.equals(self.df))
     self.assertTrue(ser.equals(self.ser))
+
+
+class TestMetaClassifierAverage(unittest.TestCase):
+
+  def setUp(self):
+    self.harness = HypergridHarness()
+    self.df = self.harness.trinary.df_feature
+    self.ser = self.harness.trinary.ser_label
+    self.dfs = self.makeFeatureDFS(0, SIZE)
+    self.mclf = meta_classifier.MetaClassifierAverage()
+
+  def testMakeTrainingData(self):
+    pass
+
+
+class TestMetaClassifierAugment(unittest.TestCase):
+
+  def setUp(self):
+    self.harness = HypergridHarness()
+    self.df = self.harness.trinary.df_feature
+    self.ser = self.harness.trinary.ser_label
+    self.dfs = self.makeFeatureDFS(0, SIZE)
+    self.mclf = meta_classifier.MetaClassifierAugment()
+
+  def testMakeTrainingData(self):
+    pass
     
 
 

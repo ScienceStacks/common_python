@@ -4,7 +4,8 @@ replications of feature values for the same instance.
 Each meta-classifier implements _makeTrainingData.
 """
 
-from common_python.classifier.majority_class import MajorityClass
+from common_python.classifier.plurality_classifier  \
+    import PluralityClassifier
 
 import copy
 import numpy as np
@@ -22,7 +23,7 @@ class MetaClassifier(object):
     """
     self.clf = clf
     self._is_fit = False
-    self.majority_clf = MajorityClass()
+    self.plurality_clf = PluralityClassifier()
 
   def _check(self):
     if not self._is_fit:
@@ -58,8 +59,6 @@ class MetaClassifier(object):
     df_feature, ser_label = self._makeTrainingData(
         dfs_feature, ser_label)
     self.clf.fit(df_feature, ser_label)
-    # Fit for the majority class
-    self.majority_clf.fit(_, ser_label)
     #
     self._is_fit = True
 
@@ -95,21 +94,19 @@ class MetaClassifier(object):
     :param pd.Series ser_label:
         index: instance
         value: class label
-    :param bool is_relative: score is relative to majority class classifier
-        1: perfect classification
-        0: equivalent to majority class classifier
-        neg: worse than majority class classifier
-    :return float, score: absolute accuracy, relative accuracy
+    :return float, score: 
+        absolute accuracy - fraction correct label
+        relative accuracy - fractional improvement over plurality
     """
     self._check()
-    ser_predicted = self.predict([df_feature])
-    num_match = [c1 == c2 for c1, c2 in 
-        zip(ser_label.values, ser_predicted.values)]
-    score_raw = num_match / len(ser_predicted)
-    score_majority = self.majority_class.predict(_, ser_label)
-    score_relative = (score_raw - score_majority) / (1 - score_majority)
-    return score_raw, score_relative
-
+    self.plurality_clf.fit(df_feature, ser_label)
+    ser_predicted = self.predict(df_feature)
+    num_match = sum([1 for c1, c2 in 
+        zip(ser_label.values, ser_predicted.values) if c1 == c2])
+    score_abs = num_match / len(ser_predicted)
+    score_plurality = self.plurality_clf.score(df_feature, ser_label)
+    score_rel = (score_abs - score_plurality) / (1 - score_plurality)
+    return score_abs, score_rel
 
 
 ##########################################
@@ -136,11 +133,11 @@ class MetaClassifierAverage(MetaClassifier):
 
 
 ##########################################
-class MetaClassifierAugmentInstances(MetaClassifier):
+class MetaClassifierAugment(MetaClassifier):
   # Uses replicas as additional instances for training.
 
   def _makeTrainingData(self, dfs_feature, ser_label):
-    df_feature = pd.concat(dfs_feature)
-    sers_class = [ser_label for _ in range(len(dfs_feature))]
-    ser_label_replicas = pd.concat(sers_class)
-    return df_feature, ser_label_replicas
+    df_feature_replica = pd.concat(dfs_feature)
+    sers = [ser_label for _ in range(len(dfs_feature))]
+    ser_label_replica = pd.concat(sers)
+    return df_feature_replica, ser_label_replica
