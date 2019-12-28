@@ -4,6 +4,8 @@ replications of feature values for the same instance.
 Each meta-classifier implements _makeTrainingData.
 """
 
+from common_python.classifier.majority_class import MajorityClass
+
 import copy
 import numpy as np
 import pandas as pd
@@ -20,7 +22,7 @@ class MetaClassifier(object):
     """
     self.clf = clf
     self._is_fit = False
-    self.majority_class = None
+    self.majority_clf = MajorityClass()
 
   def _check(self):
     if not self._is_fit:
@@ -56,6 +58,9 @@ class MetaClassifier(object):
     df_feature, ser_label = self._makeTrainingData(
         dfs_feature, ser_label)
     self.clf.fit(df_feature, ser_label)
+    # Fit for the majority class
+    self.majority_clf.fit(_, ser_label)
+    #
     self._is_fit = True
 
   def predict(self, df_feature):
@@ -81,43 +86,6 @@ class MetaClassifier(object):
         self.clf, df_feature, ser_label, **kwargs)
     return np.mean(cv_result['test_score']), np.std(cv_result['test_score'])
 
-  def fitMajorityClass(self, _, ser_label, **__):
-    """
-    Fit for a majority class classifier. This classifier is used
-    in the calculation of a relative score.
-    :param pd.Series df_class:
-        index: instance
-        value: class label
-    Updates
-      self.majority_class - most frequnetly occurring class
-    """
-    ser = ser_label.value_counts()
-    self.majority_class = ser[ser.index[0]]
-
-  def predictMajorityClass(self, df_feature):
-    """
-    :param pd.DataFrame df_feature:
-        index: instance
-        column: feature
-    :return pd.Series: 
-        index: instance
-        value: predicted class label
-    """
-    self._check()
-    return pd.Series(np.repeat(self.majority_class, len(df_feature)))
-
-  def scoreMajorityClass(self, _, ser_label, **__):
-    """
-    Scores for a majority class classifier
-    :param pd.Series ser_label:
-        index: instance
-        value: class label
-    :return float:
-    """
-    self._check()
-    num_match = [c == self.majority_class for c in ser_label]
-    return num_match / len(ser_label)
-
   def score(self, df_feature, ser_label):
     """
     Scores a previously fitted classifier.
@@ -138,9 +106,10 @@ class MetaClassifier(object):
     num_match = [c1 == c2 for c1, c2 in 
         zip(ser_label.values, ser_predicted.values)]
     score_raw = num_match / len(ser_predicted)
-    score_majority = self.scoreMajorityClass(_, ser_label)
+    score_majority = self.majority_class.predict(_, ser_label)
     score_relative = (score_raw - score_majority) / (1 - score_majority)
     return score_raw, score_relative
+
 
 
 ##########################################
