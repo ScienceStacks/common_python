@@ -16,18 +16,21 @@ class MajorityClassifier(object):
     if self.majority is None:
       raise ValueError("Must fit classifier before using predict or score.")
 
+  def __repr__(self):
+    return "Label: %s" % str(self.majority)
+
   def fit(self, _, ser_label):
     """
     Fit for a majority class classifier. This classifier is used
     in the calculation of a relative score.
-    :param pd.Series df_class:
+    :param pd.Series ser_class:
         index: instance
         value: class label
     Updates
       self.majority_class - most frequnetly occurring class
     """
     ser = ser_label.value_counts()
-    self.majority = ser[ser.index[0]]
+    self.majority = ser.index[0]
 
   def predict(self, df_feature):
     """
@@ -39,7 +42,7 @@ class MajorityClassifier(object):
         value: predicted class label
     """
     self._check()
-    return pd.Series(np.repeat(self.majority_class, len(df_feature)))
+    return pd.Series(np.repeat(self.majority, len(df_feature)))
 
   def score(self, _, ser_label):
     """
@@ -50,5 +53,5 @@ class MajorityClassifier(object):
     :return float:
     """
     self._check()
-    num_match = [c == self.majority_class for c in ser_label]
+    num_match = len([c for c in ser_label if c == self.majority])
     return num_match / len(ser_label)
