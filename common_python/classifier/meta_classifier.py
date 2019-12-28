@@ -1,20 +1,20 @@
 """
 Implements meta-classifiers, classifiers to handle multiple
-sets of features.
- 1. Constructor signature: clf - a classifier
- 2. Fit signature: list-df_feature, ser_label
- 3. Also implements: predict, score
+replications of feature values for the same instance.
+Each meta-classifier implements _makeTrainingData.
 """
 
 import copy
 import numpy as np
 import pandas as pd
+from sklearn import svm, model_selection
 
 
+##########################################
 class MetaClassifier(object):
-  # Abstract class. Must subclass and implement fit method.
+  # Abstract class. Must subclass and implement _makeTrainingData method.
 
-  def __init__(self, clf):
+  def __init__(self, clf=svm.LinearSVC()):
     """
     :param Classifier clf: implements fit, predict, score
     """
@@ -22,9 +22,69 @@ class MetaClassifier(object):
     self._is_fit = False
     self.majority_class = None
 
+  def _check(self):
+    if not self._is_fit:
+      raise ValueError("Must do fit before attempting predict or score.")
+
+  def _makeTrainingData(self, dfs_feature, ser_label):
+    """
+    Creates the training data from replicated features. This is done
+    in different ways by the subclasses and so this method must be
+    overridden.
+    :param list-pd.DataFrame df_feature: each dataframe
+        index: instance
+        column: feature
+    :param pd.Series df_class:
+        index: instance
+        value: class label
+    """
+    raise RuntimeError("Must override")
+
+  def fit(self, dfs_feature, ser_label):
+    """
+    :param list-pd.DataFrame df_feature: each dataframe
+        index: instance
+        column: feature
+    :param pd.Series df_class:
+        index: instance
+        value: class label
+    Notes
+      1. len(df_feature) == len(ser_label)
+    Updates
+      self.clf
+    """
+    df_feature, ser_label = self._makeTrainingData(
+        dfs_feature, ser_label)
+    self.clf.fit(df_feature, ser_label)
+    self._is_fit = True
+
+  def predict(self, df_feature):
+    """
+    :param pd.DataFrame df_feature:
+        index: instance
+        column: feature
+    :return pd.Series: 
+        index: instance
+        value: predicted class label
+    """
+    self._check()
+    return pd.Series(self.clf.predict(df_feature))
+
+  def crossValidate(self, dfs_feature, ser_label, **kwargs):
+    """
+    Does cross validation for the classifier.
+    :param dict kwargs: Options for cross validation
+    :return float, float: mean, std of accuracy
+    """
+    df_feature, ser_label = self._makeTrainingData(dfs_feature, ser_label)
+    cv_result = model_selection.cross_validate(
+        self.clf, df_feature, ser_label, **kwargs)
+    return np.mean(cv_result['test_score']), np.std(cv_result['test_score'])
+
   def fitMajorityClass(self, _, ser_label, **__):
     """
-    Fit for a majority class classifier.
+    Fit for a majority class classifier. This classifier is used
+    in the calculation of a relative score.
     :param pd.Series df_class:
         index: instance
         value: class label
@@ -34,46 +94,11 @@ class MetaClassifier(object):
     ser = ser_label.value_counts()
     self.majority_class = ser[ser.index[0]]
 
-  def _check(self):
-    if not self._is_fit:
-      raise ValueError("Must do fit before attempting predict or score.")
-
-  def fit(self, dfs_feature, ser_label, **kwargs):
-    """
-    :param list-pd.DataFrame df_feature: each dataframe
-        index: instance
-        column: feature
-    :param pd.Series df_class:
-        index: instance
-        value: class label
-    :param dict kwargs: optional arguments if any
-    Notes
-      1. len(df_feature) == len(ser_label)
-    Updates
-      self.clf
-      self.majority_class - most frequnetly occurring class
-    """
-    raise RuntimeError("Must override")
-
-  def predict(self, df_feature, **kwargs):
+  def predictMajorityClass(self, df_feature):
     """
     :param pd.DataFrame df_feature:
         index: instance
         column: feature
-    :param dict kwargs: optional arguments if any
-    :return pd.Series: 
-        index: instance
-        value: predicted class label
-    """
-    self._check()
-    self.clf.predict(df_feature, **kwargs)
-
-  def predictMajorityClass(self, df_feature, **kwargs):
-    """
-    :param pd.DataFrame df_feature:
-        index: instance
-        column: feature
-    :param dict kwargs: optional arguments if any
     :return pd.Series: 
         index: instance
         value: predicted class label
@@ -93,7 +118,7 @@ class MetaClassifier(object):
     num_match = [c == self.majority_class for c in ser_label]
     return num_match / len(ser_label)
 
-  def score(self, dfs_feature, ser_label, is_relative=False, **kwargs):
+  def score(self, df_feature, ser_label):
     """
     Scores a previously fitted classifier.
     :param list-pd.DataFrame df_feature: each dataframe
@@ -106,36 +131,31 @@ class MetaClassifier(object):
         1: perfect classification
         0: equivalent to majority class classifier
         neg: worse than majority class classifier
-    :param dict kwargs: optional arguments if any
-    :return float:
+    :return float, score: absolute accuracy, relative accuracy
     """
     self._check()
-    ser_predicted = self.predict(dfs_features)
+    ser_predicted = self.predict([df_feature])
     num_match = [c1 == c2 for c1, c2 in 
         zip(ser_label.values, ser_predicted.values)]
     score_raw = num_match / len(ser_predicted)
-    if is_relative:
-      score_majority_class = self.scoreMajorityClass(dfs_feature,
-           ser_label, **kwargs)
-      score = (score_raw - score_majority_class) / (1 - score_majority_class)
-    else:
-      score = score_raw
-    return score
+    score_majority = self.scoreMajorityClass(_, ser_label)
+    score_relative = (score_raw - score_majority) / (1 - score_majority)
+    return score_raw, score_relative
 
 
+##########################################
 class MetaClassifierDefault(MetaClassifier):
   # Trains on the first instance of feature data
 
-  def fit(self, dfs_feature, ser_label, **kwargs):
-    df_feature = dfs_feature[0]
-    self.clf.fit(df_feature, ser_label, **kwargs)
-    self._is_fit = True
+  def _makeTrainingData(self, dfs_feature, ser_label):
+    return dfs_feature[0], ser_label
 
 
+##########################################
 class MetaClassifierAverage(MetaClassifier):
   # Trains on the average of feature values.
 
-  def fit(self, dfs_feature, ser_label, **kwargs):
+  def _makeTrainingData(self, dfs_feature, ser_label):
     """
     Does fit on the average of the feature values.
     """
@@ -143,20 +163,15 @@ class MetaClassifierAverage(MetaClassifier):
     for df in dfs_features[1:]:
       df_feature += df
     df_feature = df_feature.applymap(lambda v: v / len(dfs_feature))
-    #
-    self.clf.fit(df_feature, ser_label, **kwargs)
-    self._is_fit = True
+    return df_feature, ser_label
 
 
+##########################################
 class MetaClassifierAugmentInstances(MetaClassifier):
   # Uses replicas as additional instances for training.
 
-  def fit(self, dfs_feature, ser_label, **kwargs):
-    """
-    Includes replications as separate instances
-    """
+  def _makeTrainingData(self, dfs_feature, ser_label):
     df_feature = pd.concat(dfs_feature)
     sers_class = [ser_label for _ in range(len(dfs_feature))]
     ser_label_replicas = pd.concat(sers_class)
-    self.clf.fit(df_feature, ser_label_replicas, **kwargs)
-    self._is_fit = True
+    return df_feature, ser_label_replicas
