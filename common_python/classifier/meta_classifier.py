@@ -151,9 +151,7 @@ class MetaClassifierPlurality(MetaClassifier):
   # Uses wrapper for plurality classifier
 
   def __init__(self):
-    self.clf = PluralityClassifier()
-    self._is_fit = False
-    self.plurality_clf = PluralityClassifier()
+    super.__init__(clf=PluralityClassifier())
 
   def _makeTrainingData(self, _, ser_label):
     return None, ser_label
