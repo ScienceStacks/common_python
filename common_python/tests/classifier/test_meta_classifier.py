@@ -61,9 +61,9 @@ class TestMetaClassifier(unittest.TestCase):
     if IGNORE_TEST:
       return
     self.mclf.fit(self.dfs, self.ser)
-    score_abs, score_rel = self.mclf.score(self.df, self.ser)
-    self.assertEqual(score_abs, 1.0)
-    self.assertEqual(score_rel, 1.0)
+    score_result = self.mclf.score(self.df, self.ser)
+    self.assertEqual(score_result.abs, 1.0)
+    self.assertEqual(score_result.rel, 1.0)
 
 class TestMetaClassifierDefault(unittest.TestCase):
 
@@ -85,6 +85,7 @@ class TestMetaClassifierDefault(unittest.TestCase):
 class TestMetaClassifierAverage(unittest.TestCase):
 
   def setUp(self):
+    return
     self.harness = HypergridHarness()
     self.df = self.harness.trinary.df_feature
     self.ser = self.harness.trinary.ser_label
@@ -98,6 +99,7 @@ class TestMetaClassifierAverage(unittest.TestCase):
 class TestMetaClassifierAugment(unittest.TestCase):
 
   def setUp(self):
+    return
     self.harness = HypergridHarness()
     self.df = self.harness.trinary.df_feature
     self.ser = self.harness.trinary.ser_label

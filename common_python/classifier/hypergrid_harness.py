@@ -359,3 +359,13 @@ class HypergridHarness(object):
     #
     return np.mean(cv_result['test_score']), plane
     #return mclf.score(trinary.df_feature, trinary.ser_label), plane
+
+  def evaluateMclfs(self, mclfs, sigma=0, repl_int=1):
+    """
+    Evaluates the classification accuracy of a MetaClassifier.
+    :param list-MetaClassifier mclf:
+    :param float sigma:
+    :param int repl_int: Number of replications
+    :return list-float: relative accuracy
+    """
+    pass

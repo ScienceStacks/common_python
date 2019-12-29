@@ -7,10 +7,15 @@ Each meta-classifier implements _makeTrainingData.
 from common_python.classifier.plurality_classifier  \
     import PluralityClassifier
 
+import collections
 import copy
 import numpy as np
 import pandas as pd
 from sklearn import svm, model_selection
+
+
+ScoreResult = collections.namedtuple("ScoreResult",
+    "abs rel")
 
 
 ##########################################
@@ -94,9 +99,7 @@ class MetaClassifier(object):
     :param pd.Series ser_label:
         index: instance
         value: class label
-    :return float, score: 
-        absolute accuracy - fraction correct label
-        relative accuracy - fractional improvement over plurality
+    :return ScoreResult:
     """
     self._check()
     self.plurality_clf.fit(df_feature, ser_label)
@@ -106,7 +109,7 @@ class MetaClassifier(object):
     score_abs = num_match / len(ser_predicted)
     score_plurality = self.plurality_clf.score(df_feature, ser_label)
     score_rel = (score_abs - score_plurality) / (1 - score_plurality)
-    return score_abs, score_rel
+    return ScoreResult(abs=score_abs, rel=score_rel)
 
 
 ##########################################
