@@ -363,9 +363,16 @@ class HypergridHarness(object):
   def evaluateMclfs(self, mclfs, sigma=0, repl_int=1):
     """
     Evaluates the classification accuracy of a MetaClassifier.
-    :param list-MetaClassifier mclf:
+    :param list-MetaClassifier mclfs:
     :param float sigma:
-    :param int repl_int: Number of replications
-    :return list-float: relative accuracy
+    :param int repl_int: Number of replications passed to classifiers
+    :return list-ScoreResult:
     """
-    pass
+    train_trinarys = self.trinary.perturb(sigma=sigma, repl_int=repl_int)
+    test_trinary = self.trinary.perturb(sigma=sigma, repl_int=1)[0]
+    dfs = [trinary.df_feature for trinary in train_trinarys]
+    [m.fit(dfs, self.trinary.ser_label) for m in mclfs]
+    score_results = [
+        m.score(test_trinary.df_feature, self.trinary.ser_label)
+        for m in mclfs]
+    return score_results

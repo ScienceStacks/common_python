@@ -144,3 +144,16 @@ class MetaClassifierAugment(MetaClassifier):
     sers = [ser_label for _ in range(len(dfs_feature))]
     ser_label_replica = pd.concat(sers)
     return df_feature_replica, ser_label_replica
+
+
+##########################################
+class MetaClassifierPlurality(MetaClassifier):
+  # Uses wrapper for plurality classifier
+
+  def __init__(self):
+    self.clf = PluralityClassifier()
+    self._is_fit = False
+    self.plurality_clf = PluralityClassifier()
+
+  def _makeTrainingData(self, _, ser_label):
+    return None, ser_label

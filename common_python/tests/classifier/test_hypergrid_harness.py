@@ -1,5 +1,7 @@
 from common_python.classifier.hypergrid_harness  \
     import HypergridHarness, TrinaryClassification, Plane, Vector
+from common_python.classifier.meta_classifier  \
+    import MetaClassifierDefault, MetaClassifierPlurality
 from common_python.testing import helpers
 import common_python.constants as cn
 from common_python.tests.classifier import helpers as test_helpers
@@ -11,7 +13,7 @@ import unittest
 
 DIM_INT = 2
 IGNORE_TEST = False
-IS_PLOT = True
+IS_PLOT = False
 NEG_ARRS = np.array([ [-1, -1], [-1, 0], [0, -1] ])
 NUM1 = 1.1
 NUM2 = 1.2
@@ -177,6 +179,17 @@ class TestHypergridHarness(unittest.TestCase):
     accuracy, plane = harness.evaluateSVM(sigma=0.0)
     self.assertGreater(accuracy, 0.8)
     self.assertLess(np.abs(plane.offset - OFFSET), 0.1)
+
+  def testEvaluateMclfs(self):
+    if IGNORE_TEST:
+      return
+    OFFSET = 0
+    harness = HypergridHarness(density=10)
+    mclfs = [MetaClassifierDefault(), MetaClassifierDefault()]
+    mclfs = [MetaClassifierPlurality(), MetaClassifierDefault()]
+    score_results = self.harness.evaluateMclfs(mclfs, repl_int=2)
+    self.assertEqual(score_results[0].abs, 0.5)
+    self.assertEqual(score_results[1].abs, 1.0)
 
 
 if __name__ == '__main__':
