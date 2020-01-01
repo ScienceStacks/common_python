@@ -18,7 +18,10 @@ if not PERSISTER.isExist():
   DATA = TrinaryData()  # Will get an error if pcl not present
   PERSISTER.set(DATA)
 else:
-  DATA = PERSISTER.get()
+  try:
+    DATA = PERSISTER.get()
+  except:
+    DATA = None
   
 def getData():
   """

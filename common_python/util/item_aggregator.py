@@ -1,4 +1,4 @@
-"""Aggregates items in list by applying function to each element."""
+"""Aggregates properties of items in list."""
 
 import common_python.constants as cn
 

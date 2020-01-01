@@ -145,7 +145,7 @@ class MetaClassifierAverage(MetaClassifier):
     Does fit on the average of the feature values.
     """
     df_feature = dfs_feature[0].copy()
-    for df in dfs_features[1:]:
+    for df in dfs_feature[1:]:
       df_feature += df
     df_feature = df_feature.applymap(lambda v: v / len(dfs_feature))
     return df_feature, ser_label

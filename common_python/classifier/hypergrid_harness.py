@@ -8,8 +8,10 @@ on the separating plane are "other".
 
 import common_python.constants as cn
 import common_python.util.util as util
+from common_python.util.item_aggregator import ItemAggregator
 from common_python.plots.plotter import Plotter
 
+import collections
 import copy
 import pandas as pd
 import numpy as np
@@ -435,17 +437,18 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     result = {}
     for sigma in sigmas:
       for repl_int in repl_ints:
-        scorer_abs = Scorer(lambda s: s.abs)
-        scorer_rel = Scorer(labmda s: s.rel)
+        aggregator_abs = ItemAggregator(lambda s: s.abs)
+        aggregator_rel = ItemAggregator(lambda s: s.rel)
         for _ in range(count):
           key = (sigma, repl_int)
           results = self._evaluateExperiment(sigma=sigma,
               repl_int=repl_int)
-          scorer_abs.append(results)
-          scorer_rel.append(results)
+          aggregator_abs.append(results)
+          aggregator_rel.append(results)
         #
-        df_abs = scorer_abs.df
-        df_rel = scorer_rel.df
-        result[(sigma, repl_int)] = ScorerResults(abs=df_abs, rel=df_rel)
+        df_abs = aggregator_abs.df
+        df_rel = aggregator_rel.df
+        result[(sigma, repl_int)] = ScorerResults(
+            abs=df_abs, rel=df_rel)
     #
     return result

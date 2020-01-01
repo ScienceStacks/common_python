@@ -12,6 +12,47 @@ import unittest
 
 IGNORE_TEST = False
 SIZE = 3
+REPL_INT = 3
+SIGMA_TRAIN = 0.1
+SIGMA_TEST = 0.3
+
+
+def testScoreGeneric(testcase, sigma=0.2, repl_int=3):
+  """
+  Generic test for a MetaClassifier
+  :param TestCase testcase: TestCase for class under test
+  """
+  # Fit to training data 
+  testcase.mclf.fit(testcase.dfs_train, testcase.ser)
+  # Score on training data
+  result1 = testcase.mclf.score(testcase.dfs_train[0], testcase.ser)
+  # Score on test data
+  result2 = testcase.mclf.score(testcase.df_test, testcase.ser)
+  #
+  testcase.assertGreater(result1.abs, result2.abs)
+
+def testMakeTrainingDataGeneric(testcase):
+  """
+  Generic test for make training data.
+  Assumes instance variables in setUp for class under tests.
+  :param TestCase testcase: TestCase for class under test
+  """
+  df, ser = testcase.mclf._makeTrainingData(
+      testcase.dfs_train, testcase.ser)
+  if len(ser) == len(testcase.ser):
+    testcase.assertTrue(ser.equals(testcase.ser))
+  testcase.assertTrue(helpers.isValidDataFrame(df,
+      expected_columns=testcase.dfs_train[0].columns))
+
+def setUpGeneric(testcase):
+  testcase.harness = HypergridHarness()
+  trinarys = testcase.harness.trinary.perturb(
+      sigma=SIGMA_TRAIN, repl_int=REPL_INT)
+  testcase.dfs_train = [t.df_feature for t in trinarys]
+  testcase.df_test = testcase.harness.trinary.perturb(
+      sigma=SIGMA_TEST)[0].df_feature
+  testcase.ser = testcase.harness.trinary.ser_label
+
 
 class TestMetaClassifier(unittest.TestCase):
 
@@ -85,29 +126,41 @@ class TestMetaClassifierDefault(unittest.TestCase):
 class TestMetaClassifierAverage(unittest.TestCase):
 
   def setUp(self):
-    return
-    self.harness = HypergridHarness()
-    self.df = self.harness.trinary.df_feature
-    self.ser = self.harness.trinary.ser_label
-    self.dfs = self.makeFeatureDFS(0, SIZE)
+    setUpGeneric(self)
     self.mclf = meta_classifier.MetaClassifierAverage()
 
   def testMakeTrainingData(self):
-    pass
+    if IGNORE_TEST:
+      return
+    testMakeTrainingDataGeneric(self)
+
+  def testScore(self):
+    if IGNORE_TEST:
+      return
+    testScoreGeneric(self)
 
 
 class TestMetaClassifierAugment(unittest.TestCase):
 
   def setUp(self):
-    return
-    self.harness = HypergridHarness()
-    self.df = self.harness.trinary.df_feature
-    self.ser = self.harness.trinary.ser_label
-    self.dfs = self.makeFeatureDFS(0, SIZE)
+    setUpGeneric(self)
     self.mclf = meta_classifier.MetaClassifierAugment()
 
   def testMakeTrainingData(self):
-    pass
+    if IGNORE_TEST:
+      return
+    testMakeTrainingDataGeneric(self)
+
+  def testScore(self):
+    if IGNORE_TEST:
+      return
+    testScoreGeneric(self)
+
+
+class TestMetaClassifierEnsemble(unittest.TestCase):
+
+  def setUp(self):
+    return
     
 
 
