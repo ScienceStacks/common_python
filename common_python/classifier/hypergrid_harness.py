@@ -31,6 +31,18 @@ NEG = -1
 NEG = -1
 
 
+##################### FUNCTIONS ###################
+def _assignObjectValues(target, source):
+  """
+  Assigns the values in the source to the target.
+  Source and target must be the same type.
+  :param object target:
+  :param object source:
+  """
+  for key, value in source.__dict__.iteritems():
+    target.__dict__[key] = value
+
+
 #################### CLASSES ######################
 class Vector(object):
   """
@@ -248,6 +260,18 @@ class HypergridHarness(object):
     self.grid = self._makeGrid()
     self.trinary = self._makeTrinary()
 
+  @classmethod
+  def initImpure(cls, density=DEF_DENSITY, impurity=0):
+    """
+    Creates a harness with the desired impurity, the difference
+    between the fraction of positive and negative instances.
+    :param float density: number of coordinates along a unit
+                        distance for an axis
+    :param float impurity: in [-1, 1]
+    :return HypergridHarness:
+    """
+    raise RuntimeError("Not implemented.")
+
   @property
   def dim_int(self):
     return self._plane.dim_int
@@ -360,10 +384,30 @@ class HypergridHarness(object):
     return np.mean(cv_result['test_score']), plane
     #return mclf.score(trinary.df_feature, trinary.ser_label), plane
 
-  def evaluateMclfs(self, mclfs, sigma=0, repl_int=1):
+
+class HypergridHarnessMetaClassifier(HypergridHarness):
+
+  # Values are dataframes with the columns cn.MEAN, cn.STD
+  # and rows are MetaClassifiers evaluated.
+  ScoreResults = collections.namedtuple("ScoreResults",
+      "abs rel")
+
+  def __init__(self, mclfs, density=DEF_DENSITY, impurity=0):
     """
-    Evaluates the classification accuracy of a MetaClassifier.
-    :param list-MetaClassifier mclfs:
+    :param list-MetaClassifier mclfs: to be studied
+    :param float density: number of coordinates along a unit
+                        distance for an axis
+    :param float impurity: in [-1, 1]
+    """
+    self.mclfs = mclfs
+    harness = HypergridHarness.initImpure(density, impurity)
+    # Copy all data to the new to this harness
+    assignObjectValues(self, harness)
+
+  def _evaluateExperiment(self, sigma=0, repl_int=1):
+    """
+    Evaluates the classification accuracy of MetaClassifiers
+    for a single experiment.
     :param float sigma:
     :param int repl_int: Number of replications passed to classifiers
     :return list-ScoreResult:
@@ -371,8 +415,37 @@ class HypergridHarness(object):
     train_trinarys = self.trinary.perturb(sigma=sigma, repl_int=repl_int)
     test_trinary = self.trinary.perturb(sigma=sigma, repl_int=1)[0]
     dfs = [trinary.df_feature for trinary in train_trinarys]
-    [m.fit(dfs, self.trinary.ser_label) for m in mclfs]
+    [m.fit(dfs, self.trinary.ser_label) for m in selfmclfs]
     score_results = [
         m.score(test_trinary.df_feature, self.trinary.ser_label)
-        for m in mclfs]
+        for m in self.mclfs]
     return score_results
+
+  def evaluate(self, count=10, sigmas=[0], repl_ints=[1]):
+    """
+    Evaluates the classification accuracy of MetaClassifier
+    for different conditions. Each experiment is repeated several times.
+    :param list-float sigmas:
+    :param list-int repl_ints:
+    :return dict:
+         key: (sigma,repl_int)
+         value: ScoreResults
+    """
+    #
+    result = {}
+    for sigma in sigmas:
+      for repl_int in repl_ints:
+        scorer_abs = Scorer(lambda s: s.abs)
+        scorer_rel = Scorer(labmda s: s.rel)
+        for _ in range(count):
+          key = (sigma, repl_int)
+          results = self._evaluateExperiment(sigma=sigma,
+              repl_int=repl_int)
+          scorer_abs.append(results)
+          scorer_rel.append(results)
+        #
+        df_abs = scorer_abs.df
+        df_rel = scorer_rel.df
+        result[(sigma, repl_int)] = ScorerResults(abs=df_abs, rel=df_rel)
+    #
+    return result

@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 from sklearn import svm, model_selection
 
+ITERMAX_INT = 500  # Maximum number of iterations for score calculation
+
 
 # Result of scoring a classifier
 #  abs: absolute accuracy in [0, 1] - fraction correct
@@ -175,9 +177,18 @@ class MetaClassifierPlurality(MetaClassifier):
 class MetaClassifierEnsemble(MetaClassifier):
   # Create an ensemble of classifier from each feature replica
 
-  def __init__(self, clf):
+  def __init__(self, clf, is_plurality=True, max_score_std=0.05):
+    """
+    :param bool is_plurality: Choose most common lablel
+                              If false, select label from the
+                                distribution of classifier results
+    :parm float max_score_std: maximum standard deviation for accuracy score.
+    """
     super.__init__(clf=clf)
-    self.ensemble = None
+    self._is_plurality = is_plurality
+    self._max_score_std = max_score_std
+    self.ensemble = None  # list-clf
+    self._is_deterministic = None  # Label is predicted deterministically
 
   def fit(self, dfs_feature, ser_label):
     self.ensemble = []
@@ -198,40 +209,60 @@ class MetaClassifierEnsemble(MetaClassifier):
         values: labels
         rows: instances
     """
-    def selectLabel(ser):
+    def selectLabelPlurality(ser):
        """
        Selects the most frequently occurring label and randomly
        select among ties.
+       :return object, bool: label, deterministic label selection
        """
        ser_count = ser.value_counts()
        ser_top = ser_count[ser_count==ser_count[ser_count.index[0]]]
        idx = np.random.randint(0, len(ser_top))
-       return ser_top.index[idx]
+       return ser_top.index[idx], (len(ser_top) == 1)
+    #
+    def selectLabelDistribution(ser):
+       """
+       Selects the most frequently occurring label and randomly
+       select among ties.
+       :return object, bool: label, not deterministic
+       """
+       idx = np.random.randint(0, len(ser))
+       return ser.index[idx], False
     #
     self._check()
+    self._is_deterministic = False
     # DataFrame where each row is a classifier prediction
     df_label = pd.concat(
         [clf.predict(df_feature) for clf in self.ensemble],
         axis=1)
     df_label = df_label.T
     # Predictions
-    predicts = [selectLabel(df_label[c]) for c in df_label.columns]
+    if self._is_plurality:
+      func = selectLabelPlurality
+    else:
+      func = selectLabelDistribution
+    results = [func(df_label[c]) for c in df_label.columns]
+    predicts = [r[0] for r in results]
+    self._is_deterministic = all([r[1] for r in results])
     #
     return pd.Series(predicts)
 
-  def _calcMatch(self, df_feature, ser_label, iter_int=10):
+  def _calcMatch(self, df_feature, ser_label):
     """
-    Calculates the number of matches of instances in score.
-    This is done repeatedly for ensemble to handle ties.
+    Calculates the number of matches of the instances in score.
+    This is done may be done repeatedly.
     :param pd.DataFrame df_feature:
     :param pd.Series ser_label:
     :param int iter_int: number of iterations in the matching
     :return float:
     """
     matches = []
+    iter_int = min(ITERMAX_INT, int((0.5/self._max_score_std)**2))
     for _ in range(iter_int):
       ser_predicted = self.predict(df_feature)
       num_match = sum([1 for c1, c2 in 
           zip(ser_label.values, ser_predicted.values) if c1 == c2])
       matches.append(num_match)
+      if self._is_deterministic:
+        break
     return np.mean(matches)
