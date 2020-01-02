@@ -160,9 +160,28 @@ class TestMetaClassifierAugment(unittest.TestCase):
 class TestMetaClassifierEnsemble(unittest.TestCase):
 
   def setUp(self):
-    return
-    
+    setUpGeneric(self)
+    self.mclf = meta_classifier.MetaClassifierEnsemble()
 
+  def testFit(self):
+    if IGNORE_TEST:
+      return
+    self.mclf.fit(self.dfs_train, self.ser)
+    self.assertEqual(len(self.mclf.ensemble), REPL_INT)
+
+  def testPredict(self):
+    if IGNORE_TEST:
+      return
+    self.mclf.fit(self.dfs_train, self.ser)
+    ser = self.mclf.predict(self.df_test)
+    self.assertEqual(len(ser), len(self.ser))
+    diff = set(ser).symmetric_difference(self.ser)
+    self.assertEqual(len(diff), 0)
+
+  def testScore(self):
+    if IGNORE_TEST:
+      return
+    testScoreGeneric(self)
 
 if __name__ == '__main__':
   unittest.main()

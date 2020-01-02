@@ -177,14 +177,15 @@ class MetaClassifierPlurality(MetaClassifier):
 class MetaClassifierEnsemble(MetaClassifier):
   # Create an ensemble of classifier from each feature replica
 
-  def __init__(self, clf, is_plurality=True, max_score_std=0.05):
+  def __init__(self, clf=svm.LinearSVC(),
+      is_plurality=True, max_score_std=0.05):
     """
     :param bool is_plurality: Choose most common lablel
                               If false, select label from the
                                 distribution of classifier results
     :parm float max_score_std: maximum standard deviation for accuracy score.
     """
-    super.__init__(clf=clf)
+    super().__init__(clf=clf)
     self._is_plurality = is_plurality
     self._max_score_std = max_score_std
     self.ensemble = None  # list-clf
@@ -233,7 +234,7 @@ class MetaClassifierEnsemble(MetaClassifier):
     self._is_deterministic = False
     # DataFrame where each row is a classifier prediction
     df_label = pd.concat(
-        [clf.predict(df_feature) for clf in self.ensemble],
+        [pd.Series(clf.predict(df_feature)) for clf in self.ensemble],
         axis=1)
     df_label = df_label.T
     # Predictions
