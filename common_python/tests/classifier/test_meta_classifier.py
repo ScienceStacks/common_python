@@ -12,12 +12,12 @@ import unittest
 
 IGNORE_TEST = False
 SIZE = 3
-REPL_INT = 3
+NUM_REPL = 3
 SIGMA_TRAIN = 0.1
 SIGMA_TEST = 0.3
 
 
-def testScoreGeneric(testcase, sigma=0.2, repl_int=3):
+def testScoreGeneric(testcase, sigma=0.2, num_repl=3):
   """
   Generic test for a MetaClassifier
   :param TestCase testcase: TestCase for class under test
@@ -47,7 +47,7 @@ def testMakeTrainingDataGeneric(testcase):
 def setUpGeneric(testcase):
   testcase.harness = HypergridHarness()
   trinarys = testcase.harness.trinary.perturb(
-      sigma=SIGMA_TRAIN, repl_int=REPL_INT)
+      sigma=SIGMA_TRAIN, num_repl=NUM_REPL)
   testcase.dfs_train = [t.df_feature for t in trinarys]
   testcase.df_test = testcase.harness.trinary.perturb(
       sigma=SIGMA_TEST)[0].df_feature
@@ -65,7 +65,7 @@ class TestMetaClassifier(unittest.TestCase):
 
   def makeFeatureDFS(self, sigma, size):
     trinary = self.harness.trinary
-    trinarys = self.harness.trinary.perturb(sigma, repl_int=size)
+    trinarys = self.harness.trinary.perturb(sigma, num_repl=size)
     return [t.df_feature for t in trinarys]
 
   def testConstructor(self):
@@ -78,7 +78,7 @@ class TestMetaClassifier(unittest.TestCase):
       return
     self.mclf.fit(self.dfs, self.ser)
     self.assertEqual(len(self.mclf.clf.coef_[0]),
-        self.harness.dim_int)
+        self.harness.num_dim)
 
   def testPredict(self):
     if IGNORE_TEST:
@@ -167,7 +167,7 @@ class TestMetaClassifierEnsemble(unittest.TestCase):
     if IGNORE_TEST:
       return
     self.mclf.fit(self.dfs_train, self.ser)
-    self.assertEqual(len(self.mclf.ensemble), REPL_INT)
+    self.assertEqual(len(self.mclf.ensemble), NUM_REPL)
 
   def testPredict(self):
     if IGNORE_TEST:

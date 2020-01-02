@@ -33,18 +33,6 @@ NEG = -1
 NEG = -1
 
 
-##################### FUNCTIONS ###################
-def _assignObjectValues(target, source):
-  """
-  Assigns the values in the source to the target.
-  Source and target must be the same type.
-  :param object target:
-  :param object source:
-  """
-  for key, value in source.__dict__.iteritems():
-    target.__dict__[key] = value
-
-
 #################### CLASSES ######################
 class Vector(object):
   """
@@ -53,7 +41,7 @@ class Vector(object):
 
   def __init__(self, coef_arr):
     self.coef_arr = np.array(coef_arr)
-    self.dim_int = len(self.coef_arr)
+    self.num_dim = len(self.coef_arr)
 
   def dot(self, vector):
     return self.coef_arr.dot(vector.coef_arr)
@@ -66,7 +54,7 @@ class Vector(object):
 
   def __str__(self):
     stg = ""
-    for idx in range(self.dim_int):
+    for idx in range(self.num_dim):
       coef = self.coef_arr[idx]
       if len(stg) == 0:
         stg = "%2.4f*x%d" % (coef, idx+1)
@@ -92,8 +80,8 @@ class Plane(object):
     return "%s + %2.3f = 0" % (str(self.vector), -self.offset)
 
   @property
-  def dim_int(self):
-    return self.vector.dim_int
+  def num_dim(self):
+    return self.vector.num_dim
 
   def makeCoordinates(self, xlim, ylim):
     """
@@ -165,7 +153,7 @@ class TrinaryClassification(object):
     self.pos_arr = np.array(util.setList(pos_arr))
     self.neg_arr = np.array(util.setList(neg_arr))
     self.other_arr = np.array(util.setList(other_arr))
-    self.dim_int = len(self.pos_arr[0])
+    self.num_dim = len(self.pos_arr[0])
     self._df_feature = None
     self._ser_label = None
 
@@ -181,19 +169,19 @@ class TrinaryClassification(object):
       self._df_feature, self._ser_label = self.makeMatrices()
     return self._ser_label
 
-  def perturb(self, sigma=0, repl_int=1):
+  def perturb(self, sigma=0, num_repl=1):
     """
     Adds a N(0, sigma) to each value
     :param float sigma: standard deviation
-    :param int repl_int: number of replications
+    :param int num_repl: number of replications
     :return list-TrinaryClassification:
     """
     def adjust(arrs):
-      return [np.random.normal(0, sigma, self.dim_int) + v
+      return [np.random.normal(0, sigma, self.num_dim) + v
           for v in arrs]
     #
     trinarys = []
-    for _ in range(repl_int):
+    for _ in range(num_repl):
       trinarys.append(TrinaryClassification(
           pos_arr=adjust(self.pos_arr),
           neg_arr=adjust(self.neg_arr),
@@ -226,9 +214,9 @@ class TrinaryClassification(object):
     :return TrinaryClassification:
     """
     trinary = copy.deepcopy(trinarys[0])
-    dim_int = trinary.dim_int
+    num_dim = trinary.num_dim
     for tri in trinarys[1:]:
-      if tri.dim_int != dim_int:
+      if tri.num_dim != num_dim:
         raise ValueError(
             "All TrinaryClassification must have the same dimension")
       trinary.pos_arr = np.concatenate([trinary.pos_arr,
@@ -263,20 +251,19 @@ class HypergridHarness(object):
     self.trinary = self._makeTrinary()
 
   @classmethod
-  def initImpure(cls, density=DEF_DENSITY, impurity=0):
+  def initImpure(cls, impurity=0, **kwargs):
     """
     Creates a harness with the desired impurity, the difference
     between the fraction of positive and negative instances.
-    :param float density: number of coordinates along a unit
-                        distance for an axis
     :param float impurity: in [-1, 1]
+    :param dict kwargs: arguments in HypergridHarness constructor
     :return HypergridHarness:
     """
     raise RuntimeError("Not implemented.")
 
   @property
-  def dim_int(self):
-    return self._plane.dim_int
+  def num_dim(self):
+    return self._plane.num_dim
 
   def _makeGrid(self):
     """
@@ -285,7 +272,7 @@ class HypergridHarness(object):
     """
     coords = [np.linspace(self._min_val, self._max_val,
         self._density*(self._max_val - self._min_val))
-        for _ in range(self.dim_int)]
+        for _ in range(self.num_dim)]
     # The grid is structured as:
     #  coordinate (e.g., x, y)
     #  row
@@ -298,11 +285,11 @@ class HypergridHarness(object):
     Creates the labels for the grid based on the classification vector.
     :return TrinaryClassification:
     """
-    rows_int = (self._density  \
-        * (self._max_val - self._min_val))**self.dim_int
-    coords = np.reshape(self.grid, (self.dim_int, rows_int))
+    num_row = (self._density  \
+        * (self._max_val - self._min_val))**self.num_dim
+    coords = np.reshape(self.grid, (self.num_dim, num_row))
     coords = np.transpose(coords)
-    #coords = [np.reshape(self.grid[n], (rows_int, 1))
+    #coords = [np.reshape(self.grid[n], (num_row, 1))
     #    for n in range(len(self.grid))]
     # TODO: Generalize so works for n-dimensions
     pos_arr = np.array([v for v in coords
@@ -354,10 +341,9 @@ class HypergridHarness(object):
     #
     return plotter
 
-  def evaluateSVM(self, mclf=None, sigma=0, repl_int=1, is_plot=True):
+  def evaluateSVM(self, mclf=None, sigma=0, num_repl=1, is_plot=True):
     """
     Evaluates the classification accuracy of an svm.
-    Assumes dim_int === 2.
     :param MetaClassifier mclf:
     :param float sigma:
     :return float, plane: accuracy measure, separating hyperplane
@@ -369,13 +355,13 @@ class HypergridHarness(object):
           mclf, trinary.df_feature, trinary.ser_label, cv=3)
       #mclf.fit(trinary.df_feature, trinary.ser_label)
     else:
-      trinarys = self.trinary.perturb(sigma=sigma, repl_int=repl_int)
+      trinarys = self.trinary.perturb(sigma=sigma, num_repl=num_repl)
       dfs_feature = [trinary.df_feature for trinary in trinarys]
       ser_label = trinarys[0].ser_label
       cv_results = mclf.cross_validate(dfs_feature, ser_label)
     # Plot construction. 
     if is_plot:
-      if self.dim_int != 2:
+      if self.num_dim != 2:
         raise ValueError("Must have a 2-dimensional grid")
       mclf.fit(trinary.df_feature, trinary.ser_label)
       vector = Vector(mclf.coef_)
@@ -385,70 +371,3 @@ class HypergridHarness(object):
     #
     return np.mean(cv_result['test_score']), plane
     #return mclf.score(trinary.df_feature, trinary.ser_label), plane
-
-
-class HypergridHarnessMetaClassifier(HypergridHarness):
-
-  # Values are dataframes with the columns cn.MEAN, cn.STD
-  # and rows are MetaClassifiers evaluated.
-  ScoreResults = collections.namedtuple("ScoreResults",
-      "abs rel")
-
-  def __init__(self, mclfs, density=DEF_DENSITY, impurity=0):
-    """
-    :param list-MetaClassifier mclfs: to be studied
-    :param float density: number of coordinates along a unit
-                        distance for an axis
-    :param float impurity: in [-1, 1]
-    """
-    self.mclfs = mclfs
-    harness = HypergridHarness.initImpure(density, impurity)
-    # Copy all data to the new to this harness
-    assignObjectValues(self, harness)
-
-  def _evaluateExperiment(self, sigma=0, repl_int=1):
-    """
-    Evaluates the classification accuracy of MetaClassifiers
-    for a single experiment.
-    :param float sigma:
-    :param int repl_int: Number of replications passed to classifiers
-    :return list-ScoreResult:
-    """
-    train_trinarys = self.trinary.perturb(sigma=sigma, repl_int=repl_int)
-    test_trinary = self.trinary.perturb(sigma=sigma, repl_int=1)[0]
-    dfs = [trinary.df_feature for trinary in train_trinarys]
-    [m.fit(dfs, self.trinary.ser_label) for m in selfmclfs]
-    score_results = [
-        m.score(test_trinary.df_feature, self.trinary.ser_label)
-        for m in self.mclfs]
-    return score_results
-
-  def evaluate(self, count=10, sigmas=[0], repl_ints=[1]):
-    """
-    Evaluates the classification accuracy of MetaClassifier
-    for different conditions. Each experiment is repeated several times.
-    :param list-float sigmas:
-    :param list-int repl_ints:
-    :return dict:
-         key: (sigma,repl_int)
-         value: ScoreResults
-    """
-    #
-    result = {}
-    for sigma in sigmas:
-      for repl_int in repl_ints:
-        aggregator_abs = ItemAggregator(lambda s: s.abs)
-        aggregator_rel = ItemAggregator(lambda s: s.rel)
-        for _ in range(count):
-          key = (sigma, repl_int)
-          results = self._evaluateExperiment(sigma=sigma,
-              repl_int=repl_int)
-          aggregator_abs.append(results)
-          aggregator_rel.append(results)
-        #
-        df_abs = aggregator_abs.df
-        df_rel = aggregator_rel.df
-        result[(sigma, repl_int)] = ScorerResults(
-            abs=df_abs, rel=df_rel)
-    #
-    return result

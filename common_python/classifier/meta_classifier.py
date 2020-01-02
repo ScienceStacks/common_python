@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from sklearn import svm, model_selection
 
-ITERMAX_INT = 500  # Maximum number of iterations for score calculation
+MAX_ITER = 500  # Maximum number of iterations for score calculation
 
 
 # Result of scoring a classifier
@@ -167,7 +167,7 @@ class MetaClassifierPlurality(MetaClassifier):
   # Uses wrapper for plurality classifier
 
   def __init__(self):
-    super.__init__(clf=PluralityClassifier())
+    super().__init__(clf=PluralityClassifier())
 
   def _makeTrainingData(self, _, ser_label):
     return None, ser_label
@@ -254,12 +254,12 @@ class MetaClassifierEnsemble(MetaClassifier):
     This is done may be done repeatedly.
     :param pd.DataFrame df_feature:
     :param pd.Series ser_label:
-    :param int iter_int: number of iterations in the matching
+    :param int num_iter: number of iterations in the matching
     :return float:
     """
     matches = []
-    iter_int = min(ITERMAX_INT, int((0.5/self._max_score_std)**2))
-    for _ in range(iter_int):
+    num_iter = min(MAX_ITER, int((0.5/self._max_score_std)**2))
+    for _ in range(num_iter):
       ser_predicted = self.predict(df_feature)
       num_match = sum([1 for c1, c2 in 
           zip(ser_label.values, ser_predicted.values) if c1 == c2])
