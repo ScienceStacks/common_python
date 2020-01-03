@@ -14,6 +14,7 @@ import pandas as pd
 from sklearn import svm, model_selection
 
 MAX_ITER = 500  # Maximum number of iterations for score calculation
+SVM_KWARGS = {"max_iter": 50000}
 
 
 # Result of scoring a classifier
@@ -29,10 +30,12 @@ ScoreResult = collections.namedtuple("ScoreResult",
 class MetaClassifier(object):
   # Abstract class. Must subclass and implement _makeTrainingData method.
 
-  def __init__(self, clf=svm.LinearSVC()):
+  def __init__(self, clf=None):
     """
     :param Classifier clf: implements fit, predict, score
     """
+    if clf is None:
+      clf = svm.LinearSVC(**SVM_KWARGS)
     self.clf = clf
     self._is_fit = False
     self.plurality_clf = PluralityClassifier()
@@ -133,7 +136,10 @@ class MetaClassifierDefault(MetaClassifier):
   # Trains on the first instance of feature data
 
   def _makeTrainingData(self, dfs_feature, ser_label):
-    return dfs_feature[0], ser_label
+    if len(dfs_feature) > 0:
+      return dfs_feature[0], ser_label
+    else:
+      return None, ser_label
 
 
 ##########################################
@@ -177,7 +183,7 @@ class MetaClassifierPlurality(MetaClassifier):
 class MetaClassifierEnsemble(MetaClassifier):
   # Create an ensemble of classifier from each feature replica
 
-  def __init__(self, clf=svm.LinearSVC(),
+  def __init__(self, clf=None,
       is_plurality=True, max_score_std=0.05):
     """
     :param bool is_plurality: Choose most common lablel
@@ -185,6 +191,8 @@ class MetaClassifierEnsemble(MetaClassifier):
                                 distribution of classifier results
     :parm float max_score_std: maximum standard deviation for accuracy score.
     """
+    if clf is None:
+      clf = svm.LinearSVC(**SVM_KWARGS)
     super().__init__(clf=clf)
     self._is_plurality = is_plurality
     self._max_score_std = max_score_std

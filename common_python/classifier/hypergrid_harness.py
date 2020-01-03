@@ -13,24 +13,28 @@ from common_python.plots.plotter import Plotter
 
 import collections
 import copy
+import itertools
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import sklearn
 
-# Place holder
-class Vector(object):
-  def __init__(self, _):
-    pass
 
+########### CONSTANTS ################
+# Default values
 DEF_NUM_DIM = 2
 DEF_ARR = np.repeat(1, DEF_NUM_DIM)
 DEF_OFFSET = 0
 DEF_DENSITY = 10
-SMALL = 1e-5
+
+# Constants
 POS = 1
 NEG = -1
-NEG = -1
+SMALL = 1e-5
+
+# Parameters
+MAX_ITER = 100
+THR_IMPURITY = 0.05
 
 
 #################### CLASSES ######################
@@ -40,6 +44,9 @@ class Vector(object):
   """
 
   def __init__(self, coef_arr):
+    """
+    :param np.array coef_arr:
+    """
     self.coef_arr = np.array(coef_arr)
     self.num_dim = len(self.coef_arr)
 
@@ -153,9 +160,29 @@ class TrinaryClassification(object):
     self.pos_arr = np.array(util.setList(pos_arr))
     self.neg_arr = np.array(util.setList(neg_arr))
     self.other_arr = np.array(util.setList(other_arr))
-    self.num_dim = len(self.pos_arr[0])
+    if len(self.pos_arr) > 0:
+      self.num_dim = len(self.pos_arr[0])
+    else:
+      self.num_dim = len(self.neg_arr[0])
+    self.num_point = self._makeNumPoint()
+    self.impurity = self._makeImpurity()
     self._df_feature = None
     self._ser_label = None
+
+  def _makeImpurity(self):
+    """
+    1: all positives
+    0: positives == negatives
+    -1: all negatives
+    """
+    num_pos = len(self.pos_arr)
+    num_neg = len(self.neg_arr)
+    return (num_pos - num_neg)/self.num_point
+
+  def _makeNumPoint(self):
+    num_pos = len(self.pos_arr)
+    num_neg = len(self.neg_arr)
+    return num_pos + num_neg
 
   @property
   def df_feature(self):
@@ -229,26 +256,30 @@ class TrinaryClassification(object):
 
 class HypergridHarness(object):
 
-  def __init__(self, density=DEF_DENSITY,
-      min_val=-1, max_val=1, plane=None):
+  def __init__(self, density=DEF_DENSITY, num_point=None,
+      min_val=-1, max_val=1, plane=None, impurity=0.0):
     """
     :param float density: number of coordinates along a unit
                         distance for an axis
+    :param int num_point: number of points in grid
+                          if None, then all in cross product
     :param float min_val: minimum value for an axis
     :param float max_val: maximum value for an axis
     :param Plane plane: separating hyperplane
+    :param float impurity: in [-1, 1] - difference between pos & neg
     """
     self._density = density
     self._min_val = min_val
     self._max_val = max_val
+    self._num_point = num_point
+    self._impurity = impurity
     if plane is None:
       plane = Plane(Vector(DEF_ARR), DEF_OFFSET)
     self._plane = plane
     self._xlim = [self._min_val, self._max_val]
     self._ylim = [self._min_val, self._max_val]
     # Computed
-    self.grid = self._makeGrid()
-    self.trinary = self._makeTrinary()
+    self.grid, self.trinary = self._makeGridAndTrinary()
 
   @classmethod
   def initImpure(cls, impurity=0, **kwargs):
@@ -270,38 +301,54 @@ class HypergridHarness(object):
     Creates a uniform grid on a space of arbitrary dimension.
     :param float density: points per unit
     """
-    coords = [np.linspace(self._min_val, self._max_val,
-        self._density*(self._max_val - self._min_val))
+    num = max(2, int(self._density*(self._max_val - self._min_val)))
+    coords = [np.random.permutation(
+        np.linspace(self._min_val, self._max_val, num))
         for _ in range(self.num_dim)]
     # The grid is structured as:
     #  coordinate (e.g., x, y)
     #  row
     #  value
-    grid = np.meshgrid(*coords)
+    if self._num_point is None:
+      grid = [g for g in itertools.product(*coords)]
+    else:
+      grid = [list(g) for n,g in enumerate(itertools.product(*coords))
+          if n < self._num_point]
     return grid
 
-  def _makeTrinary(self):
+  def _makeGridAndTrinary(self):
     """
-    Creates the labels for the grid based on the classification vector.
-    :return TrinaryClassification:
+    Creates the grid and the 
+    labels for the grid based on the classification vector.
+    :return list-list-float, TrinaryClassification:
     """
-    num_row = (self._density  \
-        * (self._max_val - self._min_val))**self.num_dim
-    coords = np.reshape(self.grid, (self.num_dim, num_row))
-    coords = np.transpose(coords)
-    #coords = [np.reshape(self.grid[n], (num_row, 1))
-    #    for n in range(len(self.grid))]
-    # TODO: Generalize so works for n-dimensions
-    pos_arr = np.array([v for v in coords
-        if self._plane.isGreater(v)])
-    neg_arr = np.array([v for v in coords
-        if self._plane.isLess(v)])
-    other_arr = np.array([v for v in coords
-        if self._plane.isNear(v)])
-    return TrinaryClassification(
-        pos_arr=pos_arr,
-        neg_arr=neg_arr,
-        other_arr=other_arr)
+    best_impurity = 1
+    for _ in range(MAX_ITER):
+      grid = self._makeGrid()
+      num_row = (np.size(grid)) / self.num_dim
+      if not np.isclose(num_row, int(num_row)):
+        raise RuntimeError("num_row should be an integer.")
+      num_row = int(num_row)
+      vectors = np.reshape(grid, (num_row, self.num_dim))
+      pos_arr = np.array([v for v in vectors
+          if self._plane.isGreater(v)])
+      neg_arr = np.array([v for v in vectors
+          if self._plane.isLess(v)])
+      other_arr = np.array([v for v in vectors
+          if self._plane.isNear(v)])
+      trinary = TrinaryClassification(
+          pos_arr=pos_arr,
+          neg_arr=neg_arr,
+          other_arr=other_arr)
+      if np.abs(self._impurity - trinary.impurity) <= THR_IMPURITY:
+        break
+      else:
+        best_impurity = min(best_impurity, np.abs(trinary.impurity))
+        trinary = None
+    if trinary is None:
+      raise ValueError("Cannot achieve impurity of %2.2f. Best: %2.2f"
+          % (self._impurity, best_impurity))
+    return grid, trinary
 
   def perturb(self, **kwargs):
     """
@@ -321,6 +368,14 @@ class HypergridHarness(object):
     :param dict kwargs: options for plotter
     :return Plotter:
     """
+    # Handle defaults
+    if not cn.PLT_TITLE in kwargs:
+      title = "Separating Hyperplane: %s" % str(self._plane)
+    if not cn.PLT_XLIM in kwargs:
+      kwargs[cn.PLT_XLIM]=self._xlim
+    if not cn.PLT_YLIM in kwargs:
+      kwargs[cn.PLT_YLIM]=self._ylim
+    #
     plotter = Plotter()
     def plot(vectors, color):
       xv, yv = zip(*vectors)
@@ -332,12 +387,11 @@ class HypergridHarness(object):
       plane = self._plane
     plot(trinary.pos_arr, "blue")
     plot(trinary.neg_arr, "red")
-    plane.plot(plotter, self._xlim, self._ylim, color="black")
+    plane.plot(plotter, kwargs[cn.PLT_XLIM],
+        kwargs[cn.PLT_YLIM], color="black")
     # Do the plot
-    if not cn.PLT_TITLE in kwargs:
-      title = "Separating Hyperplane: %s" % str(self._plane)
-    plotter.do(title=title, xlim=self._xlim,
-        ylim=self._ylim, is_plot=is_plot)
+    plotter.do(title=title, xlim=kwargs[cn.PLT_XLIM],
+        ylim=kwargs[cn.PLT_YLIM], is_plot=is_plot)
     #
     return plotter
 

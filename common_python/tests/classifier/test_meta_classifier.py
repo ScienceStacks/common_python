@@ -79,6 +79,23 @@ class TestMetaClassifier(unittest.TestCase):
     self.mclf.fit(self.dfs, self.ser)
     self.assertEqual(len(self.mclf.clf.coef_[0]),
         self.harness.num_dim)
+ 
+  def testFits(self):
+    # Ensure that different classifiers are created
+    if IGNORE_TEST:
+      return
+    trinarys = self.harness.trinary.perturb(sigma=0.3, num_repl=3)
+    dfs = [t.df_feature for t in trinarys]
+    mclfs = [
+        meta_classifier.MetaClassifierAugment(),
+        meta_classifier.MetaClassifierAverage(),
+        ]
+    for mclf in mclfs:
+      mclf.fit(dfs, self.ser)
+    [m.fit(dfs, self.ser) for m in mclfs]
+    self.assertGreater(np.abs(
+         mclfs[0].clf.coef_[0][0] - mclfs[1].clf.coef_[0][0]),
+         0.1)
 
   def testPredict(self):
     if IGNORE_TEST:
