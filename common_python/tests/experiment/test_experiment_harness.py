@@ -1,13 +1,14 @@
 from common_python.experiment.experiment_harness  \
     import ExperimentHarness
 
+import os
 import numpy as np
 import pandas as pd
 import sys
 import unittest
 
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 COL_A = "a"
 COL_B = "b"
 SIZE = 3
@@ -19,13 +20,13 @@ PARAM_DCT = {
     }
 OUT_PATH = "test_experiment_harness.csv"
 
-def func(parm1=None, parm2=None):
+def func(param1=None, param2=None):
   """
   Dummy calculation function.
   """
   return pd.DataFrame({
-      COL_A: np.repeat(str(parm1) + str(parm2), SIZE),
-      COL_B: np.repeat(str(parm2) + str(parm1), SIZE),
+      COL_A: np.repeat(str(param1) + str(param2), SIZE),
+      COL_B: np.repeat(str(param2) + str(param1), SIZE),
       })
 
 class TestExperimentHarness(unittest.TestCase):
@@ -33,6 +34,10 @@ class TestExperimentHarness(unittest.TestCase):
   def setUp(self):
     self.harness = ExperimentHarness(PARAM_DCT, func,
         out_path=OUT_PATH)
+
+  def tearDown(self):
+    if os.path.isfile(OUT_PATH):
+      os.remove(OUT_PATH)
  
   def testConstructor(self):
     if IGNORE_TEST:
@@ -41,14 +46,20 @@ class TestExperimentHarness(unittest.TestCase):
     self.assertEqual(len(self.harness.df_result), 0)
 
   def testMakeRestoreDF(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     df, completeds = self.harness._makeRestoreDF()
     self.assertEqual(len(df), 0)
     self.assertEqual(len(completeds), 0)
     #
-    df = pd.DataFrame({
-        PARAM1: 
-    import pdb; pdb.set_trace()
+    VALUES = ["xx", "yy"]
+    df_initial = func(param1=VALUES[0], param2=VALUES[1])
+    df_initial[PARAM1] = np.repeat("xx", len(df_initial))
+    df_initial[PARAM2] = np.repeat("yy", len(df_initial))
+    df_initial.to_csv(OUT_PATH)
+    df, completeds = self.harness._makeRestoreDF()
+    self.assertTrue(completeds[0] == tuple(VALUES))
+    self.assertTrue(df.equals(df_initial))
 
 
 if __name__ == '__main__':

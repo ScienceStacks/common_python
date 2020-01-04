@@ -21,6 +21,7 @@ import numpy as np
 
 
 OUT_PATH = "experiment_harness.csv"
+UNNAMED = "Unnamed: 0"
 
 
 class ExperimentHarness(object):
@@ -52,10 +53,13 @@ class ExperimentHarness(object):
     :return pd.DataFrame, list:
     """
     if os.path.isfile(self._out_path):
-      df = pd.read_csv(out_path)
-      df_sub = df[self.parameter_names]
-      df_sub = df_sub.drop_duplicates()
-      completeds = [tuple(r) for _, r in df_sub.iterrows()]
+      df = pd.read_csv(self._out_path)
+      if UNNAMED in df.columns:
+        del df[UNNAMED]
+      if len(df) > 0:
+        df_sub = df[self.parameter_names]
+        df_sub = df_sub.drop_duplicates()
+        completeds = [tuple(r) for _, r in df_sub.iterrows()]
     else:
       df = pd.DataFrame()
       completeds = []
@@ -70,7 +74,7 @@ class ExperimentHarness(object):
     self._update_cnt += 1
     if (self._update_cnt >= self._update_rpt) or is_force:
       self._update_cnt = 0
-      self.df_result.to_csv(self._out_path)
+      self.df_result.to_csv(self._out_path, index=False)
 
   def run(self):
     """
