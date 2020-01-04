@@ -8,7 +8,7 @@ import sys
 import unittest
 
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 COL_A = "a"
 COL_B = "b"
 SIZE = 3
@@ -31,13 +31,17 @@ def func(param1=None, param2=None):
 
 class TestExperimentHarness(unittest.TestCase):
 
-  def setUp(self):
-    self.harness = ExperimentHarness(PARAM_DCT, func,
-        out_path=OUT_PATH)
-
-  def tearDown(self):
+  def cleanState(self):
     if os.path.isfile(OUT_PATH):
       os.remove(OUT_PATH)
+
+  def setUp(self):
+    self.cleanState()
+    self.harness = ExperimentHarness(PARAM_DCT, func,
+        out_path=OUT_PATH, update_rpt=1)
+
+  def tearDown(self):
+    self.cleanState()
  
   def testConstructor(self):
     if IGNORE_TEST:
@@ -60,6 +64,11 @@ class TestExperimentHarness(unittest.TestCase):
     df, completeds = self.harness._makeRestoreDF()
     self.assertTrue(completeds[0] == tuple(VALUES))
     self.assertTrue(df.equals(df_initial))
+
+  def testRun(self):
+    # TESTING
+    df = self.harness.run()
+    import pdb; pdb.set_trace()
 
 
 if __name__ == '__main__':

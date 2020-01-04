@@ -39,6 +39,7 @@ class ExperimentHarness(object):
     """
     self._out_path = out_path
     self._update_rpt = update_rpt
+    self._func = func
     self.parameter_names = list(param_dct.keys())
     self.parameter_values = list(param_dct.values())
     # self.df_result - completed calculations
@@ -82,15 +83,16 @@ class ExperimentHarness(object):
     :return pd.DataFrame:
     """
     # Initializations for evaluation
-    bases = [len(v) for _v in self.parameter_values]
+    bases = [len(v) for v in self.parameter_values]
     multi_number = MultiNumber(bases)  # List of positions in lists
     # Iterate
     for cur_pos in multi_number:
-      values = [p[c] for p, c in zip(parameter_values, cur_pos)]
+      values = [p[c] for p, c in 
+          zip(self.parameter_values, cur_pos)]
       if not tuple(values) in self._completeds:
         kwargs = {k: v for k, v in zip(self.parameter_names, values)}
         # Calclate the dataframe for these values
-        df = func(**kwargs)
+        df = self._func(**kwargs)
         # Extend the dataframe with values of parameters used
         for k, v in kwargs.items():
           df[k] = np.repeat(v, len(df))
