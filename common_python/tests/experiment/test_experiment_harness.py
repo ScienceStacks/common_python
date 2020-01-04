@@ -1,5 +1,6 @@
 from common_python.experiment.experiment_harness  \
     import ExperimentHarness
+from common_python.testing import helpers
 
 import os
 import numpy as np
@@ -8,7 +9,7 @@ import sys
 import unittest
 
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 COL_A = "a"
 COL_B = "b"
 SIZE = 3
@@ -66,9 +67,15 @@ class TestExperimentHarness(unittest.TestCase):
     self.assertTrue(df.equals(df_initial))
 
   def testRun(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     df = self.harness.run()
-    import pdb; pdb.set_trace()
+    values = [len(v) for v in PARAM_DCT.values()]
+    expected_length = SIZE * np.prod(values)
+    self.assertEqual(expected_length, len(df))
+    expected_columns = [COL_A, COL_B, PARAM1, PARAM2]
+    self.assertTrue(helpers.isValidDataFrame(df,
+        expected_columns=expected_columns))
 
 
 if __name__ == '__main__':
