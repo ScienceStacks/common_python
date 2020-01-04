@@ -113,13 +113,13 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     return result
 
   @classmethod
-  def analyze(cls, mclfs=MCLFS, num_repl=3, sigma=1.5, num_dim=5,
+  def analyze(cls, mclfs=MCLFS, num_repl=3, sigmas=[1.5], num_dim=5,
       is_rel=True, **kwargs):
     """
     Compares multiple polices for handling feature replications.
     :param list-MetaClassifier mclfs: to be studied
     :param int num_repl: Number of replications of feature vectors
-    :param float sigma: std of perturbation of features
+    :param list-float sigmas: list of std of perturbation of features
     :param int num_dim: dimension of the hypergrid space
     :param dict kwargs: arguments to HypergridHarness constructor
     :param bool is_rel: report relative scores
@@ -136,19 +136,27 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     harness = HypergridHarnessMetaClassifier(
         mclfs, density=1.5, plane=plane,
         num_point=num_point, impurity=0)
-    scoress = []
-    for _ in range(MAX_ITER):
-      try:
-        score_results = harness._evaluateExperiment(
-            sigma=sigma, num_repl=num_repl)
-        rel_scores = [sel_func(score_results[i])
-            for i in range(len(score_results))]
-        scoress.append(rel_scores)
-      except:
-        pass
-    arr = np.array(scoress)
-    df = pd.DataFrame(arr)
-    ser_mean = df.mean()
-    num_exp = len(scoress)
-    ser_std = df.std() / np.sqrt(num_exp)
+    for sigma in sigmas:
+      scoress = []
+      for _ in range(MAX_ITER):
+        try:
+          score_results = harness._evaluateExperiment(
+              sigma=sigma, num_repl=num_repl)
+          rel_scores = [sel_func(score_results[i])
+              for i in range(len(score_results))]
+          scoress.append(rel_scores)
+        except:
+          pass
+      arr = np.array(scoress)
+      df = pd.DataFrame(arr)
+      ser_mean = df.mean()
+      num_exp = len(scoress)
+      ser_std = df.std() / np.sqrt(num_exp)
+      df = pd.DataFrame({
+        cn.MEAN: ser_mean,
+        cn.STD: ser_std,
+        cn.COUNT: np.repeat(num, len(ser_mean)),
+        "sigma": np.repeat(sigma, len(ser_mean)),
+        })
+     df.append(dfs)
     return ser_mean, ser_std, num_exp
