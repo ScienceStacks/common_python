@@ -100,5 +100,6 @@ class ExperimentHarness(object):
         # Write dataframe
         self._writeDF()
     # Completed
+    self.df_result.index = list(range(len(self.df_result)))
     self._writeDF(is_force=True)
     return self.df_result
