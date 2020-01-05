@@ -106,12 +106,12 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
     if IGNORE_TEST:
       return
     sigma = 0.1
-    num_dim = 2
+    num_dim = 5
     impurity = 0
     df = HypergridHarnessMetaClassifier.analyze(
         mclf_dct=hypergrid_harness_meta_classifier.MCLF_DCT,
-        sigmas=sigma, num_dim=num_dim, impurity=impurity,
-        iter_count=10,
+        sigma=sigma, num_dim=num_dim, impurity=impurity,
+        iter_count=100,
         num_repl=3,  num_point=25, density=10, is_rel=False)
     self.assertTrue(helpers.isValidDataFrame(df,
         expected_columns=["policy", cn.MEAN, cn.STD, cn.COUNT]))

@@ -1,6 +1,7 @@
 """HypergridHarness for MetaClassifiers."""
 
 import common_python.constants as cn
+from common_python.experiment.experiment_harness import ExperimentHarness
 from common_python.classifier.hypergrid_harness  \
     import HypergridHarness, Vector, Plane
 from common_python.classifier.meta_classifier  \
@@ -161,13 +162,13 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
 if __name__ == '__main__':
   def runner(sigma=1.5, num_dim=5, impurity=0.0):
     return HypergridHarnessMetaClassifier.analyze(mclf_dct=MCLF_DCT,
-        sigmas=sigma, num_dim=num_dim, impurity=impurity,
-        num_repl=3,  num_point=25, density=10, is_rel=True)
-  if False:
+        sigma=sigma, num_dim=num_dim, impurity=impurity,
+        num_repl=3,  num_point=25, density=10, is_rel=False)
+  if True:
     param_dct = {
-        "sigma": [0, 0.2, 0.5, 1.0],
-        "num_dim": [2, 5, 10, 15],
-        "impurity": [1],
+        "sigma": [0, 0.2, 0.5, 1.0, 1.5, 2.0],
+        "num_dim": [5, 10, 15],
+        "impurity": [0, -0.76, -0.6],
         }
     harness = ExperimentHarness(param_dct, runner)
     harness.run()
