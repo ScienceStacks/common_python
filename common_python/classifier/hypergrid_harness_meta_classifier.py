@@ -2,7 +2,7 @@
 
 import common_python.constants as cn
 from common_python.classifier.hypergrid_harness  \
-    import HypergridHarness
+    import HypergridHarness, Vector, Plane
 from common_python.classifier.meta_classifier  \
     import MetaClassifierDefault, MetaClassifierPlurality,  \
     MetaClassifierAugment, MetaClassifierAverage, \
@@ -17,19 +17,15 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-MAX_ITER = 1000  # Maximum of iterations in analysis
-MCLFS = [
-    MetaClassifierPlurality(),  # IDX_PLURALITY
-    MetaClassifierDefault(),    # IDX_DEFAULT
-    MetaClassifierAugment(),    # IDX_AUGMENT
-    MetaClassifierAverage(),    # IDX_AVERAGE
-    MetaClassifierEnsemble(),   # IDX_ENSEMBLE
-    ]
-IDX_PLURALITY = 0
-IDX_DEFAULT = 1
-IDX_AUGMENT = 2
-IDX_AVERAGE = 3
-IDX_ENSEMBLE = 4
+ITER_COUNT = 1000  # Number of iterations used to calculate statistics
+MCLF_DCT = {
+    "plurality": MetaClassifierPlurality(),
+    "default": MetaClassifierDefault(),
+    "augment": MetaClassifierAugment(),
+    "average": MetaClassifierAverage(),
+    "ensemble": MetaClassifierEnsemble(),
+    }
+POLICY = "policy"
 
 
 ##################### FUNCTIONS ###################
@@ -55,12 +51,12 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
   # Values are dataframes with the columns cn.MEAN, cn.STD
   # and rows are MetaClassifiers evaluated.
 
-  def __init__(self, mclfs=MCLFS, **kwargs):
+  def __init__(self, mclf_dct=MCLF_DCT, **kwargs):
     """
-    :param list-MetaClassifier mclfs: to be studied
+    :param dict mclf_dct: classifiers to study to be studied
     :param dict kwargs: arguments in HypergridHarness constructor
     """
-    self.mclfs = mclfs
+    self.mclf_dct = mclf_dct
     harness = HypergridHarness(**kwargs)
     # Copy all data to the new to this harness
     _assignObjectValues(self, harness)
@@ -76,10 +72,10 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     train_trinarys = self.trinary.perturb(sigma=sigma, num_repl=num_repl)
     test_trinary = self.trinary.perturb(sigma=sigma, num_repl=1)[0]
     dfs = [trinary.df_feature for trinary in train_trinarys]
-    [m.fit(dfs, self.trinary.ser_label) for m in self.mclfs]
+    [m.fit(dfs, self.trinary.ser_label) for m in self.mclf_dct.values()]
     score_results = [
         m.score(test_trinary.df_feature, self.trinary.ser_label)
-        for m in self.mclfs]
+        for m in self.mclf_dct.values()]
     return score_results
 
   def evaluate(self, count=10, sigmas=[0], num_repls=[1]):
@@ -113,18 +109,20 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     return result
 
   @classmethod
-  def analyze(cls, mclfs=MCLFS, num_repl=3, sigmas=[1.5], num_dim=5,
-      is_rel=True, **kwargs):
+  def analyze(cls, mclf_dct=MCLF_DCT, num_repl=3,
+      sigma=1.5, num_dim=5,
+      iter_count=ITER_COUNT, is_rel=True, **kwargs):
     """
     Compares multiple polices for handling feature replications.
-    :param list-MetaClassifier mclfs: to be studied
+    :param dict mclf_dct: dictionary of MetaClassifer
     :param int num_repl: Number of replications of feature vectors
-    :param list-float sigmas: list of std of perturbation of features
+    :param float sigma: std of perturbation of features
     :param int num_dim: dimension of the hypergrid space
-    :param dict kwargs: arguments to HypergridHarness constructor
     :param bool is_rel: report relative scores
-    :return pd.Series, pd.Series, int:
-        mean, std, number of experiments
+    :parm int iter_count: number of iterations to calculate statistics
+    :param dict kwargs: arguments to HypergridHarness constructor
+    :return pd.DataFrame: columns
+        POLICY, cn.MEAN, cn.STD, cn.COUNT
     """
     if is_rel:
       sel_func = lambda v: v.rel
@@ -134,29 +132,43 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     vector = Vector(np.repeat(1, num_dim))
     plane = Plane(vector)
     harness = HypergridHarnessMetaClassifier(
-        mclfs, density=1.5, plane=plane,
-        num_point=num_point, impurity=0)
-    for sigma in sigmas:
-      scoress = []
-      for _ in range(MAX_ITER):
-        try:
-          score_results = harness._evaluateExperiment(
-              sigma=sigma, num_repl=num_repl)
-          rel_scores = [sel_func(score_results[i])
-              for i in range(len(score_results))]
-          scoress.append(rel_scores)
-        except:
-          pass
-      arr = np.array(scoress)
-      df = pd.DataFrame(arr)
-      ser_mean = df.mean()
-      num_exp = len(scoress)
-      ser_std = df.std() / np.sqrt(num_exp)
-      df = pd.DataFrame({
+        mclf_dct=mclf_dct, density=1.5, plane=plane)
+    scoress = []
+    dfs = []
+    for _ in range(iter_count):
+      try:
+        score_results = harness._evaluateExperiment(
+            sigma=sigma, num_repl=num_repl)
+        rel_scores = [sel_func(score_results[i])
+            for i in range(len(score_results))]
+        scoress.append(rel_scores)
+      except:
+        pass
+    arr = np.array(scoress)
+    df = pd.DataFrame(arr)
+    ser_mean = df.mean()
+    num_exp = len(scoress)
+    ser_std = df.std() / np.sqrt(num_exp)
+    df = pd.DataFrame({
+        POLICY: list(mclf_dct.keys()),
         cn.MEAN: ser_mean,
         cn.STD: ser_std,
-        cn.COUNT: np.repeat(num, len(ser_mean)),
-        "sigma": np.repeat(sigma, len(ser_mean)),
+        cn.COUNT: np.repeat(num_exp, len(mclf_dct)),
         })
-     df.append(dfs)
-    return ser_mean, ser_std, num_exp
+    return df
+
+
+if __name__ == '__main__':
+  def runner(sigma=1.5, num_dim=5, impurity=0.0):
+    return HypergridHarnessMetaClassifier.analyze(mclf_dct=MCLF_DCT,
+        sigmas=sigma, num_dim=num_dim, impurity=impurity,
+        num_repl=3,  num_point=25, density=10, is_rel=True)
+  if False:
+    param_dct = {
+        "sigma": [0, 0.2, 0.5, 1.0],
+        "num_dim": [2, 5, 10, 15],
+        "impurity": [1],
+        }
+    harness = ExperimentHarness(param_dct, runner)
+    harness.run()
+  print("Done processing.")
