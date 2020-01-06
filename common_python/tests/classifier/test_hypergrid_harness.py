@@ -188,6 +188,22 @@ class TestHypergridHarness(unittest.TestCase):
     for impurity in [-0.76, -0.6, 0]:
       test(impurity)
 
+  def testConstructor2(self):
+    if IGNORE_TEST:
+      return
+    def test(impurity, num_dim=2):
+      vector = Vector(np.repeat(1, num_dim))
+      plane = Plane(vector)
+      harness = HypergridHarness(density=20, num_point=25,
+          impurity=impurity, plane=plane)
+      self.assertTrue(
+          np.isclose(np.abs(impurity - harness.trinary.impurity),
+          0))
+    #
+    for impurity in [-0.76, -0.6, 0]:
+      test(impurity, num_dim=7)
+      test(impurity, num_dim=15)
+
 
 if __name__ == '__main__':
   unittest.main()

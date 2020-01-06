@@ -335,8 +335,13 @@ class HypergridHarness(object):
       grid = [g for g in itertools.product(*coords)]
       self._num_point = len(grid)
     else:
-      grid = [list(g) for n,g in enumerate(itertools.product(*coords))
-          if n < self._num_point*mult]
+      grid = []
+      iter = itertools.product(*coords)
+      for _ in range(self._num_point*mult):
+        try:
+          grid.append(iter.__next__())
+        except StopIteration:
+          break
     return grid
 
   def _makeTrinary(self):

@@ -173,7 +173,7 @@ if __name__ == '__main__':
   def runner(sigma=None, num_dim=None, impurity=None):
     return HypergridHarnessMetaClassifier.analyze(mclf_dct=MCLF_DCT,
         sigma=sigma, num_dim=num_dim, 
-        iter_count=100,
+        iter_count=1000,
         num_repl=3, is_rel=False, 
         # HypergridHarness arguments
         impurity=impurity, num_point=25, density=10)
@@ -181,7 +181,7 @@ if __name__ == '__main__':
     param_dct = {
         "sigma": [0, 0.2, 0.5, 1.0, 1.5, 2.0],
         "impurity": [0, -0.76, -0.6],
-        "num_dim": [2, 5, 7, 15],
+        "num_dim": [2, 5, 7, 15, 30],
         }
     harness = ExperimentHarness(param_dct, runner, update_rpt=1)
     harness.run()
