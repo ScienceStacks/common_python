@@ -26,6 +26,7 @@ MCLF_DCT = {
     "average": MetaClassifierAverage(),
     "ensemble": MetaClassifierEnsemble(),
     }
+OUT_PATH = "hypergrid_harness_meta_classifier.csv"
 POLICY = "policy"
 
 
@@ -183,6 +184,7 @@ if __name__ == '__main__':
         "impurity": [0, -0.76, -0.6],
         "num_dim": [2, 5, 7, 15, 30],
         }
-    harness = ExperimentHarness(param_dct, runner, update_rpt=1)
+    harness = ExperimentHarness(param_dct, runner, update_rpt=1,
+        out_path=OUT_PATH)
     harness.run()
   print("Done processing.")
