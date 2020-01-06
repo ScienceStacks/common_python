@@ -152,9 +152,9 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
         scoress.append(rel_scores)
       except:
         pass
-      if is_iter_report:
-        print("sigma=%2.2f, num_dim=%d, impurity=%2.2f iter=%d"
-            % (sigma, num_dim, impurity, cnt+1))
+    if is_iter_report:
+      print("sigma=%2.2f, num_dim=%d, impurity=%2.2f iter=%d"
+          % (sigma, num_dim, impurity, iter_count))
     arr = np.array(scoress)
     df = pd.DataFrame(arr)
     ser_mean = df.mean()
