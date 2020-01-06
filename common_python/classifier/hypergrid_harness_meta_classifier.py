@@ -133,6 +133,10 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     else:
       sel_func = lambda v: v.abs
     #
+    if "impurity" in kwargs.keys():
+      impurity = kwargs["impurity"]
+    else:
+      impurity = 0
     vector = Vector(np.repeat(1, num_dim))
     plane = Plane(vector)
     harness = HypergridHarnessMetaClassifier(
@@ -149,7 +153,8 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
       except:
         pass
       if is_iter_report:
-        print("Completed iteration %d" % cnt)
+        print("sigma=%2.2f, num_dim=%d, impurity=%2.2f iter=%d"
+            % (sigma, num_dim, impurity, cnt+1))
     arr = np.array(scoress)
     df = pd.DataFrame(arr)
     ser_mean = df.mean()
