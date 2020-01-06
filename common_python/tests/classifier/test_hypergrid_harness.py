@@ -131,20 +131,25 @@ class TestTrinaryClassification(unittest.TestCase):
 
 
 class TestHypergridHarness(unittest.TestCase):
+  
+  def _init(self):
+    self.harness = HypergridHarness(density= 4)
 
   def setUp(self):
-    self.harness = HypergridHarness(density= 4)
+    if IGNORE_TEST:
+      return
+    self._init()
 
   def testConstructor(self):
     if IGNORE_TEST:
       return
+    self.assertTrue(isinstance(self.harness.trinary,
+        TrinaryClassification))
     tot = sum([len(v) for v in 
         [self.harness.trinary.neg_arr,
         self.harness.trinary.pos_arr,
-        self.harness.trinary.other_arr]])  \
-        *self.harness.num_dim
-    self.assertEqual(len(self.harness.grid), 2)
-    self.assertEqual(np.size(self.harness.grid), tot)
+        self.harness.trinary.other_arr]])
+    self.assertEqual(tot, self.harness._num_point)
     #
     num_dim = 4
     plane = Plane(Vector(np.repeat(1, num_dim)))
@@ -163,22 +168,25 @@ class TestHypergridHarness(unittest.TestCase):
     if IGNORE_TEST:
       return
     # Smoke test
-    OFFSET = 0.2
+    OFFSET = 0.1
     plane = Plane(Vector(np.repeat(1, NUM_DIM)), offset=OFFSET)
     harness = HypergridHarness(density=10, plane=plane)
     # With perturbation
     trinary = harness.perturb(sigma=0.5)[0]
     harness.plotGrid(trinary=trinary, is_plot=IS_PLOT)
 
-  def testEvaluateSVM(self):
+  def testConstructor2(self):
     if IGNORE_TEST:
       return
-    OFFSET = 1
-    plane = Plane(Vector(np.repeat(1, NUM_DIM)), offset=OFFSET)
-    harness = HypergridHarness(density=20, plane=plane)
-    accuracy, plane = harness.evaluateSVM(sigma=0.0)
-    self.assertGreater(accuracy, 0.8)
-    self.assertLess(np.abs(plane.offset - OFFSET), 0.1)
+    def test(impurity):
+      harness = HypergridHarness(density=20, num_point=25,
+          impurity=impurity)
+      self.assertTrue(
+          np.isclose(np.abs(impurity - harness.trinary.impurity),
+          0))
+    #
+    for impurity in [-0.76, -0.6, 0]:
+      test(impurity)
 
 
 if __name__ == '__main__':

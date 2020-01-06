@@ -61,7 +61,7 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
     if IGNORE_TEST:
       return
     self.assertEqual(self.harness._density, DENSITY)
-    self.assertGreater(len(self.harness.grid), 0)
+    self.assertGreater(len(self.harness.trinary.pos_arr), 0)
 
   def testEvaluateExperimentSingle(self):
     if IGNORE_TEST:

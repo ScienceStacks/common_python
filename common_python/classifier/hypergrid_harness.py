@@ -33,7 +33,7 @@ NEG = -1
 SMALL = 1e-5
 
 # Parameters
-MAX_ITER = 100
+MAX_ITER = 1000
 THR_IMPURITY = 0.05
 
 
@@ -166,8 +166,27 @@ class TrinaryClassification(object):
       self.num_dim = len(self.neg_arr[0])
     self.num_point = self._makeNumPoint()
     self.impurity = self._makeImpurity()
+    self.frac_pos = (1 + self.impurity) / 2
+    self.frac_neg = 1 - self.frac_pos
     self._df_feature = None
     self._ser_label = None
+
+  def trim(self, num_point):
+    """
+    Reduces the number of points if too large.
+    :int num_points: number of points desired
+    :return Trinary:
+    """
+    if self.num_point >= num_point:
+      num_pos = int(self.num_point*self.frac_pos)
+      num_neg = int(self.num_point*self.frac_neg)
+      return TrinaryClassification(
+          pos_arr=self.pos_arr[0:num_pos, :],
+          neg_arr=self.pos_arr[0:num_pos, :],
+          other_arr=self.other_arr
+          )
+    else:
+      return self
 
   def _makeImpurity(self):
     """
@@ -279,7 +298,9 @@ class HypergridHarness(object):
     self._xlim = [self._min_val, self._max_val]
     self._ylim = [self._min_val, self._max_val]
     # Computed
-    self.grid, self.trinary = self._makeGridAndTrinary()
+    # self._grid is the preliminary grid. It may be subset later
+    # to comply with the requirements of impurity.
+    self.trinary = self._makeTrinary()
 
   @classmethod
   def initImpure(cls, impurity=0, **kwargs):
@@ -296,10 +317,11 @@ class HypergridHarness(object):
   def num_dim(self):
     return self._plane.num_dim
 
-  def _makeGrid(self):
+  def _makeGrid(self, mult=1):
     """
     Creates a uniform grid on a space of arbitrary dimension.
     :param float density: points per unit
+    :param int mult: factor that inflates number of points   
     """
     num = max(2, int(self._density*(self._max_val - self._min_val)))
     coords = [np.random.permutation(
@@ -311,20 +333,32 @@ class HypergridHarness(object):
     #  value
     if self._num_point is None:
       grid = [g for g in itertools.product(*coords)]
+      self._num_point = len(grid)
     else:
       grid = [list(g) for n,g in enumerate(itertools.product(*coords))
-          if n < self._num_point]
+          if n < self._num_point*mult]
     return grid
 
-  def _makeGridAndTrinary(self):
+  def _makeTrinary(self):
     """
     Creates the grid and the 
     labels for the grid based on the classification vector.
-    :return list-list-float, TrinaryClassification:
+    :return TrinaryClassification:
     """
+    def trim(arr, tot, frac):
+      num = int(tot*frac)
+      if len(arr) >= num:
+        indices = np.random.permutation(range(len(arr)))[:num]
+        return arr[indices, :]
+      else:
+        return arr
+    #
     best_impurity = 1
+    MULT = 100  # Factor that inflates the number of points
+    desired_pos_frac = (1 + self._impurity) /2
+    desired_neg_frac = 1 - desired_pos_frac
     for _ in range(MAX_ITER):
-      grid = self._makeGrid()
+      grid = self._makeGrid(mult=MULT)
       num_row = (np.size(grid)) / self.num_dim
       if not np.isclose(num_row, int(num_row)):
         raise RuntimeError("num_row should be an integer.")
@@ -336,6 +370,8 @@ class HypergridHarness(object):
           if self._plane.isLess(v)])
       other_arr = np.array([v for v in vectors
           if self._plane.isNear(v)])
+      pos_arr = trim(pos_arr, self._num_point, desired_pos_frac)
+      neg_arr = trim(neg_arr, self._num_point, desired_neg_frac)
       trinary = TrinaryClassification(
           pos_arr=pos_arr,
           neg_arr=neg_arr,
@@ -348,7 +384,7 @@ class HypergridHarness(object):
     if trinary is None:
       raise ValueError("Cannot achieve impurity of %2.2f. Best: %2.2f"
           % (self._impurity, best_impurity))
-    return grid, trinary
+    return trinary
 
   def perturb(self, **kwargs):
     """
@@ -394,34 +430,3 @@ class HypergridHarness(object):
         ylim=kwargs[cn.PLT_YLIM], is_plot=is_plot)
     #
     return plotter
-
-  def evaluateSVM(self, mclf=None, sigma=0, num_repl=1, is_plot=True):
-    """
-    Evaluates the classification accuracy of an svm.
-    :param MetaClassifier mclf:
-    :param float sigma:
-    :return float, plane: accuracy measure, separating hyperplane
-    """
-    trinary = self.trinary.perturb(sigma=sigma)[0]
-    if mclf is None:
-      mclf = sklearn.svm.LinearSVC()
-      cv_result = sklearn.model_selection.cross_validate(
-          mclf, trinary.df_feature, trinary.ser_label, cv=3)
-      #mclf.fit(trinary.df_feature, trinary.ser_label)
-    else:
-      trinarys = self.trinary.perturb(sigma=sigma, num_repl=num_repl)
-      dfs_feature = [trinary.df_feature for trinary in trinarys]
-      ser_label = trinarys[0].ser_label
-      cv_results = mclf.cross_validate(dfs_feature, ser_label)
-    # Plot construction. 
-    if is_plot:
-      if self.num_dim != 2:
-        raise ValueError("Must have a 2-dimensional grid")
-      mclf.fit(trinary.df_feature, trinary.ser_label)
-      vector = Vector(mclf.coef_)
-      offset = -mclf.intercept_ / (mclf.coef_[0][0])
-      plane = Plane(vector, offset=offset)
-      # TODO: Do the plot
-    #
-    return np.mean(cv_result['test_score']), plane
-    #return mclf.score(trinary.df_feature, trinary.ser_label), plane
