@@ -112,7 +112,9 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
   @classmethod
   def analyze(cls, mclf_dct=MCLF_DCT, num_repl=3,
       sigma=1.5, num_dim=5,
-      iter_count=ITER_COUNT, is_rel=True, **kwargs):
+      iter_count=ITER_COUNT, is_rel=True,
+      is_iter_report=True,
+      **kwargs):
     """
     Compares multiple polices for handling feature replications.
     :param dict mclf_dct: dictionary of MetaClassifer
@@ -121,6 +123,7 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     :param int num_dim: dimension of the hypergrid space
     :param bool is_rel: report relative scores
     :parm int iter_count: number of iterations to calculate statistics
+    :param bool is_iter_report: report on each iteration
     :param dict kwargs: arguments to HypergridHarness constructor
     :return pd.DataFrame: columns
         POLICY, cn.MEAN, cn.STD, cn.COUNT
@@ -133,10 +136,10 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     vector = Vector(np.repeat(1, num_dim))
     plane = Plane(vector)
     harness = HypergridHarnessMetaClassifier(
-        mclf_dct=mclf_dct, density=1.5, plane=plane)
+        mclf_dct=mclf_dct, plane=plane, **kwargs)
     scoress = []
     dfs = []
-    for _ in range(iter_count):
+    for cnt in range(iter_count):
       try:
         score_results = harness._evaluateExperiment(
             sigma=sigma, num_repl=num_repl)
@@ -145,6 +148,8 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
         scoress.append(rel_scores)
       except:
         pass
+      if is_iter_report:
+        print("Completed iteration %d" % cnt)
     arr = np.array(scoress)
     df = pd.DataFrame(arr)
     ser_mean = df.mean()
@@ -160,16 +165,20 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
 
 
 if __name__ == '__main__':
-  def runner(sigma=1.5, num_dim=5, impurity=0.0):
+  def runner(sigma=None, num_dim=None, impurity=None):
     return HypergridHarnessMetaClassifier.analyze(mclf_dct=MCLF_DCT,
-        sigma=sigma, num_dim=num_dim, impurity=impurity,
-        num_repl=3,  num_point=25, density=10, is_rel=False)
+        sigma=sigma, num_dim=num_dim, 
+        iter_count=10,
+        num_repl=3, is_rel=False, 
+        # HypergridHarness arguments
+        impurity=impurity, num_point=25, density=10)
   if True:
     param_dct = {
         "sigma": [0, 0.2, 0.5, 1.0, 1.5, 2.0],
         "num_dim": [5, 10, 15],
-        "impurity": [0, -0.76, -0.6],
+        #"impurity": [0, -0.76, -0.6],
+        "impurity": [0],
         }
-    harness = ExperimentHarness(param_dct, runner)
+    harness = ExperimentHarness(param_dct, runner, update_rpt=1)
     harness.run()
   print("Done processing.")

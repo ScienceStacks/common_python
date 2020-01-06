@@ -31,27 +31,31 @@ SCORE_IDEAL = 1.0
 
 ################# HELPERS ##################
 def runner(sigma=1.5, num_dim=5, impurity=0.0):
-  df = HypergridHarnessMetaClassifier.analyze(mclf_dct=MCLF_DCT,
+  df = HypergridHarnessMetaClassifier.analyze(mclf_dct=None,
       sigmas=sigma, num_dim=num_dim, impurity=impurity,
       num_repl=3,  num_point=25, density=10, is_rel=True)
+
+def testAnalyze():
+  sigma = 2.0
+  num_dim = 8
+  impurity = 0
+  df = HypergridHarnessMetaClassifier.analyze(
+      mclf_dct=hypergrid_harness_meta_classifier.MCLF_DCT,
+      sigma=sigma, num_dim=num_dim, impurity=impurity,
+      iter_count=1,
+      num_repl=3,  num_point=25, density=10, is_rel=False)
 
 
 ################# TESTS ##################
 class TestHypergridHarnessMetaClassifier(unittest.TestCase):
   
   def setUp(self):
-    self.mclfs = [
-        MetaClassifierPlurality(),  # IDX_PLURALITY
-        MetaClassifierDefault(),    # IDX_DEFAULT
-        MetaClassifierAugment(),    # IDX_AUGMENT
-        MetaClassifierAverage(),    # IDX_AVERAGE
-        MetaClassifierEnsemble(),   # IDX_ENSEMBLE
-        ]
+    self.mclf_dct = mclf_dct=hypergrid_harness_meta_classifier.MCLF_DCT
     self._init()
 
   def _init(self):
     self.harness = HypergridHarnessMetaClassifier(
-        self.mclfs, density=DENSITY)
+        self.mclf_dct, density=DENSITY)
 
   def testConstructor(self):
     if IGNORE_TEST:
@@ -63,7 +67,7 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
     if IGNORE_TEST:
       return
     score_results = self.harness._evaluateExperiment()
-    self.assertEqual(len(score_results), len(self.harness.mclfs))
+    self.assertEqual(len(score_results), len(self.harness.mclf_dct))
     self.assertEqual(score_results[IDX_PLURALITY].abs,
         SCORE_PLURALITY)
     trues = [score_results[i].abs == SCORE_IDEAL
@@ -81,7 +85,7 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
     vector = Vector(np.repeat(1, NUM_DIM))
     plane = Plane(vector)
     harness = HypergridHarnessMetaClassifier(
-        self.mclfs, density=1.5, plane=plane,
+        self.mclf_dct, density=1.5, plane=plane,
         num_point=num_point, impurity=0)
     rel_scoress = []
     for _ in range(1000):
@@ -105,28 +109,18 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
   def testAnalyze(self): 
     if IGNORE_TEST:
       return
-    sigma = 0.1
-    num_dim = 5
+    sigma = 2.0
+    num_dim = 2
     impurity = 0
     df = HypergridHarnessMetaClassifier.analyze(
         mclf_dct=hypergrid_harness_meta_classifier.MCLF_DCT,
         sigma=sigma, num_dim=num_dim, impurity=impurity,
-        iter_count=100,
+        iter_count=2, is_iter_report=False,
         num_repl=3,  num_point=25, density=10, is_rel=False)
     self.assertTrue(helpers.isValidDataFrame(df,
         expected_columns=["policy", cn.MEAN, cn.STD, cn.COUNT]))
 
-  def testAnalyzeAll(self):
-    if IGNORE_TEST:
-      return
-    param_dct = {
-        "sigma": [0, 0.2],
-        "num_dim": [2, 5],
-        "impurity": [1],
-        }
-    harness = ExperimentHarness(param_dct, runner)
-    harness.run()
-
 
 if __name__ == '__main__':
   unittest.main()
+

@@ -73,7 +73,13 @@ class MetaClassifier(object):
     """
     df_feature, ser_label = self._makeTrainingData(
         dfs_feature, ser_label)
-    self.clf.fit(df_feature, ser_label)
+    if isinstance(df_feature, pd.DataFrame):
+      feature_vals = df_feature.to_numpy()
+      label_vals = ser_label.values
+    else:
+      feature_vals = df_feature
+      label_vals = ser_label
+    self.clf.fit(feature_vals, label_vals)
     #
     self._is_fit = True
 
@@ -219,15 +225,18 @@ class MetaClassifierEnsemble(MetaClassifier):
         rows: instances
     """
     def selectLabelPlurality(ser):
-       """
-       Selects the most frequently occurring label and randomly
-       select among ties.
-       :return object, bool: label, deterministic label selection
-       """
-       ser_count = ser.value_counts()
-       ser_top = ser_count[ser_count==ser_count[ser_count.index[0]]]
-       idx = np.random.randint(0, len(ser_top))
-       return ser_top.index[idx], (len(ser_top) == 1)
+      """
+      Selects the most frequently occurring label and randomly
+      select among ties.
+      :return object, bool: label, deterministic label selection
+      """
+      # TODO: Efficiency
+      ser_count = ser.value_counts()
+      ser_top = ser_count[ser_count==ser_count[ser_count.index[0]]]
+      idx = np.random.randint(0, len(ser_top))
+    
+      return ser_top.index[idx], (len(ser_top) == 1)
+       
     #
     def selectLabelDistribution(ser):
        """
@@ -265,6 +274,7 @@ class MetaClassifierEnsemble(MetaClassifier):
     :param int num_iter: number of iterations in the matching
     :return float:
     """
+    # TODO: Efficiency
     matches = []
     num_iter = min(MAX_ITER, int((0.5/self._max_score_std)**2))
     for _ in range(num_iter):
