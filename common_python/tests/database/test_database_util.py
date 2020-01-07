@@ -8,12 +8,14 @@ import pandas as pd
 import sys
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 TEST_DB_PTH = os.path.join(cn.TEST_DIR, "test_database_util.db")
 TEST_CSV_PTH = os.path.join(cn.TEST_DIR, "test_database_util.csv")
 SIZE = 4
-DF = pd.DataFrame({"a": range(SIZE)})
-DF["b"] = 10*DF["a"]
+COL_A = " a A "
+COL_B = "b"
+DF = pd.DataFrame({COL_A: range(SIZE)})
+DF[COL_B] = 10*DF[COL_A]
 
 
 class TestFunctions(unittest.TestCase):
@@ -30,7 +32,8 @@ class TestFunctions(unittest.TestCase):
     self._cleanUp()
 
   def testCsvToTable(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     DF.to_csv(TEST_CSV_PTH, index=False)
     util.csvToTable(TEST_CSV_PTH, TEST_DB_PTH)
     self.assertTrue(os.path.isfile(TEST_DB_PTH))
