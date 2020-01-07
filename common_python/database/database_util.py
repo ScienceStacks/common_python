@@ -29,4 +29,5 @@ def csvToTable(csv_path, db_path, tablename=None):
     columns.append(new_col)
   df.columns = columns
   df.to_sql(tablename, conn, if_exists='replace')
+  return df
 
