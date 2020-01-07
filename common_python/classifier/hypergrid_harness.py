@@ -163,7 +163,10 @@ class TrinaryClassification(object):
     if len(self.pos_arr) > 0:
       self.num_dim = len(self.pos_arr[0])
     else:
-      self.num_dim = len(self.neg_arr[0])
+      try:
+        self.num_dim = len(self.neg_arr[0])
+      except:
+        import pdb; pdb.set_trace()
     self.num_point = self._makeNumPoint()
     self.impurity = self._makeImpurity()
     self.frac_pos = (1 + self.impurity) / 2
@@ -351,17 +354,21 @@ class HypergridHarness(object):
     :return TrinaryClassification:
     """
     def trim(arr, tot, frac):
-      num = int(tot*frac)
+      num = max(1, int(tot*frac))
       if len(arr) >= num:
         indices = np.random.permutation(range(len(arr)))[:num]
-        return arr[indices, :]
+        try:
+          return arr[indices, :]
+        except:
+          import pdb; pdb.set_trace()
       else:
         return arr
     #
     best_impurity = 1
-    MULT = 100  # Factor that inflates the number of points
+    MULT = 1000  # Factor that inflates the number of points
     desired_pos_frac = (1 + self._impurity) /2
     desired_neg_frac = 1 - desired_pos_frac
+    best_trinary = None
     for _ in range(MAX_ITER):
       grid = self._makeGrid(mult=MULT)
       num_row = (np.size(grid)) / self.num_dim
@@ -381,14 +388,19 @@ class HypergridHarness(object):
           pos_arr=pos_arr,
           neg_arr=neg_arr,
           other_arr=other_arr)
-      if np.abs(self._impurity - trinary.impurity) <= THR_IMPURITY:
+      if best_trinary is None:
+        best_trinary = trinary
+      elif np.abs(self._impurity - trinary.impurity) <= THR_IMPURITY:
         break
       else:
-        best_impurity = min(best_impurity, np.abs(trinary.impurity))
+        if np.abs(trinary.impurity - self._impurity) <  \
+            np.abs(best_trinary.impurity - self._impurity):
+            best_trinary = trinary
         trinary = None
     if trinary is None:
-      raise ValueError("Cannot achieve impurity of %2.2f. Best: %2.2f"
-          % (self._impurity, best_impurity))
+      print("**Cannot achieve impurity of %2.2f. Using: %2.2f"
+          % (self._impurity, best_trinary.impurity))
+      trinary = best_trinary
     return trinary
 
   def perturb(self, **kwargs):

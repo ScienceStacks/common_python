@@ -171,6 +171,8 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
 
 
 if __name__ == '__main__':
+  def posToImpurity(pos_frac):
+    return np.round(2*pos_frac - 1, 2)
   def runner(sigma=None, num_dim=None, impurity=None):
     return HypergridHarnessMetaClassifier.analyze(mclf_dct=MCLF_DCT,
         sigma=sigma, num_dim=num_dim, 
@@ -181,8 +183,14 @@ if __name__ == '__main__':
   if True:
     param_dct = {
         "sigma": [0, 0.2, 0.5, 1.0, 1.5, 2.0],
-        "impurity": [0, -0.76, -0.6],
-        "num_dim": [2, 5, 7, 15, 30],
+        "impurity": [0, 
+        posToImpurity(2/25),
+        posToImpurity(3/25),
+        posToImpurity(4/25),
+        posToImpurity(5/25),
+        posToImpurity(6/25),
+        ],
+        "num_dim": [2, 5, 7, 10, 15, 20, 25, 30],
         }
     harness = ExperimentHarness(param_dct, runner, update_rpt=1,
         out_path=OUT_PATH)

@@ -196,11 +196,10 @@ class TestHypergridHarness(unittest.TestCase):
       plane = Plane(vector)
       harness = HypergridHarness(density=20, num_point=25,
           impurity=impurity, plane=plane)
-      self.assertTrue(
-          np.isclose(np.abs(impurity - harness.trinary.impurity),
-          0))
+      self.assertLess(
+          np.abs(impurity - harness.trinary.impurity),  0.05)
     #
-    for impurity in [-0.76, -0.6, 0]:
+    for impurity in [-0.95, -0.76, -0.6, 0]:
       test(impurity, num_dim=7)
       test(impurity, num_dim=15)
 
