@@ -12,6 +12,7 @@ import common_python.util.util as util
 from common_python.util.item_aggregator import ItemAggregator
 from common_python.plots.plotter import Plotter
 
+import os
 import collections
 import copy
 import pandas as pd
@@ -26,7 +27,7 @@ MCLF_DCT = {
     "average": MetaClassifierAverage(),
     "ensemble": MetaClassifierEnsemble(),
     }
-OUT_PATH = "hypergrid_harness_meta_classifier.csv"
+EVALUATION_DATA_PTH = "hypergrid_harness_meta_classifier.csv"
 POLICY = "policy"
 
 
@@ -62,6 +63,11 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     harness = HypergridHarness(**kwargs)
     # Copy all data to the new to this harness
     _assignObjectValues(self, harness)
+    # Get previously analyzed data
+    if os.path.isfile(EVALUATION_DATA_PTH):
+      self.df_data = pd.read_csv(EVALUATION_DATA_PTH)
+    else:
+      self.df_data = None
 
   def _evaluateExperiment(self, sigma=0, num_repl=1):
     """
@@ -193,6 +199,6 @@ if __name__ == '__main__':
         "num_dim": [2, 5, 7, 10, 15, 20, 25, 30],
         }
     harness = ExperimentHarness(param_dct, runner, update_rpt=1,
-        out_path=OUT_PATH)
+        out_path=EVALUATION_DATA_PTH)
     harness.run()
   print("Done processing.")

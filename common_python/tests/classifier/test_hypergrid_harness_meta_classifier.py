@@ -62,6 +62,9 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
       return
     self.assertEqual(self.harness._density, DENSITY)
     self.assertGreater(len(self.harness.trinary.pos_arr), 0)
+    self.assertTrue(helpers.isValidDataFrame(self.harness.df_data,
+        expected_columns=self.harness.df_data.columns))
+    #
 
   def testEvaluateExperimentSingle(self):
     if IGNORE_TEST:
