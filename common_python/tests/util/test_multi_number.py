@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 BASES = [1, 2, 3]
 
 
@@ -35,7 +35,8 @@ class TestMultiNumber(unittest.TestCase):
     self.assertEqual(str(self.multi), "0, 0, 1")
 
   def testNext(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     result = [x for x in self.multi]
     self.assertEqual(len(result), np.prod(BASES))
   

@@ -27,13 +27,16 @@ KEGG_CMDS = [KEGG_CMD_LIST, KEGG_CMD_GET]
 # Plotting
 PLT_CMAP = "cmap"
 PLT_COLOR = "color"
-PLT_XLABEL = "xlabel"
-PLT_XLIM = "xlim"
-PLT_YLABEL = "ylabel"
-PLT_YLIM = "ylim"
-PLT_TITLE = "title"
 PLT_FIGSIZE = "figsize"
 PLT_IS_PLOT = "is_plot"  # Flag to plot
+PLT_LEGEND = "legend"
+PLT_XLABEL = "xlabel"
+PLT_XLIM = "xlim"
+PLT_XTICKLABELS = "xticklabels"
+PLT_YLABEL = "ylabel"
+PLT_YLIM = "ylim"
+PLT_YTICKLABELS = "yticklabels"
+PLT_TITLE = "title"
 
 # Letters
 UPPER_CASE = [x for x in map(chr, range(65, 91))]

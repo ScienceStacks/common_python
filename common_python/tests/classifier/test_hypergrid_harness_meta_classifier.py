@@ -11,12 +11,13 @@ from common_python.classifier.meta_classifier  \
 from common_python.testing import helpers
 import common_python.constants as cn
 
+import os
 import pandas as pd
 import numpy as np
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 NUM_DIM = 2
 DENSITY = 10
 OFFSET = 0
@@ -27,6 +28,8 @@ IDX_AVERAGE = 3
 IDX_ENSEMBLE = 4
 SCORE_PLURALITY = 0.5
 SCORE_IDEAL = 1.0
+TEST_DATA_PTH = os.path.join(cn.TEST_DIR,
+    "test_hypergrid_harness_meta_classifier.csv")
 
 
 ################# HELPERS ##################
@@ -48,18 +51,30 @@ def testAnalyze():
 
 ################# TESTS ##################
 class TestHypergridHarnessMetaClassifier(unittest.TestCase):
+
+  def _cleanUp(self):
+    if os.path.isfile(TEST_DATA_PTH):
+      os.remove(TEST_DATA_PTH)
   
   def setUp(self):
-    self.mclf_dct = mclf_dct=hypergrid_harness_meta_classifier.MCLF_DCT
+    if IGNORE_TEST:
+      return
     self._init()
 
+  def tearDown(self):
+    if os.path.isfile(TEST_DATA_PTH):
+      os.remove(TEST_DATA_PTH)
+
   def _init(self):
+    self._cleanUp()
+    self.mclf_dct = mclf_dct=hypergrid_harness_meta_classifier.MCLF_DCT
     self.harness = HypergridHarnessMetaClassifier(
         self.mclf_dct, density=DENSITY)
 
   def testConstructor(self):
     if IGNORE_TEST:
       return
+    self._init()
     self.assertEqual(self.harness._density, DENSITY)
     self.assertGreater(len(self.harness.trinary.pos_arr), 0)
     self.assertTrue(helpers.isValidDataFrame(self.harness.df_data,
@@ -123,7 +138,34 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
     self.assertTrue(helpers.isValidDataFrame(df,
         expected_columns=["policy", cn.MEAN, cn.STD, cn.COUNT]))
 
+  def testMakeEvaluationData(self):
+    if IGNORE_TEST:
+      return
+    self._cleanUp()
+    HypergridHarnessMetaClassifier.makeEvaluationData(
+        is_test=True, out_pth=TEST_DATA_PTH)
+    self.assertTrue(os.path.isfile(TEST_DATA_PTH))
+
+  def testPlotMetaClassifiers(self):
+    if IGNORE_TEST:
+      return
+    # Smoke test
+    self._init()
+    self.harness.plotMetaClassifiers(20, -0.6, is_plot=IS_PLOT)
+
+  def testPlotMultipleMetaClassifiers(self):
+    # TESTING
+    # Smoke test
+    self._init()
+    impuritys = list(self.harness.df_data["impurity"].unique())
+    impuritys = [i for i in impuritys if i != -0.68]
+    impuritys.sort()
+    self.harness.plotMultipleMetaClassifiers(5, impuritys,
+        is_plot=IS_PLOT)
+
+
+    
+
 
 if __name__ == '__main__':
   unittest.main()
-
