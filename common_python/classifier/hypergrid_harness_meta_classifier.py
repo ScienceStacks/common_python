@@ -253,12 +253,13 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     for policy in policies:
       df_plot = df[df[POLICY] == policy]
       ax.errorbar(df_plot[SIGMA],
-           df_plot[cn.MEAN], 2*df_plot[cn.STD])
+           df_plot[cn.MEAN], 2*df_plot[cn.STD], label=policy)
     if plotter is not None:
-      plotter.ax.legend(policies)
+      plotter.ax.legend()
       title = "num_dim: %d, impurity: %2.2f" % (num_dim, impurity)
       plotter.do(xlabel="std", ylabel="accuracy", title=title,
-          xlim=[0, 2], ylim=[0.5, 1.0], legend=policies)
+         xlim=[0, 2], ylim=[0.5, 1.0])
+         # xlim=[0, 2], ylim=[0.5, 1.0], legend=policies)
 
   def plotMultipleMetaClassifiers(self, num_dim, impuritys, **kwargs):
     """
@@ -291,6 +292,7 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
       plotter.doAx(plotter.axes[idx], **pltargs)
       self.plotMetaClassifiers(num_dim, impurity,
           ax=plotter.axes[idx])
+    plotter.axes[-1].legend(loc="upper right")
     plotter.do()
   
 

@@ -43,7 +43,7 @@ class Plotter(object):
     if  cn.PLT_YTICKLABELS in kwargs.keys():
       ax.set_yticklabels(kwargs[cn.PLT_YTICKLABELS])
     if  cn.PLT_LEGEND in kwargs.keys():
-      ax.legend(kwargs[cn.PLT_LEGEND])
+      leg = ax.legend(kwargs[cn.PLT_LEGEND])
   
   def do(self, is_plot=True, **kwargs):
     """

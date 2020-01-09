@@ -151,7 +151,9 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
       return
     # Smoke test
     self._init()
-    self.harness.plotMetaClassifiers(20, -0.6, is_plot=IS_PLOT)
+    self.harness.plotMetaClassifiers(5, 0.0, is_plot=IS_PLOT)
+    self.harness.plotMetaClassifiers(15, -0.6, is_plot=IS_PLOT)
+    self.harness.plotMetaClassifiers(15, -0.84, is_plot=IS_PLOT)
 
   def testPlotMultipleMetaClassifiers(self):
     if IGNORE_TEST:
