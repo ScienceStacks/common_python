@@ -119,7 +119,10 @@ class Plane(object):
     :param Vector vector: vector whose position is evaluated
     """
     arr = Vector.toArray(vector)
-    result = self.vector.coef_arr.dot(arr) - self.offset > SMALL
+    try:
+      result = self.vector.coef_arr.dot(arr) - self.offset > SMALL
+    except:
+      import pdb; pdb.set_trace()
     return result
 
   def isNear(self, vector):

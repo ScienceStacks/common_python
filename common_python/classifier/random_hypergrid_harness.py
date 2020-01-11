@@ -4,8 +4,8 @@ grid (hypergrid). Ground truth is a set of randomly selected
 points based on the distribution of values in the coordinate space.
 """
 
-from common_python.classification.hypergrid_harness import  \
-    Plane, HypergridHarness
+from common_python.classifier.hypergrid_harness import  \
+    HypergridHarness, Vector, Plane, TrinaryClassification
 import common_python.constants as cn
 import common_python.util.util as util
 from common_python.util.item_aggregator import ItemAggregator
@@ -36,6 +36,7 @@ THR_IMPURITY = 0.05
 
 class RandomHypergridHarness(object):
 
+  # FIXME: Need to set values for _xlim, _ylim
   def __init__(self, num_point=25, stds=DEF_STDS, impurity=0.0):
     """
     :param int num_point: number of points in grid
@@ -46,11 +47,9 @@ class RandomHypergridHarness(object):
     self._num_dim = len(stds)
     self._num_point = num_point
     self._impurity = impurity
-    self._plane = Plane(np.repeat(0, self._num_dim), offset=0)
+    self._plane = Plane(Vector(np.repeat(1, self._num_dim)), offset=0)
     self.trinary = self._makeTrinary()  # Adjusts self._plane
-    self.
 
-  # FIXME: Need to set values for _xlim, _ylim
   def _makeTrinary(self):
     """
     Creates the grid and the 
@@ -77,14 +76,14 @@ class RandomHypergridHarness(object):
         new_offset_adj = cur_offset_adj 
       else:
         # Passed the desired value
-        new_offset_adj = -new_offset_adji*OFFSET_ADJ_REDUCE
+        new_offset_adj = -offset_adj*OFFSET_ADJ_REDUCE
       new_offset = cur_offset + cur_offset_adj
       return new_offset, new_offset_adj
     #    
     best_trinary = None
     grid = [np.random.normal(0, std, self._num_point)
         for std in self._stds]
-    vectors = np.reshape(grid, (num_row, self.num_dim))
+    vectors = np.reshape(grid, (self._num_point, self._num_dim))
     offset_adj = OFFSET_ADJ
     offset = self._plane.offset
     # Find a plane that achieves the desired impurity
@@ -103,8 +102,7 @@ class RandomHypergridHarness(object):
       else:
         # Adjust the plane to approach the desired impurity
         offset, offset_adj = adjustOffset(trinary.impurity, offset, offset_adj)
-        self._plane = Plane(self._vector, offset)
-          if offset_adj
+        self._plane = Plane(self._plane.vector, offset)
         if np.abs(trinary.impurity - self._impurity) <  \
             np.abs(best_trinary.impurity - self._impurity):
             best_trinary = trinary
