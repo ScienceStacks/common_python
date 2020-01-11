@@ -34,7 +34,7 @@ MAX_ITER = 1000
 THR_IMPURITY = 0.05
 
 
-class RandomHypergridHarness(object):
+class RandomHypergridHarness(HypergridHarness):
 
   # FIXME: Need to set values for _xlim, _ylim
   def __init__(self, num_point=25, stds=DEF_STDS, impurity=0.0):
@@ -49,6 +49,22 @@ class RandomHypergridHarness(object):
     self._impurity = impurity
     self._plane = Plane(Vector(np.repeat(1, self._num_dim)), offset=0)
     self.trinary = self._makeTrinary()  # Adjusts self._plane
+    self._xlim, self._ylim = self._makeAxesLimits() 
+
+  def _makeAxesLimits(self):
+    """
+    Finds the range of values for the first two axes.
+    """
+    def makeRange(arr):
+      """
+      Returns minimum and maximum values of the array.
+      """
+      return np.round(np.min(arr),2), np.round(np.max(arr), 2)
+    #
+    arr = np.concatenate([self.trinary.pos_arr, self.trinary.neg_arr])
+    xlim = makeRange(arr[:, 0])
+    ylim = makeRange(arr[:, 1])
+    return xlim, ylim
 
   def _makeTrinary(self):
     """

@@ -16,6 +16,7 @@ import unittest
 
 NUM_DIM = 2
 IGNORE_TEST = False
+IS_PLOT = False
 STDS = [0.1, 0.1]
 IMPURITY = 0
 NUM_POINT = 25
@@ -27,7 +28,7 @@ class TestRandomHypergridHarness(unittest.TestCase):
     self.harness = RandomHypergridHarness(NUM_POINT,
         STDS, IMPURITY)
 
-  def testConstructor(self):
+  def testConstructorImpurity(self):
     if IGNORE_TEST:
       return
     def test(impurity):
@@ -37,6 +38,21 @@ class TestRandomHypergridHarness(unittest.TestCase):
     #
     for impurity in [0, -0.6, -0.8, 0.1]:
       test(impurity)
+
+  def testConstructorLim(self):
+    if IGNORE_TEST:
+      return
+    def test(arr):
+      self.assertLess(arr[0], arr[1])
+    #
+    test(self.harness._xlim)
+    test(self.harness._ylim)
+
+  def testPlotGrid(self):
+    if IGNORE_TEST:
+      return
+    harness = RandomHypergridHarness(NUM_POINT, STDS, -0.6)
+    harness.plotGrid(is_plot=IS_PLOT)
 
 
 if __name__ == '__main__':
