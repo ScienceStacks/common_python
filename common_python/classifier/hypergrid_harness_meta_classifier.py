@@ -171,7 +171,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
           is_iter_report = is_iter_report,
           num_repl=3, is_rel=False, 
           # RandomHypergridHarness arguments
-          impurity=impurity, num_point=25, density=10)
+          impurity=impurity, num_point=25)
     if not is_test:
       param_dct = {
           SIGMA: [0, 0.2, 0.5, 1.0, 1.5, 2.0],

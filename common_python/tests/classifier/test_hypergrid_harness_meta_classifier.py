@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_PLOT = False
 NUM_DIM = 2
 NUM_POINT = 25
@@ -123,7 +123,8 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
         expected_columns=["policy", cn.MEAN, cn.STD, cn.COUNT]))
 
   def testMakeEvaluationData(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     self._cleanUp()
     HypergridHarnessMetaClassifier.makeEvaluationData(
         is_test=True, out_pth=TEST_DATA_PTH)
@@ -148,9 +149,6 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
     impuritys.sort()
     self.harness.plotMultipleMetaClassifiers(5, impuritys,
         is_plot=IS_PLOT)
-
-
-    
 
 
 if __name__ == '__main__':
