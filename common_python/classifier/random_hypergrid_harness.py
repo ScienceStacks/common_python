@@ -30,13 +30,12 @@ NEG = -1
 SMALL = 1e-5
 
 # Parameters
-MAX_ITER = 1000
+MAX_ITER = 50
 THR_IMPURITY = 0.05
 
 
 class RandomHypergridHarness(HypergridHarness):
 
-  # FIXME: Need to set values for _xlim, _ylim
   def __init__(self, num_point=25, stds=DEF_STDS, impurity=0.0):
     """
     :param int num_point: number of points in grid
@@ -95,34 +94,37 @@ class RandomHypergridHarness(HypergridHarness):
         new_offset_adj = -offset_adj*OFFSET_ADJ_REDUCE
       new_offset = cur_offset + cur_offset_adj
       return new_offset, new_offset_adj
-    #    
-    best_trinary = None
-    grid = [np.random.normal(0, std, self._num_point)
-        for std in self._stds]
-    vectors = np.reshape(grid, (self._num_point, self._num_dim))
-    offset_adj = OFFSET_ADJ
-    offset = self._plane.offset
-    # Find a plane that achieves the desired impurity
+    # Try several grids    
     for _ in range(MAX_ITER):
-      pos_arr = np.array([v for v in vectors if self._plane.isGreater(v)])
-      neg_arr = np.array([v for v in vectors if self._plane.isLess(v)])
-      other_arr = np.array([v for v in vectors if self._plane.isNear(v)])
-      trinary = TrinaryClassification(
-          pos_arr=pos_arr,
-          neg_arr=neg_arr,
-          other_arr=other_arr)
-      if best_trinary is None:
-        best_trinary = trinary
-      elif np.abs(self._impurity - trinary.impurity) <= THR_IMPURITY:
+      best_trinary = None
+      grid = [np.random.normal(0, std, self._num_point)
+          for std in self._stds]
+      vectors = np.reshape(grid, (self._num_point, self._num_dim))
+      offset_adj = OFFSET_ADJ
+      offset = self._plane.offset
+      # Find a plane that achieves the desired impurity
+      for _ in range(MAX_ITER):
+        pos_arr = np.array([v for v in vectors if self._plane.isGreater(v)])
+        neg_arr = np.array([v for v in vectors if self._plane.isLess(v)])
+        other_arr = np.array([v for v in vectors if self._plane.isNear(v)])
+        trinary = TrinaryClassification(
+            pos_arr=pos_arr,
+            neg_arr=neg_arr,
+            other_arr=other_arr)
+        if best_trinary is None:
+          best_trinary = trinary
+        elif np.abs(self._impurity - trinary.impurity) <= THR_IMPURITY:
+          break
+        else:
+          # Adjust the plane to approach the desired impurity
+          offset, offset_adj = adjustOffset(trinary.impurity, offset, offset_adj)
+          self._plane = Plane(self._plane.vector, offset)
+          if np.abs(trinary.impurity - self._impurity) <  \
+              np.abs(best_trinary.impurity - self._impurity):
+              best_trinary = trinary
+          trinary = None
+      if trinary is not None:
         break
-      else:
-        # Adjust the plane to approach the desired impurity
-        offset, offset_adj = adjustOffset(trinary.impurity, offset, offset_adj)
-        self._plane = Plane(self._plane.vector, offset)
-        if np.abs(trinary.impurity - self._impurity) <  \
-            np.abs(best_trinary.impurity - self._impurity):
-            best_trinary = trinary
-        trinary = None
     if trinary is None:
       print("**Cannot achieve impurity of %2.2f. Using: %2.2f"
           % (self._impurity, best_trinary.impurity))

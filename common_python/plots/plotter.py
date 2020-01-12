@@ -32,14 +32,14 @@ class Plotter(object):
 
   def mergeOptions(self, kwargs):
     """
-    Merges with default options.
+    Merges with default options. Options
+    passed override the defaults.
     :param dict kwargs:
     :return dict:
     """
-    new_kwargs = dict(kwargs)
-    for key in self.kwargs:
-      if not key in kwargs:
-        new_kwargs[key] = self.kwargs[key]
+    new_kwargs = dict(self.kwargs)
+    for key in kwargs:
+      new_kwargs[key] = kwargs[key]
     return new_kwargs
 
   def doAx(self, ax, **kwargs):
