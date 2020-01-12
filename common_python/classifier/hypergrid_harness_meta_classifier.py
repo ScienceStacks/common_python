@@ -164,6 +164,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
         is_iter_report = False
       else:
         is_iter_report = True
+      stds = np.repeat(1.0, num_dim)
       return HypergridHarnessMetaClassifier.analyze(
           mclf_dct=MCLF_DCT,
           sigma=sigma, num_dim=num_dim, 
@@ -171,7 +172,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
           is_iter_report = is_iter_report,
           num_repl=3, is_rel=False, 
           # RandomHypergridHarness arguments
-          impurity=impurity, num_point=25)
+          stds=stds, impurity=impurity, num_point=25)
     if not is_test:
       param_dct = {
           SIGMA: [0, 0.2, 0.5, 1.0, 1.5, 2.0],
