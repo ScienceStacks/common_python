@@ -164,7 +164,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
         is_iter_report = False
       else:
         is_iter_report = True
-      stds = np.repeat(1.0, num_dim)
+      stds = np.repeat(0.2, num_dim)
       return HypergridHarnessMetaClassifier.analyze(
           mclf_dct=MCLF_DCT,
           sigma=sigma, num_dim=num_dim, 
