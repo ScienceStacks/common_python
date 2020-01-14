@@ -16,8 +16,8 @@ import pandas as pd
 import numpy as np
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 NUM_DIM = 2
 NUM_POINT = 25
 NUM_REPL = 3
@@ -140,14 +140,14 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
     self.harness.plotMetaClassifiers(15, -0.84, is_plot=IS_PLOT)
 
   def testPlotMultipleMetaClassifiers(self):
-    if IGNORE_TEST:
-      return
+    # TESTING
     # Smoke test
     self._init()
     impuritys = list(self.harness.df_data["impurity"].unique())
     impuritys = [i for i in impuritys if i != -0.68]
     impuritys.sort()
     self.harness.plotMultipleMetaClassifiers(5, impuritys,
+        figsize=(10, 12),
         is_plot=IS_PLOT)
 
 

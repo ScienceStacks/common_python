@@ -164,7 +164,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
         is_iter_report = False
       else:
         is_iter_report = True
-      stds = np.repeat(0.2, num_dim)
+      stds = np.repeat(0.1, num_dim)
       return HypergridHarnessMetaClassifier.analyze(
           mclf_dct=MCLF_DCT,
           sigma=sigma, num_dim=num_dim, 
@@ -175,7 +175,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
           stds=stds, impurity=impurity, num_point=25)
     if not is_test:
       param_dct = {
-          SIGMA: [0, 0.2, 0.5, 1.0, 1.5, 2.0],
+          SIGMA: [0, 0.1, 0.2, 0.5, 1.0, 1.5, 2.0],
           IMPURITY: [0, 
           posToImpurity(2/25),
           posToImpurity(3/25),
@@ -245,23 +245,28 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
     plotter = Plotter(subplots=subplots)
     policies = [p for p in self.df_data[POLICY].unique()]
     for idx, impurity in enumerate(impuritys):
-      pltargs = {}
       if idx == 0:
-        pltargs[cn.PLT_YLABEL] = "accuracy"
+        plotter.setDefault(cn.PLT_YLABEL, "accuracy")
       else:
-        pltargs[cn.PLT_YLABEL] = ""
-        pltargs[cn.PLT_YTICKLABELS] = ""
+        plotter.setDefault(cn.PLT_YLABEL, "")
+        plotter.setDefault(cn.PLT_YTICKLABELS, "")
       if idx == length - 1:
-        pltargs[cn.PLT_LEGEND] = policies
-      pltargs[cn.PLT_TITLE] = "%2.2f" % impurity
-      pltargs[cn.PLT_XLABEL] = "std"
-      pltargs[cn.PLT_XLIM] = [0, 2.0]
-      pltargs[cn.PLT_YLIM] = [0.5, 1.0]
-      plotter.doAx(plotter.axes[idx], **pltargs)
+        plotter.setDefault(cn.PLT_LEGEND, policies)
+      plotter.setDefault(cn.PLT_TITLE, "%2.2f" % impurity)
+      plotter.setDefault(cn.PLT_XLABEL, "std")
+      plotter.setDefault(cn.PLT_XLIM, [0, 2.0])
+      plotter.setDefault(cn.PLT_YLIM, [0.5, 1.0])
+      plotter.doAx(plotter.axes[idx], **kwargs)
       self.plotMetaClassifiers(num_dim, impurity,
           ax=plotter.axes[idx])
     plotter.axes[-1].legend(loc="upper right")
-    plotter.do()
+    processed_options = [cn.PLT_YLABEL,
+        cn.PLT_YTICKLABELS, cn.PLT_LEGEND, 
+        cn.PLT_TITLE, cn.PLT_XLABEL, cn.PLT_YLIM, cn.PLT_XLIM]
+    opts = {k: v for k,v in kwargs.items()
+        if not k in processed_options}
+    plotter.resetDefaults()
+    plotter.do(**opts)
   
 
 if __name__ == '__main__':

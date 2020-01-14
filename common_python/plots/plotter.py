@@ -70,6 +70,9 @@ class Plotter(object):
     :param object default:
     """
     self.kwargs[keyword] = default
+
+  def resetDefaults(self):
+    self.kwargs = {}
   
   def do(self, is_plot=True, **kwargs):
     """
@@ -77,5 +80,7 @@ class Plotter(object):
     """
     for ax in self.axes:
       self.doAx(ax, **kwargs)
+    if cn.PLT_FIGSIZE in kwargs.keys():
+      self.figure.set_size_inches(kwargs[cn.PLT_FIGSIZE])
     if is_plot:
       plt.show()
