@@ -224,10 +224,13 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
            df_plot[cn.MEAN], 2*df_plot[cn.STD], label=policy)
     if plotter is not None:
       plotter.ax.legend()
-      title = "num_dim: %d, impurity: %2.2f" % (num_dim, impurity)
-      plotter.do(xlabel="std", ylabel="accuracy", title=title,
-         xlim=[0, 2], ylim=[0.5, 1.0])
-         # xlim=[0, 2], ylim=[0.5, 1.0], legend=policies)
+      plotter.setDefault(cn.PLT_TITLE,
+          "num_dim: %d, impurity: %2.2f" % (num_dim, impurity))
+      plotter.setDefault(cn.PLT_YLABEL, "accuracy")
+      plotter.setDefault(cn.PLT_XLABEL, "std")
+      plotter.setDefault(cn.PLT_XLIM, [0, 2])
+      plotter.setDefault(cn.PLT_YLIM, [0.5, 1.0])
+      plotter.do(**kwargs)
 
   def plotMultipleMetaClassifiers(self, num_dim, impuritys, **kwargs):
     """
