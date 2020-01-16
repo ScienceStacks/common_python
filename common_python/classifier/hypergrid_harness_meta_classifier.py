@@ -3,7 +3,9 @@
 import common_python.constants as cn
 from common_python.experiment.experiment_harness import ExperimentHarness
 from common_python.classifier.hypergrid_harness  \
-    import HypergridHarness, Vector, Plane
+    import Vector, Plane
+from common_python.classifier.random_hypergrid_harness  \
+    import RandomHypergridHarness
 from common_python.classifier.meta_classifier  \
     import MetaClassifierDefault, MetaClassifierPlurality,  \
     MetaClassifierAugment, MetaClassifierAverage, \
@@ -15,6 +17,7 @@ from common_python.plots.plotter import Plotter
 import os
 import collections
 import copy
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,8 +30,13 @@ MCLF_DCT = {
     "average": MetaClassifierAverage(),
     "ensemble": MetaClassifierEnsemble(),
     }
-EVALUATION_DATA_PTH = "hypergrid_harness_meta_classifier.csv"
+PTH = os.path.join(cn.CODE_DIR, "classifier")
+EVALUATION_DATA_PTH = os.path.join(PTH,
+    "hypergrid_harness_meta_classifier.csv")
 POLICY = "policy"
+SIGMA = "sigma"
+IMPURITY = "impurity"
+NUM_DIM = "num_dim"
 
 
 ##################### FUNCTIONS ###################
@@ -49,7 +57,7 @@ ScoreResults = collections.namedtuple("ScoreResults",
     "abs rel")
 
 
-class HypergridHarnessMetaClassifier(HypergridHarness):
+class HypergridHarnessMetaClassifier(RandomHypergridHarness):
 
   # Values are dataframes with the columns cn.MEAN, cn.STD
   # and rows are MetaClassifiers evaluated.
@@ -59,10 +67,8 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     :param dict mclf_dct: classifiers to study to be studied
     :param dict kwargs: arguments in HypergridHarness constructor
     """
+    super().__init__(**kwargs)
     self.mclf_dct = mclf_dct
-    harness = HypergridHarness(**kwargs)
-    # Copy all data to the new to this harness
-    _assignObjectValues(self, harness)
     # Get previously analyzed data
     if os.path.isfile(EVALUATION_DATA_PTH):
       self.df_data = pd.read_csv(EVALUATION_DATA_PTH)
@@ -86,36 +92,6 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
         for m in self.mclf_dct.values()]
     return score_results
 
-  def evaluate(self, count=10, sigmas=[0], num_repls=[1]):
-    """
-    Evaluates the classification accuracy of MetaClassifier
-    for different conditions. Each experiment is repeated several times.
-    :param list-float sigmas:
-    :param list-int num_repls:
-    :return dict:
-         key: (sigma,num_repl)
-         value: ScoreResults
-    """
-    #
-    result = {}
-    for sigma in sigmas:
-      for num_repl in num_repls:
-        aggregator_abs = ItemAggregator(lambda s: s.abs)
-        aggregator_rel = ItemAggregator(lambda s: s.rel)
-        for _ in range(count):
-          key = (sigma, num_repl)
-          results = self._evaluateExperiment(sigma=sigma,
-              num_repl=num_repl)
-          aggregator_abs.append(results)
-          aggregator_rel.append(results)
-        #
-        df_abs = aggregator_abs.df
-        df_rel = aggregator_rel.df
-        result[(sigma, num_repl)] = ScorerResults(
-            abs=df_abs, rel=df_rel)
-    #
-    return result
-
   @classmethod
   def analyze(cls, mclf_dct=MCLF_DCT, num_repl=3,
       sigma=1.5, num_dim=5,
@@ -123,7 +99,7 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
       is_iter_report=True,
       **kwargs):
     """
-    Compares multiple polices for handling feature replications.
+    Compares multiple policies for handling feature replications.
     :param dict mclf_dct: dictionary of MetaClassifer
     :param int num_repl: Number of replications of feature vectors
     :param float sigma: std of perturbation of features
@@ -131,7 +107,7 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     :param bool is_rel: report relative scores
     :parm int iter_count: number of iterations to calculate statistics
     :param bool is_iter_report: report on each iteration
-    :param dict kwargs: arguments to HypergridHarness constructor
+    :param dict kwargs: arguments to RandomHypergridHarness
     :return pd.DataFrame: columns
         POLICY, cn.MEAN, cn.STD, cn.COUNT
     """
@@ -140,14 +116,10 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
     else:
       sel_func = lambda v: v.abs
     #
-    if "impurity" in kwargs.keys():
-      impurity = kwargs["impurity"]
-    else:
-      impurity = 0
-    vector = Vector(np.repeat(1, num_dim))
-    plane = Plane(vector)
+    if not IMPURITY in kwargs.keys():
+      kwargs[IMPURITY] = 0
     harness = HypergridHarnessMetaClassifier(
-        mclf_dct=mclf_dct, plane=plane, **kwargs)
+        mclf_dct=mclf_dct, **kwargs)
     scoress = []
     dfs = []
     for cnt in range(iter_count):
@@ -161,7 +133,7 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
         pass
     if is_iter_report:
       print("sigma=%2.2f, num_dim=%d, impurity=%2.2f iter=%d"
-          % (sigma, num_dim, impurity, iter_count))
+          % (sigma, num_dim, kwargs[IMPURITY], iter_count))
     arr = np.array(scoress)
     df = pd.DataFrame(arr)
     ser_mean = df.mean()
@@ -175,30 +147,130 @@ class HypergridHarnessMetaClassifier(HypergridHarness):
         })
     return df
 
+  @classmethod
+  def makeEvaluationData(cls, is_test=False,
+      out_pth=EVALUATION_DATA_PTH):
+    """
+    Generate data evaluating meta-classifiers on a hypergrid.
+    :param bool is_test: Test invocation
+    :param str out_pth: path to file written
+    """
+    def posToImpurity(pos_frac):
+      return np.round(2*pos_frac - 1, 2)
+    def runner(sigma=None, num_dim=None, impurity=None,
+        iter_count=1000):
+      if is_test:
+        iter_count = 2
+        is_iter_report = False
+      else:
+        is_iter_report = True
+      stds = np.repeat(0.1, num_dim)
+      return HypergridHarnessMetaClassifier.analyze(
+          mclf_dct=MCLF_DCT,
+          sigma=sigma, num_dim=num_dim, 
+          iter_count=iter_count,
+          is_iter_report = is_iter_report,
+          num_repl=3, is_rel=False, 
+          # RandomHypergridHarness arguments
+          stds=stds, impurity=impurity, num_point=25)
+    if not is_test:
+      param_dct = {
+          SIGMA: [0, 0.1, 0.2, 0.5, 1.0, 1.5, 2.0],
+          IMPURITY: [0, 
+          posToImpurity(2/25),
+          posToImpurity(3/25),
+          posToImpurity(4/25),
+          posToImpurity(5/25),
+          posToImpurity(6/25),
+          ],
+          NUM_DIM: [2, 5, 7, 10, 15, 20, 25, 30],
+          }
+    else:
+      param_dct = {
+          SIGMA: [0],
+          IMPURITY: [0, 
+          posToImpurity(6/25),
+          ],
+          NUM_DIM: [2],
+          }
+    harness = ExperimentHarness(param_dct, runner, update_rpt=1,
+        out_pth=out_pth)
+    harness.run()
+    if not is_test:
+      print("Done processing.")
+
+  def plotMetaClassifiers(self, num_dim, impurity, ax=None, **kwargs):
+    """
+    Plots the meta-classifiers from the evaluation data.
+    x-axis: sigma
+    y-axis: accuaracy
+    :param int num_dim:
+    :param float impurity:
+    :param dict kwargs: optional plot arguments
+    """
+    if ax is None:
+      plotter = Plotter()
+      ax = plotter.ax
+    else:
+      plotter = None
+    sel = [(r[NUM_DIM]==num_dim) and (r[IMPURITY]==impurity)
+        for _, r in self.df_data.iterrows()]
+    df = self.df_data.loc[sel, :]
+    df = df[[POLICY, cn.MEAN, SIGMA, cn.STD]]
+    policies = df[POLICY].unique()
+    for policy in policies:
+      df_plot = df[df[POLICY] == policy]
+      ax.errorbar(df_plot[SIGMA],
+           df_plot[cn.MEAN], 2*df_plot[cn.STD], label=policy)
+    if plotter is not None:
+      plotter.ax.legend()
+      plotter.setDefault(cn.PLT_TITLE,
+          "num_dim: %d, impurity: %2.2f" % (num_dim, impurity))
+      plotter.setDefault(cn.PLT_YLABEL, "accuracy")
+      plotter.setDefault(cn.PLT_XLABEL, "std")
+      plotter.setDefault(cn.PLT_XLIM, [0, 2])
+      plotter.setDefault(cn.PLT_YLIM, [0.5, 1.0])
+      plotter.do(**kwargs)
+
+  def plotMultipleMetaClassifiers(self, num_dim, impuritys, **kwargs):
+    """
+    Plots the meta-classifiers from the evaluation data.
+    x-axis: sigma
+    y-axis: accuaracy
+    :param int num_dim:
+    :param list-float impurity:
+    :param dict kwargs: optional plot arguments
+    """
+    subplots = []
+    length = len(impuritys)
+    for idx in range(1, length + 1):
+      subplots.append((1, length, idx))
+    plotter = Plotter(subplots=subplots)
+    policies = [p for p in self.df_data[POLICY].unique()]
+    for idx, impurity in enumerate(impuritys):
+      if idx == 0:
+        plotter.setDefault(cn.PLT_YLABEL, "accuracy")
+      else:
+        plotter.setDefault(cn.PLT_YLABEL, "")
+        plotter.setDefault(cn.PLT_YTICKLABELS, "")
+      if idx == length - 1:
+        plotter.setDefault(cn.PLT_LEGEND, policies)
+      plotter.setDefault(cn.PLT_TITLE, "%2.2f" % impurity)
+      plotter.setDefault(cn.PLT_XLABEL, "std")
+      plotter.setDefault(cn.PLT_XLIM, [0, 2.0])
+      plotter.setDefault(cn.PLT_YLIM, [0.5, 1.0])
+      plotter.doAx(plotter.axes[idx], **kwargs)
+      self.plotMetaClassifiers(num_dim, impurity,
+          ax=plotter.axes[idx])
+    plotter.axes[-1].legend(loc="upper right")
+    processed_options = [cn.PLT_YLABEL,
+        cn.PLT_YTICKLABELS, cn.PLT_LEGEND, 
+        cn.PLT_TITLE, cn.PLT_XLABEL, cn.PLT_YLIM, cn.PLT_XLIM]
+    opts = {k: v for k,v in kwargs.items()
+        if not k in processed_options}
+    plotter.resetDefaults()
+    plotter.do(**opts)
+  
 
 if __name__ == '__main__':
-  def posToImpurity(pos_frac):
-    return np.round(2*pos_frac - 1, 2)
-  def runner(sigma=None, num_dim=None, impurity=None):
-    return HypergridHarnessMetaClassifier.analyze(mclf_dct=MCLF_DCT,
-        sigma=sigma, num_dim=num_dim, 
-        iter_count=1000,
-        num_repl=3, is_rel=False, 
-        # HypergridHarness arguments
-        impurity=impurity, num_point=25, density=10)
-  if True:
-    param_dct = {
-        "sigma": [0, 0.2, 0.5, 1.0, 1.5, 2.0],
-        "impurity": [0, 
-        posToImpurity(2/25),
-        posToImpurity(3/25),
-        posToImpurity(4/25),
-        posToImpurity(5/25),
-        posToImpurity(6/25),
-        ],
-        "num_dim": [2, 5, 7, 10, 15, 20, 25, 30],
-        }
-    harness = ExperimentHarness(param_dct, runner, update_rpt=1,
-        out_path=EVALUATION_DATA_PTH)
-    harness.run()
-  print("Done processing.")
+  HypergridHarnessMetaClassifier.makeEvaluationData()

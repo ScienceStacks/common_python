@@ -119,7 +119,10 @@ class Plane(object):
     :param Vector vector: vector whose position is evaluated
     """
     arr = Vector.toArray(vector)
-    result = self.vector.coef_arr.dot(arr) - self.offset > SMALL
+    try:
+      result = self.vector.coef_arr.dot(arr) - self.offset > SMALL
+    except:
+      import pdb; pdb.set_trace()
     return result
 
   def isNear(self, vector):
@@ -412,7 +415,7 @@ class HypergridHarness(object):
     return self.trinary.perturb(**kwargs)
     
   def plotGrid(self, trinary=None, plane=None,
-      is_plot=True, **kwargs):
+      **kwargs):
     """
     Plots classes on a grid.
     :param TrinaryClassification trinary:
@@ -421,15 +424,13 @@ class HypergridHarness(object):
     :param dict kwargs: options for plotter
     :return Plotter:
     """
-    # Handle defaults
-    if not cn.PLT_TITLE in kwargs:
-      title = "Separating Hyperplane: %s" % str(self._plane)
-    if not cn.PLT_XLIM in kwargs:
-      kwargs[cn.PLT_XLIM]=self._xlim
-    if not cn.PLT_YLIM in kwargs:
-      kwargs[cn.PLT_YLIM]=self._ylim
-    #
     plotter = Plotter()
+    # Handle defaults
+    plotter.setDefault(cn.PLT_TITLE,
+      "Separating Hyperplane: %s" % str(self._plane))
+    plotter.setDefault(cn.PLT_XLIM, self._xlim)
+    plotter.setDefault(cn.PLT_YLIM, self._ylim)
+    #
     def plot(vectors, color):
       xv, yv = zip(*vectors)
       plotter.ax.scatter(xv, yv, color=color)
@@ -440,10 +441,10 @@ class HypergridHarness(object):
       plane = self._plane
     plot(trinary.pos_arr, "blue")
     plot(trinary.neg_arr, "red")
-    plane.plot(plotter, kwargs[cn.PLT_XLIM],
-        kwargs[cn.PLT_YLIM], color="black")
+    merged_kwargs = plotter.mergeOptions(kwargs)
+    plane.plot(plotter, merged_kwargs[cn.PLT_XLIM],
+         merged_kwargs[cn.PLT_YLIM], color="black")
     # Do the plot
-    plotter.do(title=title, xlim=kwargs[cn.PLT_XLIM],
-        ylim=kwargs[cn.PLT_YLIM], is_plot=is_plot)
+    plotter.do(**kwargs)
     #
     return plotter

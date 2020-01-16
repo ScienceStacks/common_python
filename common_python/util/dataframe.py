@@ -16,3 +16,25 @@ def isLessEqual(df1, df2):
   df_tot = df.applymap(lambda v: v <= 0)
   result = df_tot.sum().sum() == df.size
   return result
+
+def mean(dfs):
+  """
+  Calculates the mean of values in a list of dataframes
+  for the same index, column.
+  :param list-pd.DataFrame dfs:
+  :return pd.DataFrame:
+  """
+  df_mean = sum(dfs)
+  return df_mean/len(dfs)
+
+def std(dfs):
+  """
+  Calculates the standard deviation of values in a 
+  list of dataframes for the same index, column.
+  :param list-pd.DataFrame dfs:
+  :return pd.DataFrame:
+  """
+  df_mean = mean(dfs)
+  df_sq = sum([(df - df_mean)*(df - df_mean) for df in dfs])
+  return df_sq / len(dfs)
+  
