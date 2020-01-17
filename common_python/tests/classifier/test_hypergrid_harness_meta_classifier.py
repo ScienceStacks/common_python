@@ -14,9 +14,10 @@ import common_python.constants as cn
 import os
 import pandas as pd
 import numpy as np
+from sklearn.linear_model import LogisticRegression
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 IS_PLOT = False
 NUM_DIM = 2
 NUM_POINT = 25
@@ -88,9 +89,10 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
     if IGNORE_TEST:
       return
     self._init()
-    self.assertGreater(len(self.harness.trinary.pos_arr), 0)
-    self.assertTrue(helpers.isValidDataFrame(self.harness.df_data,
-        expected_columns=self.harness.df_data.columns))
+    if self.harness.df_data is not None:
+      self.assertGreater(len(self.harness.trinary.pos_arr), 0)
+      self.assertTrue(helpers.isValidDataFrame(self.harness.df_data,
+          expected_columns=self.harness.df_data.columns))
     #
 
   def testEvaluateExperiment(self):
@@ -123,8 +125,7 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
         expected_columns=["policy", cn.MEAN, cn.STD, cn.COUNT]))
 
   def testMakeEvaluationData(self):
-    if IGNORE_TEST:
-      return
+    # TESTING
     self._cleanUp()
     HypergridHarnessMetaClassifier.makeEvaluationData(
         is_test=True, out_pth=TEST_DATA_PTH)
@@ -135,22 +136,56 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
       return
     # Smoke test
     self._init()
-    self.harness.plotMetaClassifiers(5, 0.0, is_plot=IS_PLOT,
-        title="This is fine.")
-    self.harness.plotMetaClassifiers(15, -0.6, is_plot=IS_PLOT)
-    self.harness.plotMetaClassifiers(15, -0.84, is_plot=IS_PLOT)
+    if self.harness.df_data is not None:
+      self.harness.plotMetaClassifiers(5, 0.0, is_plot=IS_PLOT,
+          title="This is fine.")
+      self.harness.plotMetaClassifiers(15, -0.6, is_plot=IS_PLOT)
+      self.harness.plotMetaClassifiers(15, -0.84, is_plot=IS_PLOT)
 
   def testPlotMultipleMetaClassifiers(self):
     if IGNORE_TEST:
       return
     # Smoke test
     self._init()
-    impuritys = list(self.harness.df_data["impurity"].unique())
-    impuritys = [i for i in impuritys if i != -0.68]
-    impuritys.sort()
-    self.harness.plotMultipleMetaClassifiers(5, impuritys,
-        figsize=(10, 12),
-        is_plot=IS_PLOT)
+    if self.harness.df_data is not None:
+      impuritys = list(self.harness.df_data["impurity"].unique())
+      impuritys = [i for i in impuritys if i != -0.68]
+      impuritys.sort()
+      self.harness.plotMultipleMetaClassifiers(5, impuritys,
+          figsize=(10, 12),
+          is_plot=IS_PLOT)
+
+  def testAnalyzeLogisticRegressionClassifiers(self):
+    if IGNORE_TEST:
+      return
+    mclf_dct = {
+        "plurality": MetaClassifierPlurality(),
+        "default":
+         MetaClassifierDefault(
+         clf=LogisticRegression(random_state=0)),
+        "augment":
+         MetaClassifierAugment(
+         clf=LogisticRegression(random_state=0)),
+        "average":
+         MetaClassifierAverage(
+         clf=LogisticRegression(random_state=0)),
+        "ensemble":
+         MetaClassifierEnsemble(
+         clf=LogisticRegression(random_state=0))
+        }
+    sigma = 0
+    num_dim = 2
+    impurity = -0.6
+    df = HypergridHarnessMetaClassifier.analyze(
+        # MetaClassifier
+        mclf_dct=mclf_dct,
+        is_rel=False, iter_count=10,
+        sigma=sigma, num_repl=NUM_REPL,
+        # RandomHypergridHarness
+        stds=np.repeat(STD, num_dim), impurity=impurity,
+        num_point=NUM_POINT)
+    self.assertTrue(helpers.isValidDataFrame(df,
+        expected_columns=["policy", cn.MEAN, cn.STD, cn.COUNT]))
 
 
 if __name__ == '__main__':

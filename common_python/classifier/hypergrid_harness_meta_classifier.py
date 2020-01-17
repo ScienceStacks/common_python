@@ -6,6 +6,7 @@ from common_python.classifier.hypergrid_harness  \
     import Vector, Plane
 from common_python.classifier.random_hypergrid_harness  \
     import RandomHypergridHarness
+from common_python.classifier import meta_classifier
 from common_python.classifier.meta_classifier  \
     import MetaClassifierDefault, MetaClassifierPlurality,  \
     MetaClassifierAugment, MetaClassifierAverage, \
@@ -21,6 +22,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.linear_model import LogisticRegression
 
 ITER_COUNT = 100  # Number of iterations used to calculate statistics
 MCLF_DCT = {
@@ -29,6 +31,21 @@ MCLF_DCT = {
     "augment": MetaClassifierAugment(),
     "average": MetaClassifierAverage(),
     "ensemble": MetaClassifierEnsemble(),
+    }
+LOGISTIC_MCLF_DCT = {
+    "plurality": MetaClassifierPlurality(),
+    "default":
+     MetaClassifierDefault(
+     clf=LogisticRegression(random_state=0)),
+    "augment":
+     MetaClassifierAugment(
+     clf=LogisticRegression(random_state=0)),
+    "average":
+     MetaClassifierAverage(
+     clf=LogisticRegression(random_state=0)),
+    "ensemble":
+     MetaClassifierEnsemble(
+     clf=LogisticRegression(random_state=0))
     }
 PTH = os.path.join(cn.CODE_DIR, "classifier")
 EVALUATION_DATA_PTH = os.path.join(PTH,
@@ -149,6 +166,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
 
   @classmethod
   def makeEvaluationData(cls, is_test=False,
+      mclf_dict=MCLF_DCT,
       out_pth=EVALUATION_DATA_PTH):
     """
     Generate data evaluating meta-classifiers on a hypergrid.
@@ -158,7 +176,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
     def posToImpurity(pos_frac):
       return np.round(2*pos_frac - 1, 2)
     def runner(sigma=None, num_dim=None, impurity=None,
-        iter_count=1000):
+        mclf_dct=MCLF_DCT, iter_count=1000):
       if is_test:
         iter_count = 2
         is_iter_report = False
@@ -166,7 +184,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
         is_iter_report = True
       stds = np.repeat(0.1, num_dim)
       return HypergridHarnessMetaClassifier.analyze(
-          mclf_dct=MCLF_DCT,
+          mclf_dct=mclf_dct,
           sigma=sigma, num_dim=num_dim, 
           iter_count=iter_count,
           is_iter_report = is_iter_report,
@@ -273,4 +291,5 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
   
 
 if __name__ == '__main__':
-  HypergridHarnessMetaClassifier.makeEvaluationData()
+  HypergridHarnessMetaClassifier.makeEvaluationData(
+      mclf_dct=LOGISTIC_MCLF_DCT)

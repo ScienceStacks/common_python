@@ -9,12 +9,16 @@ import pandas as pd
 import numpy as np
 from sklearn import svm
 import unittest
+from sklearn.linear_model import LogisticRegression
+
 
 IGNORE_TEST = False
 SIZE = 3
 NUM_REPL = 3
 SIGMA_TRAIN = 0.1
 SIGMA_TEST = 0.3
+SCORE_PERFECT = 1.0
+TEST_LOGISTIC = False  # Do tests for logistic classifier
 
 
 def testScoreGeneric(testcase, sigma=0.2, num_repl=3):
@@ -61,7 +65,11 @@ class TestMetaClassifier(unittest.TestCase):
     self.df = self.harness.trinary.df_feature
     self.ser = self.harness.trinary.ser_label
     self.dfs = self.makeFeatureDFS(0, SIZE)
-    self.mclf = meta_classifier.MetaClassifierDefault()
+    if TEST_LOGISTIC:
+      clf = LogisticRegression(random_state=0)
+      self.mclf = meta_classifier.MetaClassifierDefault(clf=clf)
+    else:
+      self.mclf = meta_classifier.MetaClassifierDefault()
 
   def makeFeatureDFS(self, sigma, size):
     trinary = self.harness.trinary
@@ -122,6 +130,17 @@ class TestMetaClassifier(unittest.TestCase):
     score_result = self.mclf.score(self.df, self.ser)
     self.assertEqual(score_result.abs, 1.0)
     self.assertEqual(score_result.rel, 1.0)
+
+  def testLogisticRegression(self):
+    if IGNORE_TEST:
+      return
+    clf = LogisticRegression(random_state=0)
+    mclf = meta_classifier.MetaClassifierDefault(clf=clf)
+    mclf.fit(self.dfs, self.ser)
+    self.assertEqual(len(mclf.clf.coef_[0]),
+        self.harness.num_dim)
+    score = mclf.score(self.dfs[0], self.ser)
+    self.assertEqual(score.abs, SCORE_PERFECT)
 
 class TestMetaClassifierDefault(unittest.TestCase):
 
