@@ -166,7 +166,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
 
   @classmethod
   def makeEvaluationData(cls, is_test=False,
-      mclf_dict=MCLF_DCT,
+      mclf_dct=MCLF_DCT,
       out_pth=EVALUATION_DATA_PTH):
     """
     Generate data evaluating meta-classifiers on a hypergrid.
