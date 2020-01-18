@@ -114,7 +114,6 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
   def analyze(cls, mclf_dct=MCLF_DCT, num_repl=3,
       sigma=1.5, num_dim=5,
       iter_count=ITER_COUNT, is_rel=True,
-      is_iter_report=True,
       **kwargs):
     """
     Compares multiple policies for handling feature replications.
@@ -124,7 +123,6 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
     :param int num_dim: dimension of the hypergrid space
     :param bool is_rel: report relative scores
     :parm int iter_count: number of iterations to calculate statistics
-    :param bool is_iter_report: report on each iteration
     :param dict kwargs: arguments to RandomHypergridHarness
     :return pd.DataFrame: columns
         POLICY, cn.MEAN, cn.STD, cn.COUNT
@@ -149,10 +147,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
         scoress.append(rel_scores)
       except:
         pass
-    # TODO: report stds
-    if is_iter_report:
-      print("sigma=%2.2f, num_dim=%d, impurity=%2.2f iter=%d"
-          % (sigma, num_dim, kwargs[IMPURITY], iter_count))
+    # 
     arr = np.array(scoress)
     df = pd.DataFrame(arr)
     ser_mean = df.mean()
@@ -169,6 +164,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
   @classmethod
   def makeEvaluationData(cls, is_test=False,
       mclf_dct=MCLF_DCT,
+      is_quiet=False,
       out_pth=EVALUATION_DATA_PTH):
     """
     Generate data evaluating meta-classifiers on a hypergrid.
@@ -181,20 +177,25 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
         mclf_dct=MCLF_DCT, iter_count=1000, stdb=0.5):
       if is_test:
         iter_count = 2
-        is_iter_report = False
-      else:
-        is_iter_report = True
-        # Standard deviations between time points
+      # Standard deviations between time points
       stds = np.repeat(stdb, num_dim)
       return HypergridHarnessMetaClassifier.analyze(
           mclf_dct=mclf_dct,
           sigma=sigma, num_dim=num_dim, 
           iter_count=iter_count,
-          is_iter_report = is_iter_report,
           num_repl=3, is_rel=False, 
           # RandomHypergridHarness arguments
           stds=stds, impurity=impurity, num_point=25)
-    if not is_test:
+    if is_test:
+      param_dct = {
+          SIGMA: [0],
+          IMPURITY: [0, 
+          posToImpurity(6/25),
+          ],
+          NUM_DIM: [2],
+          STDB: [1],
+          }
+    else:
       param_dct = {
           SIGMA: [0, 0.025, 0.05, 0.08, 0.1, 0.3, 0.5, 1.0],
           IMPURITY: [0, 
@@ -207,17 +208,8 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
           NUM_DIM: [2, 5, 10, 15, 20],
           STDB: [0.2, 0.6, 1.0],
           }
-    else:
-      param_dct = {
-          SIGMA: [0],
-          IMPURITY: [0, 
-          posToImpurity(6/25),
-          ],
-          NUM_DIM: [2],
-          STDB: [0],
-          }
     harness = ExperimentHarness(param_dct, runner, update_rpt=1,
-        out_pth=out_pth)
+        out_pth=out_pth, is_quiet=is_quiet)
     harness.run()
     if not is_test:
       print("Done processing.")
