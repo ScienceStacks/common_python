@@ -27,7 +27,7 @@ UNNAMED = "Unnamed: 0"
 class ExperimentHarness(object):
 
   def __init__(self, param_dct, func, out_pth=OUT_PTH,
-      update_rpt=5):
+      update_rpt=5, is_quiet=False):
     """
     :param dict param_dct: dictionary of parameter values
     :param Function func: function that takes keyword arguments
@@ -36,10 +36,12 @@ class ExperimentHarness(object):
         results are stored
     :param int update_rpt: number of times the function
         is run before results are written.
+    :parm bool is_quiet: no progress information
     """
     self._out_pth = out_pth
     self._update_rpt = update_rpt
     self._func = func
+    self._is_quiet = is_quiet
     self.parameter_names = list(param_dct.keys())
     self.parameter_values = list(param_dct.values())
     # self.df_result - completed calculations
@@ -93,6 +95,12 @@ class ExperimentHarness(object):
         kwargs = {k: v for k, v in zip(self.parameter_names, values)}
         # Calclate the dataframe for these values
         df = self._func(**kwargs)
+        # Report progress
+        if not self._is_quiet:
+          stg = "Completed"
+          for k,v in kwargs.items():
+            stg += " %s=%s" % (k, str(v))
+          print(stg)
         # Extend the dataframe with values of parameters used
         for k, v in kwargs.items():
           df[k] = np.repeat(v, len(df))

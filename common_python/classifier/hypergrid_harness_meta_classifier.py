@@ -54,6 +54,7 @@ POLICY = "policy"
 SIGMA = "sigma"
 IMPURITY = "impurity"
 NUM_DIM = "num_dim"
+STDB = "stdb"
 
 
 ##################### FUNCTIONS ###################
@@ -148,6 +149,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
         scoress.append(rel_scores)
       except:
         pass
+    # TODO: report stds
     if is_iter_report:
       print("sigma=%2.2f, num_dim=%d, impurity=%2.2f iter=%d"
           % (sigma, num_dim, kwargs[IMPURITY], iter_count))
@@ -175,14 +177,15 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
     """
     def posToImpurity(pos_frac):
       return np.round(2*pos_frac - 1, 2)
-    def runner(sigma=None, num_dim=None, impurity=None,
-        mclf_dct=MCLF_DCT, iter_count=1000):
+    def runner(sigma=None, num_dim=2, impurity=None,
+        mclf_dct=MCLF_DCT, iter_count=1000, stdb=0.5):
       if is_test:
         iter_count = 2
         is_iter_report = False
       else:
         is_iter_report = True
-      stds = np.repeat(0.1, num_dim)
+        # Standard deviations between time points
+      stds = np.repeat(stdb, num_dim)
       return HypergridHarnessMetaClassifier.analyze(
           mclf_dct=mclf_dct,
           sigma=sigma, num_dim=num_dim, 
@@ -193,7 +196,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
           stds=stds, impurity=impurity, num_point=25)
     if not is_test:
       param_dct = {
-          SIGMA: [0, 0.1, 0.2, 0.5, 1.0, 1.5, 2.0],
+          SIGMA: [0, 0.025, 0.05, 0.08, 0.1, 0.3, 0.5, 1.0],
           IMPURITY: [0, 
           posToImpurity(2/25),
           posToImpurity(3/25),
@@ -201,7 +204,8 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
           posToImpurity(5/25),
           posToImpurity(6/25),
           ],
-          NUM_DIM: [2, 5, 7, 10, 15, 20, 25, 30],
+          NUM_DIM: [2, 5, 10, 15, 20],
+          STDB: [0.2, 0.6, 1.0],
           }
     else:
       param_dct = {
@@ -210,6 +214,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
           posToImpurity(6/25),
           ],
           NUM_DIM: [2],
+          STDB: [0],
           }
     harness = ExperimentHarness(param_dct, runner, update_rpt=1,
         out_pth=out_pth)
@@ -292,4 +297,4 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
 
 if __name__ == '__main__':
   HypergridHarnessMetaClassifier.makeEvaluationData(
-      mclf_dct=LOGISTIC_MCLF_DCT)
+      mclf_dct=MCLF_DCT)
