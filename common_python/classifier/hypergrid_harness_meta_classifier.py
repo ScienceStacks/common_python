@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn import svm, model_selection
 from sklearn.linear_model import LogisticRegression
 
 ITER_COUNT = 100  # Number of iterations used to calculate statistics
@@ -31,6 +32,13 @@ MCLF_DCT = {
     "augment": MetaClassifierAugment(),
     "average": MetaClassifierAverage(),
     "ensemble": MetaClassifierEnsemble(),
+    }
+MCLF_CLASS_DCT = {
+    "plurality": MetaClassifierPlurality,
+    "default": MetaClassifierDefault,
+    "augment": MetaClassifierAugment,
+    "average": MetaClassifierAverage,
+    "ensemble": MetaClassifierEnsemble,
     }
 LOGISTIC_MCLF_DCT = {
     "plurality": MetaClassifierPlurality(),
@@ -179,8 +187,16 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
     """
     def posToImpurity(pos_frac):
       return np.round(2*pos_frac - 1, 2)
-    def runner(sigma=None, num_dim=2, impurity=None,
-        mclf_dct=MCLF_DCT, iter_count=1000, stdb=0.5):
+    def runner(sigma=None, num_dim=2, impurity=None, clf=CLF_SVM,
+        mclf_class_dct=MCLF_CLASS_DCT, iter_count=1000, stdb=0.5):
+      if clf == CLF_SVM:
+        mclf_dct = {k: v(clf=svm.LinearSVC())
+            for k, v in mclf_class_dct.items()
+            if k != "plurality"}
+      else:
+        mclf_dct = {k: v(clf=LogisticRegression(random_state=0))
+            for k, v in mclf_class_dct.items()
+            if k != "plurality"}
       if is_test:
         iter_count = 2
       # Standard deviations between time points
@@ -200,6 +216,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
           ],
           NUM_DIM: [2],
           STDB: [1],
+          CLF: [CLF_SVM, CLF_LOGISTIC],
           }
     else:
       param_dct = {
@@ -213,6 +230,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
           ],
           NUM_DIM: [2, 5, 10, 15, 20],
           STDB: [0.2, 0.6, 1.0],
+          CLF: [CLF_SVM, CLF_LOGISTIC],
           }
     harness = ExperimentHarness(param_dct, runner, update_rpt=1,
         out_pth=out_pth, is_quiet=is_quiet)

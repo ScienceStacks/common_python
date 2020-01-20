@@ -132,6 +132,7 @@ class TestHypergridHarnessMetaClassifier(unittest.TestCase):
       return
     self._cleanUp()
     HypergridHarnessMetaClassifier.makeEvaluationData(
+        is_quiet=True,
         is_test=True, out_pth=TEST_DATA_PTH)
     self.assertTrue(os.path.isfile(TEST_DATA_PTH))
 

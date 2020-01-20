@@ -12,7 +12,6 @@ import copy
 import numpy as np
 import pandas as pd
 from sklearn import svm, model_selection
-from sklearn.linear_model import LogisticRegression
 
 MAX_ITER = 500  # Maximum number of iterations for score calculation
 SVM_KWARGS = {"max_iter": 50000}
