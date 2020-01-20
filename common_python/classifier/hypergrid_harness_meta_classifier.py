@@ -55,6 +55,7 @@ SIGMA = "sigma"
 IMPURITY = "impurity"
 NUM_DIM = "num_dim"
 STDB = "stdb"
+STDW = "stdw"
 
 
 ##################### FUNCTIONS ###################
@@ -214,12 +215,14 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
     if not is_test:
       print("Done processing.")
 
-  def plotMetaClassifiers(self, num_dim, impurity, ax=None, **kwargs):
+  def plotMetaClassifiers(self, num_dim, stdb,
+       impurity, ax=None, **kwargs):
     """
     Plots the meta-classifiers from the evaluation data.
-    x-axis: sigma
+    x-axis: sigma_b
     y-axis: accuaracy
     :param int num_dim:
+    :param float stdb: standard deviation between timepoints
     :param float impurity:
     :param dict kwargs: optional plot arguments
     """
@@ -229,6 +232,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
     else:
       plotter = None
     sel = [(r[NUM_DIM]==num_dim) and (r[IMPURITY]==impurity)
+        and (r[STDB]==stdb)
         for _, r in self.df_data.iterrows()]
     df = self.df_data.loc[sel, :]
     df = df[[POLICY, cn.MEAN, SIGMA, cn.STD]]
@@ -242,17 +246,18 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
       plotter.setDefault(cn.PLT_TITLE,
           "num_dim: %d, impurity: %2.2f" % (num_dim, impurity))
       plotter.setDefault(cn.PLT_YLABEL, "accuracy")
-      plotter.setDefault(cn.PLT_XLABEL, "std")
+      plotter.setDefault(cn.PLT_XLABEL, "stdw")
       plotter.setDefault(cn.PLT_XLIM, [0, 2])
       plotter.setDefault(cn.PLT_YLIM, [0.5, 1.0])
       plotter.do(**kwargs)
 
-  def plotMultipleMetaClassifiers(self, num_dim, impuritys, **kwargs):
+  def plotMultipleMetaClassifiers(self, num_dim, stdb, impuritys, **kwargs):
     """
     Plots the meta-classifiers from the evaluation data.
-    x-axis: sigma
+    x-axis: stdw
     y-axis: accuaracy
     :param int num_dim:
+    :param float stdb: standard deviation between timepoints
     :param list-float impurity:
     :param dict kwargs: optional plot arguments
     """
@@ -271,11 +276,11 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
       if idx == length - 1:
         plotter.setDefault(cn.PLT_LEGEND, policies)
       plotter.setDefault(cn.PLT_TITLE, "%2.2f" % impurity)
-      plotter.setDefault(cn.PLT_XLABEL, "std")
-      plotter.setDefault(cn.PLT_XLIM, [0, 2.0])
+      plotter.setDefault(cn.PLT_XLABEL, "stdw")
+      plotter.setDefault(cn.PLT_XLIM, [0, 1.0])
       plotter.setDefault(cn.PLT_YLIM, [0.5, 1.0])
       plotter.doAx(plotter.axes[idx], **kwargs)
-      self.plotMetaClassifiers(num_dim, impurity,
+      self.plotMetaClassifiers(num_dim, stdb, impurity,
           ax=plotter.axes[idx])
     plotter.axes[-1].legend(loc="upper right")
     processed_options = [cn.PLT_YLABEL,
