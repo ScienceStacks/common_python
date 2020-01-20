@@ -21,7 +21,7 @@ SCORE_PERFECT = 1.0
 TEST_LOGISTIC = False  # Do tests for logistic classifier
 
 
-def testScoreGeneric(testcase, sigma=0.2, num_repl=3):
+def _testScoreGeneric(testcase, sigma=0.2, num_repl=3):
   """
   Generic test for a MetaClassifier
   :param TestCase testcase: TestCase for class under test
@@ -35,7 +35,7 @@ def testScoreGeneric(testcase, sigma=0.2, num_repl=3):
   #
   testcase.assertGreater(result1.abs, result2.abs)
 
-def testMakeTrainingDataGeneric(testcase):
+def _testMakeTrainingDataGeneric(testcase):
   """
   Generic test for make training data.
   Assumes instance variables in setUp for class under tests.
@@ -168,12 +168,12 @@ class TestMetaClassifierAverage(unittest.TestCase):
   def testMakeTrainingData(self):
     if IGNORE_TEST:
       return
-    testMakeTrainingDataGeneric(self)
+    _testMakeTrainingDataGeneric(self)
 
   def testScore(self):
     if IGNORE_TEST:
       return
-    testScoreGeneric(self)
+    _testScoreGeneric(self)
 
 
 class TestMetaClassifierAugment(unittest.TestCase):
@@ -185,12 +185,12 @@ class TestMetaClassifierAugment(unittest.TestCase):
   def testMakeTrainingData(self):
     if IGNORE_TEST:
       return
-    testMakeTrainingDataGeneric(self)
+    _testMakeTrainingDataGeneric(self)
 
   def testScore(self):
     if IGNORE_TEST:
       return
-    testScoreGeneric(self)
+    _testScoreGeneric(self)
 
 
 class TestMetaClassifierEnsemble(unittest.TestCase):
@@ -217,7 +217,7 @@ class TestMetaClassifierEnsemble(unittest.TestCase):
   def testScore(self):
     if IGNORE_TEST:
       return
-    testScoreGeneric(self)
+    _testScoreGeneric(self)
 
 if __name__ == '__main__':
   unittest.main()
