@@ -56,6 +56,9 @@ IMPURITY = "impurity"
 NUM_DIM = "num_dim"
 STDB = "stdb"
 STDW = "stdw"
+CLF = "clf"
+CLF_SVM = "SVM"
+CLF_LOGISTIC = "logistic"
 
 
 ##################### FUNCTIONS ###################
@@ -81,18 +84,20 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
   # Values are dataframes with the columns cn.MEAN, cn.STD
   # and rows are MetaClassifiers evaluated.
 
-  def __init__(self, mclf_dct=MCLF_DCT, **kwargs):
+  def __init__(self, mclf_dct=MCLF_DCT, data_pth=None, **kwargs):
     """
     :param dict mclf_dct: classifiers to study to be studied
+    :param str data_pth: path to results of previously created
+                         analysis data
     :param dict kwargs: arguments in HypergridHarness constructor
     """
     super().__init__(**kwargs)
     self.mclf_dct = mclf_dct
     # Get previously analyzed data
-    if os.path.isfile(EVALUATION_DATA_PTH):
-      self.df_data = pd.read_csv(EVALUATION_DATA_PTH)
-    else:
+    if data_pth is None:
       self.df_data = None
+    else:
+      self.df_data = pd.read_csv(data_pth)
 
   def _evaluateExperiment(self, sigma=0, num_repl=1):
     """
@@ -216,7 +221,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
       print("Done processing.")
 
   def plotMetaClassifiers(self, num_dim, stdb,
-       impurity, ax=None, **kwargs):
+       impurity, clf=CLF_SVM, ax=None, **kwargs):
     """
     Plots the meta-classifiers from the evaluation data.
     x-axis: sigma_b
@@ -224,6 +229,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
     :param int num_dim:
     :param float stdb: standard deviation between timepoints
     :param float impurity:
+    :param str clf: classifier
     :param dict kwargs: optional plot arguments
     """
     if ax is None:
@@ -231,8 +237,10 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
       ax = plotter.ax
     else:
       plotter = None
-    sel = [(r[NUM_DIM]==num_dim) and (r[IMPURITY]==impurity)
+    sel = [(r[NUM_DIM]==num_dim)
+        and (r[IMPURITY]==impurity)
         and (r[STDB]==stdb)
+        and (r[CLF]==CLF_SVM)
         for _, r in self.df_data.iterrows()]
     df = self.df_data.loc[sel, :]
     df = df[[POLICY, cn.MEAN, SIGMA, cn.STD]]
@@ -251,14 +259,16 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
       plotter.setDefault(cn.PLT_YLIM, [0.5, 1.0])
       plotter.do(**kwargs)
 
-  def plotMultipleMetaClassifiers(self, num_dim, stdb, impuritys, **kwargs):
+  def plotMultipleMetaClassifiers(self, num_dim, stdb, impuritys,
+     clf=CLF_SVM, **kwargs):
     """
     Plots the meta-classifiers from the evaluation data.
     x-axis: stdw
     y-axis: accuaracy
     :param int num_dim:
     :param float stdb: standard deviation between timepoints
-    :param list-float impurity:
+    :param list-float impuritys:
+    :param str clf: classifier
     :param dict kwargs: optional plot arguments
     """
     subplots = []
@@ -281,7 +291,7 @@ class HypergridHarnessMetaClassifier(RandomHypergridHarness):
       plotter.setDefault(cn.PLT_YLIM, [0.5, 1.0])
       plotter.doAx(plotter.axes[idx], **kwargs)
       self.plotMetaClassifiers(num_dim, stdb, impurity,
-          ax=plotter.axes[idx])
+          clf=clf, ax=plotter.axes[idx])
     plotter.axes[-1].legend(loc="upper right")
     processed_options = [cn.PLT_YLABEL,
         cn.PLT_YTICKLABELS, cn.PLT_LEGEND, 
