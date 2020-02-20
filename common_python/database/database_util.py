@@ -36,7 +36,7 @@ def updateDBTable(df, db_path, tablename):
   try:
     conn = sqlite3.connect(db_path)
   except sqlite3.OperationalError as err:
-    print("%s for path %s" % (err, db_path)
+    print("%s for path %s" % (err, db_path))
     raise sqlite3.OperationalError()
   columns = []
   for col in df.columns:
