@@ -44,6 +44,6 @@ def updateDBTable(df, db_path, tablename):
     new_col = new_col.replace(" ", "_")
     columns.append(new_col)
   df.columns = columns
-  df.to_sql(tablename, conn, if_exists='replace')
+  df.to_sql(tablename, conn, if_exists='replace', index=False)
   conn.close()
   return df
