@@ -3,7 +3,7 @@
 import os.path
 import pandas as pd
 
-DEBUG = False
+DEBUG = True
 
 
 def isValidDataFrame(df, expected_columns, min_rows=1,
