@@ -1,6 +1,7 @@
 """Helpers for classifier testing."""
 
 from common_python.util.persister import Persister
+from common.trinary_data import TrinaryData
 #from common.trinary_data import TrinaryData
 
 import os

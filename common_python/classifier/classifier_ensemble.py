@@ -2,15 +2,20 @@
 Ensemble of classifiers formed by training with different data.
 The underlying classifier is called the base classifier.
 1. Requirements
-  a. The base classifier must expose methods for fit, predict, score.
-  b. Sub-class ClassifierDescriptor and implement getImportance
-2. The EnsembleClassifer is trained using randomly selecting data
-subsets using a specified number of holdouts.
+  a. The base classifier must expose methods for fit,
+     predict, score.
+  b. Sub-class ClassifierDescriptor and implement
+     getImportance
+2. The EnsembleClassifer is trained using randomly
+   selecting data subsets using a specified number of 
+   holdouts.
 3. The ClassifierEnsemble exposes fit, predict, score.
 4. In addition, features can be exampled and plotted
-  a. Importance is float for a feature that indicates its contribution
+  a. Importance is float for a feature that indicates 
+     its contribution
      to classifications
-  b. Rank is an ordering of features based on their importance
+  b. Rank is an ordering of features based on their 
+     importance
 """
 
 import common_python.constants as cn
@@ -126,8 +131,10 @@ class ClassifierEnsemble(ClassifierCollection):
     :param pd.DataFrame: features, indexed by instance.
     :return pd.DataFrame:  probability by class;
         columns are classes; index by instance
-    Assumes that self.clfs has been previously populated with fitted
-    classifiers.
+    Notes:
+      1. Assumes that self.clfs has been previously populated 
+         with fitted classifiers.
+      2. Considers all classes encountered during fit
     """
     # Change to an array of array of features
     DUMMY_COLUMN = "dummy_column"
@@ -169,6 +176,11 @@ class ClassifierEnsemble(ClassifierCollection):
     classifiers.
     """
     df_predict = self.predict(df_X)
+    missing_columns = set(ser_y).difference(
+        df_predict.columns)
+    for column in missing_columns:
+      df_predict[column] = np.repeat(0,
+          len(df_predict))
     accuracies = []
     for instance in ser_y.index:
       # Accuracy is the probability of selecting the correct class

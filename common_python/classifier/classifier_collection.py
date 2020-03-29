@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+
 CrossValidationResult = collections.namedtuple(
     "CrossValidationResult",
     "mean std collection"
@@ -103,13 +104,16 @@ class ClassifierCollection(object):
       new_clf = copy.deepcopy(clf)
       dff_X, serr_y = copyContainers(dff_X, serr_y)
       test_indices = selTestIndicesFunc(serr_y)
-      df_X_train, df_X_test = cls._partitionIndices(dff_X, indices, test_indices)
-      ser_y_train, ser_y_test = cls._partitionIndices(serr_y, indices, test_indices)
+      df_X_train, df_X_test = cls._partitionIndices(
+          dff_X, indices, test_indices)
+      ser_y_train, ser_y_test = cls._partitionIndices(
+          serr_y, indices, test_indices)
       # Train the clf and evaluate the clf
       new_clf.fit(df_X_train, ser_y_train)
       clfs.append(new_clf)
       scores.append(new_clf.score(df_X_test, ser_y_test))
-    return cls(clfs, df_X.columns.tolist(), classes, scores=scores)
+    return cls(clfs, df_X.columns.tolist(),
+        classes=classes, scores=scores)
 
   @classmethod
   def makeByRandomHoldout(cls, clf, df_X, ser_y, count, holdouts=1):
@@ -136,12 +140,15 @@ class ClassifierCollection(object):
   @classmethod
   def makeByRandomStateHoldout(cls, clf, df_X, ser_y, count, holdouts=1):
     """
-    Creates a collection of fitted models with randomly chosen holdouts.
-    :param Classifier clf: untrained clf with fit, score methods
-    :param pd.DataFrame df_X: columns of features, rows of instances
+    Creates a collection of fitted models with randomly 
+    chosen holdouts.
+    :param Classifier clf: untrained clf
+    :param pd.DataFrame df_X: 
+        columns of features, rows of instances
     :param pd.Series ser_y: state values
     :param int count: number of models to create
-    :param int holdouts: number of instances per state in test data
+    :param int holdouts: number of instances 
+        per state in test data
     :return ClassifierCollection:
     Notes
       1. df_X, ser_y must have the same index
@@ -173,18 +180,21 @@ class ClassifierCollection(object):
     return np.mean(self.scores), np.std(self.scores)
 
   @classmethod
-  def crossValidateByState(cls, clf, df_X, ser_y, num_clfs):
+  def crossValidateByState(cls, clf, df_X, ser_y,
+      num_clfs):
     """
     Does cross validation for a classification class
     that supports the fit and score methods.
+    Folds are chosen to equalize the distribution
+    of states in the test set.
     :param Classifier clf: Instantiated classifier
     :param pd.DataFrame df_X: feature matrix
     :param pd.DataFrame ser_y: classes
     :param int num_clfs: Number of classifiers to create
     :return CrossValidationResult:
     """
-    collection = cls.makeByRandomStateHoldout(clf, df_X, ser_y,
-         num_clfs)
+    collection = cls.makeByRandomStateHoldout(clf, df_X,
+        ser_y, num_clfs)
     clf_mean, clf_std = collection.crossValidate()
-    return CrossValidationResult(mean=clf_mean, std=clf_std,
-        collection=collection)
+    return CrossValidationResult(mean=clf_mean, 
+        std=clf_std, collection=collection)
