@@ -191,6 +191,8 @@ class ClassifierCollection(object):
     :param pd.DataFrame df_X: feature matrix
     :param pd.DataFrame ser_y: classes
     :param int num_clfs: Number of classifiers to create
+        This is the number of iterations in the
+        cross validation.
     :return CrossValidationResult:
     """
     collection = cls.makeByRandomStateHoldout(clf, df_X,

@@ -83,7 +83,7 @@ class ClassifierEnsemble(ClassifierCollection):
     :param ClassifierDescriptor clf_desc:
     :param int holdouts: number of holdouts when fitting
     :param int size: size of the ensemble
-    :param int/None filter_high_rank: maxium rank considered
+    :param int/None filter_high_rank: maximum rank considered
     :param dict kwargs: keyword arguments used by parent classes
     """
     self.clf_desc = clf_desc
@@ -262,7 +262,8 @@ class ClassifierEnsemble(ClassifierCollection):
     # Plot
     if ax is None:
       fig, ax = plt.subplots()
-    ax.bar(indices, df[cn.MEAN], yerr=df[cn.STD], align='center', 
+    ax.bar(indices, df[cn.MEAN], yerr=df[cn.STD],
+        align='center', 
         alpha=0.5, ecolor='black', capsize=10)
     bottom = util.getValue(kwargs, "bottom", 0.25)
     plt.gcf().subplots_adjust(bottom=bottom)

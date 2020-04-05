@@ -1,5 +1,6 @@
 """Calculates statistics."""
 
+import itertools
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
@@ -56,3 +57,57 @@ def decorrelate(df):
     values = df_result[col].tolist()
     df_result[col] = np.random.permutation(values)
   return df_result
+
+def generalizedBinomialDensity(probs, num_choose):
+  """
+  Calculates the probability of exactly n events out of a
+  set of size |probs|. This is a generalization of the
+  binomial where events can have different
+  probabilities.
+  :param list-float probs: probability of each event
+  :param int num_choose: number of events
+  :return float:
+  """
+  length = len(probs)
+  if num_choose > length:
+    msg = "Combination size must be lessr than the list"
+    raise ValueError(msg)
+  #
+  indices = list(range(length))
+  set_indices = set(indices)
+  prob_arr = np.array(probs)
+  result = 0
+  for combination in itertools.combinations(indices,
+      num_choose):
+    if (len(combination) < length) and (len(combination) > 0):
+      occurred_indices = np.array(combination)
+      prob_occurred = prob_arr[occurred_indices].prod()
+      non_occurred_indices = np.array(
+          list(set_indices.difference(occurred_indices)))
+      non_occurreds = 1 - prob_arr[non_occurred_indices]
+      prob_non_occurred = non_occurreds.prod()
+      prob = prob_occurred*prob_non_occurred
+    elif len(combination) == length:
+      prob = prob_arr[indices].prod()
+    elif len(combination) == 0:
+      non_occurreds = 1 - prob_arr[indices]
+      prob = non_occurreds.prod()
+    result += prob
+  return result
+
+def generalizedBinomialTail(probs, num_choose):
+  """
+  Calculates P(n >= num_choose)
+  :param list-float probs: probability of each event
+  :param int num_choose: number of events
+  :return float:
+  """
+  length = len(probs)
+  if num_choose > length:
+    msg = "Combination size must be lessr than the list"
+    raise ValueError(msg)
+  #
+  result = 0
+  for num in range(num_choose, length+1):
+    result += generalizedBinomialDensity(probs, num)
+  return result
