@@ -35,7 +35,13 @@ class TestFunctions(unittest.TestCase):
     self.assertTrue(np.isnan(adjacents.n_dist))
     self.assertEqual(adjacents.prv, 1)
     self.assertEqual(adjacents.p_dist, 3)
-    import pdb; pdb.set_trace()
+    #
+    adjacents = util_classifier.findAdjacentStates(
+        SER_Y, "1-2")
+    self.assertEqual(adjacents.nxt, 2)
+    self.assertEqual(adjacents.n_dist, 1)
+    self.assertEqual(adjacents.prv, 0)
+    self.assertEqual(adjacents.p_dist, 2)
 
 
 if __name__ == '__main__':

@@ -4,6 +4,10 @@ import collections
 import pandas as pd
 import numpy as np
 
+
+FRACTION = "fraction"
+STATE = "state"
+
 # Previous, current, and next state in a time series
 # p_dist - # indices to previous state
 # n_dist - # indices to next state
@@ -43,3 +47,21 @@ def findAdjacentStates(ser_y, index):
   prv_state, p_dist = findNewState(prv_indices)
   return AdjacentStates(prv=prv_state, cur=cur_state,
       nxt=nxt_state, p_dist=p_dist, n_dist=n_dist)
+
+def calcStateProbs(ser_y):
+  """
+  Calculates the probability of each state occurrence.
+  :param pd.Series ser_y:
+      index: instance
+      value: state
+  :return pd.Series:
+      index: state
+      value: float
+  """
+  df = pd.DataFrame()
+  df[STATE] = ser_y
+  df[FRACTION] = df[STATE]
+  dfg = df.groupby(state).count()
+  df_result = pd.DataFrame(dfg)
+  ser = df_result[FRACTION]/len(df)
+  return ser
