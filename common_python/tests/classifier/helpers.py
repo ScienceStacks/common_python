@@ -17,12 +17,16 @@ PERSISTER = Persister(TEST_DATA_PATH)
 
 if not PERSISTER.isExist():
   DATA = TrinaryData()  # Will get an error if pcl not present
-  PERSISTER.set(DATA)
+  DATA_LONG = TrinaryData(is_averaged=False,
+      is_dropT1=False)
+  # Will get an error if pcl not present
+  PERSISTER.set([DATA, DATA_LONG])
 else:
   try:
-    DATA = PERSISTER.get()
+    [DATA, DATA_LONG] = PERSISTER.get()
   except:
     DATA = None
+    DATA_LONG = None
   
 def getData():
   """
@@ -31,4 +35,13 @@ def getData():
   df_X = DATA.df_X
   df_X.columns = DATA.features
   ser_y = DATA.ser_y
+  return df_X, ser_y
+  
+def getDataLong():
+  """
+  Provides classification data
+  """
+  df_X = DATA_LONG.df_X
+  df_X.columns = DATA_LONG.features
+  ser_y = DATA_LONG.ser_y
   return df_X, ser_y

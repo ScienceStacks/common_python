@@ -19,9 +19,11 @@ The underlying classifier is called the base classifier.
 """
 
 import common_python.constants as cn
+from common_python.statistics import util_statistics
 from common_python.util import util
 from common_python.classifier.classifier_collection  \
     import ClassifierCollection
+from common_python.classifier import util_classifier
 from common_python.util import persister
 
 import collections
@@ -282,28 +284,69 @@ class ClassifierEnsemble(ClassifierCollection):
     return fig, ax
 
   def makeInstancePredictionDF(self, df_X, ser_y):
-      """
-      Constructs predictions for each instance for
-      using a classifier trained without that instance.
-      :param pd.DataFrame df_X:
-      :param pd.Series ser_y:
-      :return pd.DataFrame:
-        columns: state indices
-        index: instance
-        value: probability
-      """
-      indices = ser.index
-      dfs = []
-      for test_index in indices:
-          train_indices = list(set(indices).difference(
-             [test_index])) 
-          new_clf = copy.deepcopy(self)
-          new_clf.fit(df_X.loc[train_indices, :],
-              ser_y.loc[train_indices])
-          df_X_test = pd.DataFrame(df_X.loc[
-              test_index, :]) 
-          dfs.append(new_clf.predict(df_X_test.T))
-      return pd.concat(dfs)
+    """
+    Constructs predictions for each instance for
+    using a classifier trained without that instance.
+    :param pd.DataFrame df_X:
+    :param pd.Series ser_y:
+    :return pd.DataFrame:
+      columns: state indices
+      index: instance
+      value: probability
+    """
+    indices = ser_y.index
+    dfs = []
+    for test_index in indices:
+        train_indices = list(set(indices).difference(
+           [test_index])) 
+        new_clf = copy.deepcopy(self)
+        new_clf.fit(df_X.loc[train_indices, :],
+            ser_y.loc[train_indices])
+        df_X_test = pd.DataFrame(df_X.loc[
+            test_index, :]) 
+        dfs.append(new_clf.predict(df_X_test.T))
+    df_pred = pd.concat(dfs)
+    return util_classifier.aggregatePredictions(df_pred)
+
+  def calcAdjStateProbTail(self, df_X, ser_y):
+    """
+    Calculates the probability of having at least the
+    number of misclassifications be in an adjacent state
+    as the number of predictions for the current classifier.
+    :param pd.DataFrame df_X:
+    :param pd.Series ser_y:
+    :return float:
+    """
+    ser_pred = self.makeInstancePredictionDF(df_X, ser_y)
+    # Find the indices where the predicted is not
+    # the same as the actual
+    sel = [v1 != v2 for v1, v2 in 
+        zip(ser_y.values, ser_pred.values)]
+    indices = ser_y[sel].index
+    ser_state = util_classifier.calcStateProbs(ser_y)
+    # Calculate the probability of an adjacent state
+    # for each misclassified index
+    probs = []
+    num_adjacent = 0  # predicteds that are adjacents
+    for index in indices:
+      adj_states = util_classifier.findAdjacentStates(
+          ser_y, index)
+      states = [adj_states.prv, adj_states.nxt]
+      if np.nan in states:
+        states.remove(np.nan)
+      states = list(set(states))
+      if ser_pred[index] in states:
+        num_adjacent += 1
+      probs.append(np.sum([
+          ser_state[s]/(1 - ser_state[adj_states.cur])
+          for s in states]))
+    # Calculate the tail probability for the number
+    # of adjacents.
+    prob = util_statistics.generalizedBinomialTail(
+        probs, num_adjacent)
+    #
+    return prob
+          
 
   def plotRank(self, top=None, fig=None, ax=None, 
       is_plot=True, **kwargs):

@@ -33,7 +33,6 @@ TEST_FILE = "test_classifier_ensemble.pcl"
 
 
 ######## Helper Classes ######
-# TODO: Create tests that use RandomClassifier or delete this
 class RandomClassifier(object):
 
   def __init__(self):
@@ -94,8 +93,12 @@ class TestClassifierEnsemble(unittest.TestCase):
 
   def _init(self):
     self.df_X, self.ser_y = test_helpers.getData()
+    self.df_X_long, self.ser_y_long =  \
+        test_helpers.getDataLong()
     holdouts = 1
-    self.svm_ensemble = ClassifierEnsemble(ClassifierDescriptorSVM(),
+    self.svm_ensemble = ClassifierEnsemble(
+        ClassifierDescriptorSVM(),
+    #    filter_high_rank=15,
         size=SIZE, holdouts=holdouts)
     self.classifier_ensemble_random = ClassifierEnsemble(
         ClassifierDescriptorRandom(),
@@ -228,6 +231,7 @@ class TestClassifierEnsemble(unittest.TestCase):
     mean = ser.mean(axis=1).values[0]
     expected = 1/SIZE
     self.assertLess(abs(mean - expected), 0.1)
+# TODO: Create tests that use RandomClassifier or delete this
 
   def testScore(self):
     if IGNORE_TEST:
@@ -248,7 +252,35 @@ class TestClassifierEnsemble(unittest.TestCase):
     self.assertEqual(len(diff), 0)
 
   def testMakeInstancePredictionDF(self):
-    pass
+    if IGNORE_TEST:
+      return
+    self._init()
+    ser = self.svm_ensemble.makeInstancePredictionDF(
+        self.df_X, self.ser_y)
+    num = sum([v1 == v2 for v1, v2 in 
+        zip(self.ser_y.values, ser.values)])
+    self.assertGreater(num/len(ser), 0.9)
+    #
+    self.svm_ensemble = ClassifierEnsemble(
+        ClassifierDescriptorSVM(),
+        size=SIZE, holdouts=1)
+
+  def testCalcAdjProbTail(self):
+    if IGNORE_TEST:
+      return
+    def test(prob):
+      self.assertTrue(isinstance(prob, float))
+      self.assertGreaterEqual(prob, 0)
+      self.assertLessEqual(prob, 1)
+    self._init()
+    prob_long =  self.svm_ensemble.calcAdjStateProbTail(
+        self.df_X_long, self.ser_y_long)
+    test(prob_long)
+    prob_short =  self.svm_ensemble.calcAdjStateProbTail(
+        self.df_X, self.ser_y)
+    test(prob_short)
+    self.assertGreater(prob_short, prob_long)
+     
 
 if __name__ == '__main__':
   unittest.main()
