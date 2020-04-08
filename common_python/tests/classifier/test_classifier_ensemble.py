@@ -25,7 +25,7 @@ ITERATIONS = 3
 values = list(range(SIZE))
 values.extend(values)
 DF = pd.DataFrame({
-    'A': values,
+    'A': [10*v for v in values],
     'B': np.repeat(1, 2*SIZE),
     })
 SER = pd.Series(values)
@@ -70,6 +70,25 @@ class RandomClassifier(object):
     return value
 
 
+class ClassifierDescriptorRandom(
+    classifier_ensemble.ClassifierDescriptor):
+  # Descriptor information needed for Random classifiers
+  # Descriptor is for one-vs-rest. So, there is a separate
+  # classifier for each class.
+  
+  def __init__(self, clf=RandomClassifier()):
+    self.clf = clf
+
+  def getImportance(self, clf, class_selection=None):
+    """
+    Calculates the importances of features.
+    :param Classifier clf:
+    :param int class_selection: class for which importance is computed
+    :return list-float:
+    """
+    return self.clf.coef_
+
+
 ######## Test Classes ######
 class TestClassifierEnsemble(unittest.TestCase):
 
@@ -78,6 +97,10 @@ class TestClassifierEnsemble(unittest.TestCase):
     holdouts = 1
     self.svm_ensemble = ClassifierEnsemble(ClassifierDescriptorSVM(),
         size=SIZE, holdouts=holdouts)
+    self.classifier_ensemble_random = ClassifierEnsemble(
+        ClassifierDescriptorRandom(),
+        size=SIZE, holdouts=holdouts)
+    self.classifier_ensemble_random.fit(DF, SER)
   
   def setUp(self):
     if IGNORE_TEST:
@@ -175,6 +198,7 @@ class TestClassifierEnsemble(unittest.TestCase):
     # Tests the cross validation of ClassifierEnsemble
     if IGNORE_TEST:
       return
+    self._init()
     cvrs = []
     num_clfs = 10 # number of classifiers created randomly
     for fltr in [6, 1515]:
@@ -186,9 +210,9 @@ class TestClassifierEnsemble(unittest.TestCase):
           clf, self.df_X, self.ser_y, num_clfs))
     self.assertGreater(cvrs[1], cvrs[0])
 
-  # TODO: Use or delete
   def testRandomClassifier(self):
-    return
+    if IGNORE_TEST:
+      return
     clf = RandomClassifier()
     clf.fit(DF, SER)
     self.assertEqual(clf.class_probs[0], 1/SIZE)
@@ -196,20 +220,20 @@ class TestClassifierEnsemble(unittest.TestCase):
     trues = [c in range(SIZE) for c in ser_predict.values]
     self.assertTrue(all(trues))
 
-  # TODO: Use or delete
   def testPredict(self):
-    return
+    if IGNORE_TEST:
+      return
     self._init()
-    ser = self.random_classifier_ensemble.predict(DF.loc[0,:])
+    ser = self.classifier_ensemble_random.predict(DF)
     mean = ser.mean(axis=1).values[0]
     expected = 1/SIZE
     self.assertLess(abs(mean - expected), 0.1)
 
-  # TODO: Use or delete
   def testScore(self):
-    return
+    if IGNORE_TEST:
+      return
     self._init()
-    score = self.random_classifier_ensemble.score(DF, SER)
+    score = self.classifier_ensemble_random.score(DF, SER)
     expected = 1/SIZE
     self.assertLess(abs(score- expected), 0.1)
 
@@ -223,6 +247,8 @@ class TestClassifierEnsemble(unittest.TestCase):
         svm_ensemble.features)
     self.assertEqual(len(diff), 0)
 
+  def testMakeInstancePredictionDF(self):
+    pass
 
 if __name__ == '__main__':
   unittest.main()

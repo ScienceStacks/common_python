@@ -61,7 +61,34 @@ def calcStateProbs(ser_y):
   df = pd.DataFrame()
   df[STATE] = ser_y
   df[FRACTION] = df[STATE]
-  dfg = df.groupby(state).count()
+  dfg = df.groupby(STATE).count()
   df_result = pd.DataFrame(dfg)
   ser = df_result[FRACTION]/len(df)
+  return ser
+
+def aggregatePredictions(df_pred, threshold=0.8):
+  """
+  Aggregates probabilistic predictions, choosing the
+  class with the largest probability, if it exceeds
+  the threshold.
+  :param pd.DataFrame df_pred:
+      columns: class
+      rows: instance
+      values: float
+  :param float threshold:
+  :return pd.Series:
+      index: instance
+      values: class or np.nan if below threshold
+  """
+  MISSING = -1
+  columns = df_pred.columns
+  values = []
+  df = df_pred.applymap(lambda v: 1 if v >= threshold
+      else MISSING)
+  for idx, row in df_pred.iterrows():
+    row_list = row.tolist()
+    pos = row_list.index(max(row_list))
+    values.append(columns[pos])
+  ser = pd.Series(values, index=df_pred.index)
+  ser = ser.apply(lambda v: np.nan if v == MISSING else v)
   return ser

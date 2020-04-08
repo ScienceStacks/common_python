@@ -281,6 +281,30 @@ class ClassifierEnsemble(ClassifierCollection):
       plt.show()
     return fig, ax
 
+  def makeInstancePredictionDF(self, df_X, ser_y):
+      """
+      Constructs predictions for each instance for
+      using a classifier trained without that instance.
+      :param pd.DataFrame df_X:
+      :param pd.Series ser_y:
+      :return pd.DataFrame:
+        columns: state indices
+        index: instance
+        value: probability
+      """
+      indices = ser.index
+      dfs = []
+      for test_index in indices:
+          train_indices = list(set(indices).difference(
+             [test_index])) 
+          new_clf = copy.deepcopy(self)
+          new_clf.fit(df_X.loc[train_indices, :],
+              ser_y.loc[train_indices])
+          df_X_test = pd.DataFrame(df_X.loc[
+              test_index, :]) 
+          dfs.append(new_clf.predict(df_X_test.T))
+      return pd.concat(dfs)
+
   def plotRank(self, top=None, fig=None, ax=None, 
       is_plot=True, **kwargs):
     """
