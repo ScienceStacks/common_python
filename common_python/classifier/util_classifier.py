@@ -1,5 +1,16 @@
 '''Utilities common to classifiers.'''
 
+"""
+Functions know about features and states.
+The feature matrix df_X has columns that are
+feature names, and index that are instances.
+Trinary values are in the set {-1, 0, 1}.
+The state Series ser_y has values that are
+states, and indexes that are instances.
+The state F-statistic for a gene quantifies
+how well it distinguishes between states.
+"""
+
 import collections
 import pandas as pd
 import numpy as np
@@ -69,16 +80,16 @@ def calcStateProbs(ser_y):
 def aggregatePredictions(df_pred, threshold=0.8):
   """
   Aggregates probabilistic predictions, choosing the
-  class with the largest probability, if it exceeds
+  state with the largest probability, if it exceeds
   the threshold.
   :param pd.DataFrame df_pred:
-      columns: class
+      columns: state
       rows: instance
       values: float
   :param float threshold:
   :return pd.Series:
       index: instance
-      values: class or np.nan if below threshold
+      values: state or np.nan if below threshold
   """
   MISSING = -1
   columns = df_pred.columns
@@ -92,3 +103,81 @@ def aggregatePredictions(df_pred, threshold=0.8):
   ser = pd.Series(values, index=df_pred.index)
   ser = ser.apply(lambda v: np.nan if v == MISSING else v)
   return ser
+
+def makeFStatSer(df_X, ser_y,
+     is_prune=True, state_equ=None):
+  """
+  Constructs the state F-static for gene features.
+  This statistic quantifies the variation of the
+  gene expression between states to that within
+  states.
+  :param pd.DataFrame df_X:
+      column: gene
+      row: instance
+      value: trinary
+  :param pd.Series ser_y:
+      row: instance
+      value: state
+  :param bo0l is_prune: removes nan and inf values
+  :param dict state_equ: Provides for state equivalences
+      key: state in ser_y
+      value: new state
+  """
+  if state_equ is None:
+      state_equ = {s: s for s in ser_y.unique()}
+  # Construct the groups
+  df_X[STATE] = ser_y.apply(lambda v: state_equ[v])
+  # Calculate aggregations
+  dfg = df_X.groupby(STATE)
+  dfg_std = dfg.std()
+  dfg_mean = dfg.mean()
+  dfg_count = dfg.count()
+  # Calculate SSB
+  ser_mean = df_X.mean()
+  del ser_mean[STATE]
+  df_ssb = dfg_count*(dfg_mean - ser_mean)**2
+  ser_ssb = df_ssb.sum()
+  # SSW
+  df_ssw = dfg_std*(dfg_count - 1)
+  ser_ssw = df_ssw.sum()
+  # Calculate the F-Statistic
+  ser_fstat = ser_ssb/ser_ssw
+  ser_fstat = ser_fstat.sort_values(ascending=False)
+  if is_prune:
+    ser_fstat = ser_fstat[ser_fstat != np.inf]
+    sel = ser_fstat.isnull()
+    ser_fstat = ser_fstat[~sel]
+  return ser_fstat
+
+def plotStateFstat(state, df_X, ser_y, is_plot=True):
+  """
+  Plot state F-statistic
+  :param pd.DataFrame df_X:
+      column: gene
+      row: instance
+      value: trinary
+  :param pd.Series ser_y:
+      row: instance
+      value: state
+  :param bool is_plot: Construct the plot
+  """
+  if state is None:
+      state_equ = {s: s for s in ser_y.unique()}
+  else:
+      state_equ = {s: s if s==state else -1 for s in ser_y.unique()}
+  num_state = len(state_equ.values())
+  ser_fstat = makeFStatSer(df_X, ser_y, state_equ=state_equ)
+  ser_sl = ser_fstat.apply(lambda v: -np.log(1 - f.cdf(v, num_state-1, len(df_X)-num_state)))
+  indices = ser_sl.index[0:10]
+  _ = plt.figure(figsize=(8, 6))
+  _ = plt.bar(indices, ser_sl[indices])
+  _ = plt.xticks(indices, indices, rotation=90)
+  _ = plt.ylabel("-log(SL)")
+  if state is None:
+      _ = plt.title("All States")
+  else:
+      _ = plt.title("State: %d" % state)
+  if state is not None:
+      _ = plt.ylim([0, 1.4])
+  if is_plot:
+    plt.show()
