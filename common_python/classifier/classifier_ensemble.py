@@ -275,7 +275,8 @@ class ClassifierEnsemble(ClassifierCollection):
     this_max = max(df[cn.MEAN] + df[cn.STD])*1.1
     this_min = min(df[cn.MEAN] - df[cn.STD])*1.1
     this_min = min(this_min, 0)
-    ylim = util.getValue(kwargs, cn.PLT_YLIM, [this_min, this_max])
+    ylim = util.getValue(kwargs, cn.PLT_YLIM,
+        [this_min, this_max])
     ax.set_ylim(ylim)
     if cn.PLT_TITLE in kwargs:
       ax.set_title(kwargs[cn.PLT_TITLE])

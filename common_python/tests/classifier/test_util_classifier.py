@@ -1,6 +1,7 @@
 from common_python.classifier import util_classifier
 from common_python.tests.classifier  \
     import helpers as test_helpers
+from common_python.classifier import classifier_ensemble
 
 import pandas as pd
 import numpy as np
@@ -100,6 +101,17 @@ class TestFunctions(unittest.TestCase):
     util_classifier.plotStateFstat(state, self.df_X_long,
         self.ser_y_long, is_plot=IS_PLOT)
 
+  def testPlotInstancePredictions(self):
+    if IGNORE_TEST:
+      return
+    # Smoke test
+    svm_ensemble = classifier_ensemble.ClassifierEnsemble(
+        classifier_ensemble.ClassifierDescriptorSVM(),
+        size=1, filter_high_rank=5)
+    ser_pred = svm_ensemble.makeInstancePredictionDF(
+        self.df_X_long, self.ser_y_long)
+    util_classifier.plotInstancePredictions(
+        self.ser_y_long, ser_pred)
 
 if __name__ == '__main__':
   unittest.main()

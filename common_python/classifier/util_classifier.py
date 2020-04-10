@@ -167,7 +167,8 @@ def plotStateFstat(state, df_X, ser_y, is_plot=True):
   if state is None:
       state_equ = {s: s for s in ser_y.unique()}
   else:
-      state_equ = {s: s if s==state else -1 for s in ser_y.unique()}
+      state_equ = {s: s if s==state else -1 for s 
+          in ser_y.unique()}
   num_state = len(state_equ.values())
   ser_fstat = makeFstatSer(df_X, ser_y,
       state_equ=state_equ)
@@ -185,5 +186,30 @@ def plotStateFstat(state, df_X, ser_y, is_plot=True):
       _ = plt.title("State: %d" % state)
   if state is not None:
       _ = plt.ylim([0, 1.4])
+  if is_plot:
+    plt.show()
+
+def plotInstancePredictions(ser_y, ser_pred,
+    is_plot=True):
+  """
+  Plots the predicted states with text codings of
+  the actual states.
+  :param pd.Series ser_y: actual states
+       States are numeric
+  :param pd.Series ser_pred: actual states
+  :param bool is_plot: Produce the plot
+  """
+  min_state = ser_y.min()
+  max_state = ser_y.max()
+  plt.figure(figsize=(12, 8))
+  plt.scatter([-1,80], [-1,7])
+  for obs in range(len(ser_y)):
+      index = ser_pred.index[obs]
+      _ = plt.text(obs, ser_pred[index],
+          "%d" % ser_pred[index], fontsize=16)
+  plt.xlim([0, len(ser_y)])
+  plt.ylim([-0.5+min_state, 0.5+max_state])
+  _ = plt.xlabel("Observation", fontsize=18)
+  _ = plt.ylabel("Predicted State", fontsize=18)
   if is_plot:
     plt.show()
