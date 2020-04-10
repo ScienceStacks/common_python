@@ -12,8 +12,10 @@ how well it distinguishes between states.
 """
 
 import collections
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import scipy.stats
 
 
 FRACTION = "fraction"
@@ -104,7 +106,7 @@ def aggregatePredictions(df_pred, threshold=0.8):
   ser = ser.apply(lambda v: np.nan if v == MISSING else v)
   return ser
 
-def makeFStatSer(df_X, ser_y,
+def makeFstatSer(df_X, ser_y,
      is_prune=True, state_equ=None):
   """
   Constructs the state F-static for gene features.
@@ -126,6 +128,7 @@ def makeFStatSer(df_X, ser_y,
   if state_equ is None:
       state_equ = {s: s for s in ser_y.unique()}
   # Construct the groups
+  df_X = df_X.copy()
   df_X[STATE] = ser_y.apply(lambda v: state_equ[v])
   # Calculate aggregations
   dfg = df_X.groupby(STATE)
@@ -166,8 +169,11 @@ def plotStateFstat(state, df_X, ser_y, is_plot=True):
   else:
       state_equ = {s: s if s==state else -1 for s in ser_y.unique()}
   num_state = len(state_equ.values())
-  ser_fstat = makeFStatSer(df_X, ser_y, state_equ=state_equ)
-  ser_sl = ser_fstat.apply(lambda v: -np.log(1 - f.cdf(v, num_state-1, len(df_X)-num_state)))
+  ser_fstat = makeFstatSer(df_X, ser_y,
+      state_equ=state_equ)
+  ser_sl = ser_fstat.apply(lambda v: -np.log(
+      1 - scipy.stats.f.cdf(v, num_state-1,
+      len(df_X)-num_state)))
   indices = ser_sl.index[0:10]
   _ = plt.figure(figsize=(8, 6))
   _ = plt.bar(indices, ser_sl[indices])

@@ -7,7 +7,8 @@ import numpy as np
 import unittest
 
 
-IGNORE_TEST = True
+IGNORE_TEST = False
+IS_PLOT = False
 SER_Y = pd.Series({
     "0-1": 0,
     "0-2": 0,
@@ -34,8 +35,8 @@ DF_PRED = DF_PRED.T
 class TestFunctions(unittest.TestCase):
 
   def setUp(self):
-    self.df_X_short, self.ser_y_short =  \
-        test_helpers.getData()
+    data = test_helpers.getData()
+    self.df_X_short, self.ser_y_short = data
     self.df_X_long, self.ser_y_long =  \
         test_helpers.getDataLong()
  
@@ -76,22 +77,28 @@ class TestFunctions(unittest.TestCase):
         DF_PRED, threshold=0.8)
     self.assertTrue([i == v for i, v in ser.items()])
 
-  def testMakeFStatSer(self):
-    # TESTING
-    ser = util_classifier.makeFStatSer(self.df_X_short,
+  def testMakeFstatSer(self):
+    if IGNORE_TEST:
+      return
+    ser = util_classifier.makeFstatSer(self.df_X_short,
         self.ser_y_short)
     self.assertGreater(len(self.df_X_short.columns),
         len(ser))
     self.assertEqual(sum(ser.isnull()), 0)
     self.assertEqual(sum(ser == np.inf), 0)
     #
-    ser = util_classifier.makeFStatSer(self.df_X_long,
+    ser = util_classifier.makeFstatSer(self.df_X_long,
         self.ser_y_long)
     self.assertGreater(len(self.df_X_long.columns),
         len(ser))
 
   def testPlotStateFstat(self):
-    raise RuntimeError("Not implemented")
+    if IGNORE_TEST:
+      return
+    # Smoke test
+    state = 0
+    util_classifier.plotStateFstat(state, self.df_X_long,
+        self.ser_y_long, is_plot=IS_PLOT)
 
 
 if __name__ == '__main__':
