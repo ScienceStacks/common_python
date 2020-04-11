@@ -2,6 +2,7 @@ from common_python.classifier import util_classifier
 from common_python.tests.classifier  \
     import helpers as test_helpers
 from common_python.classifier import classifier_ensemble
+from common_python.testing import helpers
 
 import pandas as pd
 import numpy as np
@@ -111,7 +112,15 @@ class TestFunctions(unittest.TestCase):
     ser_pred = svm_ensemble.makeInstancePredictionDF(
         self.df_X_long, self.ser_y_long)
     util_classifier.plotInstancePredictions(
-        self.ser_y_long, ser_pred)
+        self.ser_y_long, ser_pred, is_plot=IS_PLOT)
+
+  def testMakeFstatDF(self):
+    if IGNORE_TEST:
+      return
+    df = util_classifier.makeFstatDF(
+        self.df_X_long, self.ser_y_long)
+    self.assertTrue(helpers.isValidDataFrame(df,
+        self.ser_y_long.unique()))
 
 if __name__ == '__main__':
   unittest.main()
