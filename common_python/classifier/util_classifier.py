@@ -123,7 +123,7 @@ def makeFstatDF(df_X, ser_y):
      value: -log significance level
      ordered by descending magnitude of sum(value)
   """
-  SUM = "sum"
+  MAX = "max"
   states = ser_y.unique()
   df = pd.DataFrame()
   for state in states:
@@ -132,9 +132,9 @@ def makeFstatDF(df_X, ser_y):
     ser = makeFstatSer(df_X, ser_y, state_equ=state_equ,
         is_prune=False)
     df[state] = ser
-  df[SUM] = df.sum(axis=1)
-  df = df.sort_values(SUM, ascending=False)
-  del df[SUM]
+  df[MAX] = df.max(axis=1)
+  df = df.sort_values(MAX, ascending=False)
+  del df[MAX]
   return df
 
 def makeFstatSer(df_X, ser_y,
@@ -237,7 +237,7 @@ def plotInstancePredictions(ser_y, ser_pred,
   for obs in range(len(ser_y)):
       index = ser_pred.index[obs]
       _ = plt.text(obs, ser_pred[index],
-          "%d" % ser_pred[index], fontsize=16)
+          "%d" % ser_y[index], fontsize=16)
   plt.xlim([0, len(ser_y)])
   plt.ylim([-0.5+min_state, 0.5+max_state])
   _ = plt.xlabel("Observation", fontsize=18)
