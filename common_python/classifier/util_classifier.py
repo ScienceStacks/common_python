@@ -106,6 +106,19 @@ def aggregatePredictions(df_pred, threshold=0.8):
   ser = ser.apply(lambda v: np.nan if v == MISSING else v)
   return ser
 
+def makeOneStateSer(ser, state):
+  """
+  Creates a Series where state is 1 for the designated
+  state and 0 otherwise.
+  :param pd.Series ser:
+       index: instance
+       value: int (state)
+  :param int
+  :return pd.Series
+  """
+  result = ser.map(lambda v: 1 if v==state else 0)
+  return result
+
 def makeFstatDF(df_X, ser_y):
   """
   Constructs the state F-static for gene features
@@ -127,9 +140,7 @@ def makeFstatDF(df_X, ser_y):
   states = ser_y.unique()
   df = pd.DataFrame()
   for state in states:
-    state_equ = {k: 1 if k==state else -1 for
-        k in states}
-    ser = makeFstatSer(df_X, ser_y, state_equ=state_equ,
+    ser = makeFstatSer(df_X, makeOneStateSer(ser_y, state),
         is_prune=False)
     df[state] = ser
   df[MAX] = df.max(axis=1)

@@ -40,21 +40,24 @@ class ClassifierDescriptor(object):
 
   def __init__(self):
     self.clf = None # Must assign to a classifier Type
-    raise RuntimeError("Must override ClassifierDescriptor.__init__")
 
   def getImportance(self, clf, **kwargs):
     """
-    Returns the importances of features.
+    Default handling of importance is that the classifier
+    has an appropriate method.
+    :param Classifier clf:
+    :param dict kwargs: optional parameters for getImportance
     :return list-float:
     """
-    raise RuntimeError(
-        "Must override ClassifierDescriptor.getImportance")
+    return clf.getImportance(**kwargs)
 
 
 class ClassifierDescriptorSVM(ClassifierDescriptor):
-  # Descriptor information needed for SVM classifiers
-  # Descriptor is for one-vs-rest. So, there is a separate
-  # classifier for each class.
+  """
+  Descriptor information needed for SVM classifiers
+  Descriptor is for one-vs-rest. So, there is a separate
+  classifier for each class.
+  """
   
   def __init__(self, clf=svm.LinearSVC()):
     self.clf = clf
