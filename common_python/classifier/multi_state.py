@@ -1,6 +1,6 @@
 """
 Classifier for multiple states constructed from a
-bass classifier. Classifier features
+base classifier. Classifier features
 are selected separately for each state (class).
 
 The base classifier must expose methods for fit,
@@ -11,13 +11,9 @@ without the use of cross validation (for performance
 reasons).
 """
 
-import common_python.constants as cn
-from common_python.util import util
 from common_python.classifier import util_classifier
 
-import collections
 import copy
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn import svm
@@ -35,9 +31,9 @@ class MultiState(object):
     self.base_clf = base_clf
     self.states = []
     self.all_features = None
-    self.feature_dct = {}  # key is state; value is ser
-    self.clf_dct = {}  # key is state
-    self.score_dct = {}  # key is state
+    self.feature_dct = {}  # key is state; value is list
+    self.clf_dct = {}  # key is state; value is clf
+    self.score_dct = {}  # key is state; value is score
 
   def fit(self, df_X, ser_y):
     """
@@ -63,7 +59,7 @@ class MultiState(object):
       self.clf_dct[state] = copy.deepcopy(self.base_clf)
       ser_fstat = df_fstat[state]
       ser_fstat.sort_values()
-      all_features = ser_fstat.index.tolist()
+      features_state = ser_fstat.index.tolist()
       ser_y_state = util_classifier.makeOneStateSer(ser_y,
           state)
       # Use enough features to obtain the desired accuracy
@@ -93,130 +89,43 @@ class MultiState(object):
   def predict(self, df_X):
     """
     Predict using the results of the classifier for each
-    state.
+    state. Prediction probability is the fraction of states
+    that predict a 1 for the instance.
     :param pd.DataFrame: features, indexed by instance.
     :return pd.DataFrame: fraction prediction by state;
-        columns are states; index by instance
-    Notes:
-      1. Assumes that self.clfs has been previously populated 
-         with fitted classifiers.
-      2. Considers all states encountered during fit
+        column: states
+        index: instance
+        values: fraction
+    :globals:
+        read: clf_dct
     """
+    df_pred = pd.DataFrame()
+    for state in self.states:
+      df_X_sub = self._setFeatures(df_X, state)
+      df_pred[state] = self.clf_dct[state].predict(df_X_sub)
+    ser_tot = df_pred.sum(axis=1)
+    df_pred = df_pred/ser_tot
+    return df_pred
 
   def score(self, df_X, ser_y):
     """
     Evaluates the accuracy of the ensemble classifier for
     the instances pvodied.
-    :param pd.DataFrame df_X: columns are features, rows are instances
-    :param pd.Series ser_y: rows are instances, values are states
-    Returns a float in [0, 1] which is the accuracy of the
-    ensemble classifier.
-    Assumes that self.clfs has been previously populated with fitted
-    classifiers.
+    :param pd.DataFrame df_X:
+        columns: features
+        index: instances
+    :param pd.Series ser_y:
+        index: instances
+        values: state
     """
+    score = 0
+    total = 0
     df_predict = self.predict(df_X)
-    missing_columns = set(ser_y).difference(
-        df_predict.columns)
-    for column in missing_columns:
-      df_predict[column] = np.repeat(0,
-          len(df_predict))
-    accuracies = []
-    for instance in ser_y.index:
-      # Accuracy is the probability of selecting the correct state
-      try:
-        accuracy = df_predict.loc[instance, ser_y.loc[instance]]
-      except:
-        import pdb; pdb.set_trace()
-      accuracies.append(accuracy)
-    return np.mean(accuracies)
-
-  def _orderFeatures(self, clf, state_selection=None):
-    """
-    Orders features by descending value of importance.
-    :param int state_selection: restrict analysis to a single state
-    :return list-int:
-    """
-    values = self.clf_desc.getImportance(clf,
-        state_selection=state_selection)
-    length = len(values)
-    sorted_tuples = np.argsort(values).tolist()
-    # Calculate rank in descending order
-    result = [length - sorted_tuples.index(v) for v in range(length)]
-    return result
-
-  def makeRankDF(self, state_selection=None):
-    """
-    Constructs a dataframe of feature ranks for importance,
-    where the rank is the feature order of importance.
-    A more important feature has a lower rank (closer to 0)
-    :param int state_selection: restrict analysis to a single state
-    :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
-    """
-    df_values = pd.DataFrame()
-    for idx, clf in enumerate(self.clfs):
-      df_values[idx] = pd.Series(self._orderFeatures(clf,
-          state_selection=state_selection),
-          index=self.features)
-    df_result = self._makeFeatureDF(df_values)
-    df_result = df_result.fillna(0)
-    return df_result.sort_values(cn.MEAN)
-
-  def makeImportanceDF(self, state_selection=None):
-    """
-    Constructs a dataframe of feature importances.
-    :param int state_selection: restrict analysis to a single state
-    :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
-    The importance of a feature is the maximum absolute value of its coefficient
-    in the collection of classifiers for the multi-state vector (one vs. rest, ovr).
-    """
-    ABS_MEAN = "abs_mean"
-    df_values = pd.DataFrame()
-    for idx, clf in enumerate(self.clfs):
-      values = self.clf_desc.getImportance(clf,
-         state_selection=state_selection)
-      df_values[idx] = pd.Series(values, index=self.features)
-    df_result = self._makeFeatureDF(df_values)
-    df_result[ABS_MEAN] = [np.abs(x) for x in df_result[cn.MEAN]]
-    df_result = df_result.sort_values(ABS_MEAN, ascending=False)
-    del df_result[ABS_MEAN]
-    df_result = df_result.fillna(0)
-    return df_result
-
-  def _plot(self, df, top, fig, ax, is_plot, **kwargs):
-    """
-    Common plotting codes
-    :param pd.DataFrame: cn.MEAN, cn.STD, indexed by feature
-    :param str ylabel:
-    :param int top:
-    :param bool is_plot: produce the plot
-    :param ax, fig: matplotlib
-    :param dict kwargs: keyword arguments for plot
-    """
-    # Data preparation
-    if top == None:
-      top = len(df)
-    indices = df.index.tolist()
-    indices = indices[0:top]
-    df = df.loc[indices, :]
-    # Plot
-    if ax is None:
-      fig, ax = plt.subplots()
-    ax.bar(indices, df[cn.MEAN], yerr=df[cn.STD],
-        align='center', 
-        alpha=0.5, ecolor='black', capsize=10)
-    bottom = util.getValue(kwargs, "bottom", 0.25)
-    plt.gcf().subplots_adjust(bottom=bottom)
-    ax.set_xticklabels(indices, rotation=90, fontsize=10)
-    ax.set_ylabel(kwargs[cn.PLT_YLABEL])
-    ax.set_xlabel(util.getValue(kwargs, cn.PLT_XLABEL, "Gene Group"))
-    this_max = max(df[cn.MEAN] + df[cn.STD])*1.1
-    this_min = min(df[cn.MEAN] - df[cn.STD])*1.1
-    this_min = min(this_min, 0)
-    ylim = util.getValue(kwargs, cn.PLT_YLIM,
-        [this_min, this_max])
-    ax.set_ylim(ylim)
-    if cn.PLT_TITLE in kwargs:
-      ax.set_title(kwargs[cn.PLT_TITLE])
-    if is_plot:
-      plt.show()
-    return fig, ax
+    for state in self.states:
+      sel = ser_y == state
+      df_predict_sub = df_predict.loc[sel, :]
+      score += df_predict_sub[state].sum()
+      total += len(df_pred_sub)
+    if total != len(df_X):
+      raise RuntimeError("Should process each row once.")
+    return score/len(df_X)
