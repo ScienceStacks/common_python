@@ -1,14 +1,14 @@
 import common_python.constants as cn
 from common_python.testing import helpers
 from common_python.tests.classifier import helpers as test_helpers
-from common_python.classsifier import multi_classifier
+from common_python.classifier import multi_classifier
 from common_python.testing import helpers
 
 import pandas as pd
 import numpy as np
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 
 
 class TestFeatureHandler(unittest.TestCase):
@@ -24,7 +24,18 @@ class TestFeatureHandler(unittest.TestCase):
       return
     self.assertTrue(self.df_X.equals(
         self.handler.df_X))
-    import pdb; pdb.set_trace()
+
+  def testFeatureDct(self):
+    # TESTING
+    feature_dct = self.handler.feature_dct
+    diff = set(feature_dct.keys()).symmetric_difference(
+        self.ser_y.unique())
+    self.assertEqual(len(diff), 0)
+
+  def testGetFeatures(self):
+
+  def testGetNonFeatures(self):
+    
 
 
 class TestMultiClassifier(unittest.TestCase):

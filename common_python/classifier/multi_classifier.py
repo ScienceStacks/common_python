@@ -43,7 +43,7 @@ class FeatureHandler(object):
     self.df_X = df_X
     self.ser_y = ser_y
     self.all_features = df_X.columns.tolist()
-    self._feature_dct = None
+    self._feature_dct = {}
 
   @property
   def feature_dct(self):
@@ -53,9 +53,10 @@ class FeatureHandler(object):
         key: class
         value: list of features in descending order
     """
-    if self._feature_dct is None:
-      df_fstat = util_classifier.makeFstatDF(df_X, ser_y)
-      for cls in ser_y.unique():
+    if len(self._feature_dct) == 0:
+      df_fstat = util_classifier.makeFstatDF(
+          self.df_X, self.ser_y)
+      for cls in self.ser_y.unique():
         ser_fstat = df_fstat[cls]
         ser_fstat.sort_values()
         self._feature_dct[cls] = ser_fstat.index.tolist()
@@ -72,7 +73,7 @@ class FeatureHandler(object):
 class MultiClassifier(object):
  
   def __init__(self, base_clf=svm.LinearSVC(),
-        feature_handler=FeatureHandler(),
+        feature_handler=FeatureHandler,
         desired_accuracy=0.9):
     """
     :param Classifier base_clf: 
