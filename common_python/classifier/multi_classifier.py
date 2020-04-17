@@ -3,7 +3,7 @@ Classifier for data with multiple classes. The
 classifier is constructed from a binary classier,
 which is referred to as the base classifier.
 Classifier features are selected using a
-FeaturePolicy instance.
+FeatureHandler instance.
 
 The base classifier must expose methods for fit,
 predict, score. Fitting is done by forward selection
@@ -25,9 +25,9 @@ from sklearn import svm
 
 
 ###################################################
-class FeaturePolicy(object):
+class FeatureHandler(object):
   """
-  Default policy for selecting features for a class.
+  Default handler for selecting features for a class.
   Provides ordered values of features.
   """
 
@@ -64,25 +64,25 @@ class FeaturePolicy(object):
   def getFeatures(self, cls):
     return self.feature_dct[cls]
 
-  def getNonFeatures(self, cls):
+  def getNonFeatures(self, features):
     return list(set(self.all_features).difference(
-        self.features_dct[cls]))
+        features))
 
 
 class MultiClassifier(object):
  
   def __init__(self, base_clf=svm.LinearSVC(),
-        feature_policy=FeaturePolicy(),
+        feature_handler=FeatureHandler(),
         desired_accuracy=0.9):
     """
     :param Classifier base_clf: 
-    :param FeaturePolicy feature_policy:
+    :param FeatureHandler feature_handler:
     :param float desired_accuracy: accuracy for clf
     """
     self.base_clf = base_clf
     self.classes = []
     self.all_features = None
-    self.feature_policy = None
+    self.feature_handler = None
     self.feature_dct = {}  # Features used for classifier
     self.clf_dct = {}  # key is cls; value is clf
     self.score_dct = {}  # key is cls; value is score
@@ -103,12 +103,12 @@ class MultiClassifier(object):
                   clf_dct, score_dct, feature_dct
        
     """
-    self.feature_policy = FeaturePolicy(df_X, ser_y)
+    self.feature_handler = FeatureHandler(df_X, ser_y)
     self.classes = ser_y.unique()
     for cls in self.classes:
       # Initialize for this class
       self.clf_dct[cls] = copy.deepcopy(self.base_clf)
-      features_cls = self.feature_policy.getFeatures(cls)
+      features_cls = self.feature_handler.getFeatures(cls)
       ser_y_cls = util_classifier.makeOneStateSer(ser_y,
           cls)
       # Use enough features to obtain the desired accuracy
@@ -121,15 +121,16 @@ class MultiClassifier(object):
         if self.score_dct[cls] >= self.desired_accuracy:
           break
 
-  def _setFeatures(self, df_X, cls):
+  def _setFeatures(self, cls):
     """
     Initializes the features for a class.
     :return pd.DataFrame: Non-feature columns are 0
     :globals:
         read: all_features
     """
-    non_features = self.feature_policy.getNonFeatures(cls)
-    df_X_sub = df_X.copy()
+    non_features = self.feature_handler.getNonFeatures(
+        self.feature_dct[cls])
+    df_X_sub = self.feature_handler.df_X.copy()
     df_X_sub[non_features] = 0
     return df_X_sub
 
