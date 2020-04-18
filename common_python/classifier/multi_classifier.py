@@ -3,7 +3,7 @@ Classifier for data with multiple classes. The
 classifier is constructed from a binary classier,
 which is referred to as the base classifier.
 Classifier features are selected using a
-FeatureHandler instance.
+FeatureSelector instance.
 
 The base classifier must expose methods for fit,
 predict, score. Fitting is done by forward selection
@@ -27,18 +27,24 @@ MAX_CORR = 0.5  # Maxium correlation with an existing feature
 
 
 ###################################################
-class FeatureHandler(object):
+class FeatureSelector(object):
   """
-  Default handler for selecting features for a class.
-  FeatureHandler responsibilities
-    1. Create descending order of features for each class
-    2. Select the next best feature for forward
+  Selects features for a class for a classifier.
+  FeatureSelector responsibilities
+    1. feature_dct
+       Container for features chosen for each class.
+    2. getNextFeatures()
+       Updates feature_dct to include
+       the next best feature for forward
        feature selection. This is done by eliminating
        from consideration features that are too highly
        correlated with features that are already selected.
+    3. getNonFeatures()
+       Compute the complement of the current features
+       and the full set of features.
   """
 
-  def __init__(self, df_X, ser_y, max_corr=0.5):
+  def __init__(self, df_X, ser_y, max_corr=MAX_CORR):
     """
     :param pd.DataFrame df_X:
         columns: features
@@ -54,29 +60,38 @@ class FeatureHandler(object):
     self._ser_y = ser_y
     self._classes = list(self._ser_y.uniquie())
     self._max_corr = max_corr
-    self._ordered_dct = self._makeOrderedDct()
     self._df_corr = np.corrcoef(self._df_X)
     # Public
+    # Features in descending order
+    # f-statistics for features by class
+    self.ordered_dct, self.fstat_dct = self._makeOrderedDct()
     # Features selected for each state
     self.feature_dct = {c: [] for c in self._classes}
 
-  def _makeOrderedDct(self):
+  def _makeDct(self):
     """
-    Features ordered in descending priority for each class.
-    :return dict:
-        key: class
-        value: list of features by descending fstat
+    Constructs features ordered in descending priority
+    and F-statistics for each class.
+    :return dict, dict:
+        First:
+          key: class
+          value: list of features by descending fstat
+        Second:
+          key: class
+          value: Series for fstat
     """
     ordered_dct = {}
+    fstat_dct = {}
     df_fstat = util_classifier.makeFstatDF(
         self._df_X, self._ser_y)
     for cls in self._classes:
       ser_fstat = df_fstat[cls]
       ser_fstat.sort_values()
+      fstat_dct[cls] = ser_fstat
       ordered_dct[cls] = ser_fstat.index.tolist()
-    return ordered_dct
+    return ordered_dct, fstat_dct
 
-  def setNonFeatures(self, cls):
+  def getNonFeatures(self, cls):
     """
     Sets values of non-features to zero.
     :return pd.DataFrame: Non-feature columns are 0
@@ -87,7 +102,7 @@ class FeatureHandler(object):
     df_X_sub[non_features] = 0
     return df_X_sub
 
-  def nextFeatures(self, cls):
+  def getNextFeatures(self, cls):
     """
     Selects the next feature to add for this class.
     :param object cls:
@@ -100,7 +115,7 @@ class FeatureHandler(object):
     # Choose the highest priority feature that is
     # not highly correlated with the existing features.
     indices = ser_max.index[ser_max < self.max_corr]
-    feature_subset = [f for f in self._ordered_dct[cls]
+    feature_subset = [f for f in self.ordered_dct[cls]
         if f in ser_max[sel]]
     if len(feature_subset) > 0:
       self.feature_dct[cls].append(feature_subset[0])
@@ -112,42 +127,41 @@ class FeatureHandler(object):
 class MultiClassifier(object):
  
   def __init__(self, base_clf=svm.LinearSVC(),
-        feature_handler_cls=FeatureHandler,
+        feature_selector_cls=FeatureSelector,
         desired_accuracy=0.9,
         **kwargs):
     """
     :param Classifier base_clf: 
-    :param FeatureHandler feature_handler:
+    :param FeatureSelector feature_selector:
     :param float desired_accuracy: accuracy for clf
-    :param dict kwargs: arguments passed to FeatureHandler
+    :param dict kwargs: arguments passed to FeatureSelector
     """
     # Public
     self.clf_dct = {}  # key is cls; value is clf
     self.score_dct = {}  # key is cls; value is score
-    self.feature_handler = None  # Constructed during fit
+    self.feature_selector = None  # Constructed during fit
     # Private
     self._kwargs = kwargs
     self._desired_accuracy = desired_accuracy
-    self.feature_handler_cls = feature_handler_cls
+    self.feature_selector_cls = feature_selector_cls
     self._base_clf = base_clf
     self._classes = []
 
   def fit(self, df_X, ser_y):
     """
     Selects the top features for each class and fits
-    a classifier with the desired accuracy.
-    Classifiers are in self.clfs.
+    a classifier with the desired accuracy by including
+    more features as selected by FeatureSelector.
     :param pd.DataFrame df_X:
         columns: features
         index: instances
     :param pd.Series ser_y:
         index: instances
         values: class
-    :globals:
-        assigned: all_features, classes,
-                  clf_dct, score_dct
+    ASSIGNED INSTANCE VARIABLES
+        _classes, clf_dct, score_dct
     """
-    self.feature_handler = self.feature_handler_cls(
+    self.feature_selector = self.feature_selector_cls(
         df_X, ser_y, **self._kwargs)
     self._classes = ser_y.unique()
     for cls in self._classes:
@@ -159,9 +173,9 @@ class MultiClassifier(object):
       # Use enough features to obtain the desired accuracy
       # This may not be possible
       for rank in range(len(features_cls)):
-        if self.feature_handler.nextFeatures(cls) is None:
+        if self.feature_selector.getNextFeatures(cls) is None:
           break
-        df_X_rank = self.feature_handler.setNonFeatures(cls)
+        df_X_rank = self.feature_selector.getNonFeatures(cls)
         self.clf_dct[cls].fit(df_X_rank, ser_y_cls)
         self.score_dct[cls] = self.clf_dct[cls].score(
             df_X, ser_y_cls)
@@ -179,8 +193,6 @@ class MultiClassifier(object):
         column: class
         index: instance
         values: fraction
-    :globals:
-        read: clf_dct
     """
     df_pred = pd.DataFrame()
     for cls in self._classes:
