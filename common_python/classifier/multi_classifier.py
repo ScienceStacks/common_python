@@ -49,46 +49,39 @@ class FeatureHandler(object):
     :param float max_corr: maximum correlation
         between a new feature an an existing feature
     """
+    # Private
+    self._df_X = df_X
+    self._ser_y = ser_y
+    self._classes = list(self._ser_y.uniquie())
+    self._max_corr = max_corr
+    self._ordered_dct = self._makeOrderedDct()
+    self._df_corr = np.corrcoef(self._df_X)
     # Public
-    self.df_X = df_X
-    self.ser_y = ser_y
-    self._classes = list(self.ser_y.uniquie())
-    self.all_features = df_X.columns.tolist()
     # Features selected for each state
     self.feature_dct = {c: [] for c in self._classes}
-    # Private
-    # Features in descending priority order by class
-    self._max_corr = max_corr
-    self._ordered_dct = {}
-    self._df_corr = np.corrcoef(self.df_X)
 
-  @property
-  def ordered_dct(self):
+  def _makeOrderedDct(self):
     """
     Features ordered in descending priority for each class.
     :return dict:
         key: class
-        value: list of features in descending order
+        value: list of features by descending fstat
     """
-    if len(self._ordered_dct) == 0:
-      df_fstat = util_classifier.makeFstatDF(
-          self.df_X, self.ser_y)
-      for cls in self._classes:
-        ser_fstat = df_fstat[cls]
-        ser_fstat.sort_values()
-        self._ordered_dct[cls] = ser_fstat.index.tolist()
-    return self._ordered_dct
-
-  def getNonFeatures(self, cls):
-    return list(set(self.feature_dct[cls]).difference(
-        features))
+    ordered_dct = {}
+    df_fstat = util_classifier.makeFstatDF(
+        self._df_X, self._ser_y)
+    for cls in self._classes:
+      ser_fstat = df_fstat[cls]
+      ser_fstat.sort_values()
+      ordered_dct[cls] = ser_fstat.index.tolist()
+    return ordered_dct
 
   def setNonFeatures(self, cls):
     """
     Sets values of non-features to zero.
     :return pd.DataFrame: Non-feature columns are 0
     """
-    df_X_sub = self.df_X.copy()
+    df_X_sub = self._df_X.copy()
     non_features = list(set(self.feature_dct[cls]
         ).difference(self.feature_dct[cls]))
     df_X_sub[non_features] = 0
@@ -129,10 +122,9 @@ class MultiClassifier(object):
     :param dict kwargs: arguments passed to FeatureHandler
     """
     # Public
-    self.feature_dct = {}  # Features used for classifier
     self.clf_dct = {}  # key is cls; value is clf
     self.score_dct = {}  # key is cls; value is score
-    self.feature_handler = None
+    self.feature_handler = None  # Constructed during fit
     # Private
     self._kwargs = kwargs
     self._desired_accuracy = desired_accuracy
@@ -153,7 +145,7 @@ class MultiClassifier(object):
         values: class
     :globals:
         assigned: all_features, classes,
-                  clf_dct, score_dct, feature_dct
+                  clf_dct, score_dct
     """
     self.feature_handler = self.feature_handler_cls(
         df_X, ser_y, **self._kwargs)
