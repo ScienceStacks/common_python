@@ -154,9 +154,10 @@ class ClassifierEnsemble(ClassifierCollection):
     array = df_X_sub.values
     array = array.reshape(len(df_X.index), len(df_X_sub.columns)) 
     # Create a dataframe of class predictions
-    clf_predictions = [clf.predict(df_X_sub) for clf in self.clfs]
-    instance_predictions = [dict(collections.Counter(x)) for x in zip(*clf_predictions)]
-    import pdb; pdb.set_trace()
+    clf_predictions = [clf.predict(df_X_sub)
+        for clf in self.clfs]
+    instance_predictions = [dict(collections.Counter(x))
+        for x in zip(*clf_predictions)]
     df = pd.DataFrame()
     df[DUMMY_COLUMN] = np.repeat(-1, len(self.classes))
     for idx, instance in enumerate(instance_predictions):

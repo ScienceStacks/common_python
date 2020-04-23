@@ -5,6 +5,7 @@ from common_python.classifier import classifier_ensemble
 from common_python.testing import helpers
 
 import pandas as pd
+import random
 import numpy as np
 import unittest
 
@@ -121,6 +122,19 @@ class TestFunctions(unittest.TestCase):
         self.df_X_long, self.ser_y_long)
     self.assertTrue(helpers.isValidDataFrame(df,
         self.ser_y_long.unique()))
+    #
+    random_indices = random.sample(
+        self.df_X_long.index.tolist(), 10)
+    ser_weight = self.ser_y_long.copy()
+    ser_weight.loc[:] = 1
+    ser_weight.loc[random_indices] = 20
+    df2 = util_classifier.makeFstatDF(
+        self.df_X_long, self.ser_y_long,
+        ser_weight=ser_weight)
+    self.assertTrue(helpers.isValidDataFrame(df2,
+        self.ser_y_long.unique()))
+    
+
 
 if __name__ == '__main__':
   unittest.main()

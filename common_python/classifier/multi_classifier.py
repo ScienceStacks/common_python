@@ -17,136 +17,63 @@ Technical notes:
 """
 
 from common_python.classifier import util_classifier
+from common_python.classifier import feature_selector
 
 import copy
 import numpy as np
 import pandas as pd
+import random
 from sklearn import svm
 
-MAX_CORR = 0.5  # Maxium correlation with an existing feature
-
-
-###################################################
-class FeatureSelector(object):
-  """
-  Selects features for a class for a classifier.
-  FeatureSelector responsibilities
-    1. feature_dct
-       Container for features chosen for each class.
-    2. getNextFeatures()
-       Updates feature_dct to include
-       the next best feature for forward
-       feature selection. This is done by eliminating
-       from consideration features that are too highly
-       correlated with features that are already selected.
-    3. getNonFeatures()
-       Compute the complement of the current features
-       and the full set of features.
-  """
-
-  def __init__(self, df_X, ser_y, max_corr=MAX_CORR):
-    """
-    :param pd.DataFrame df_X:
-        columns: features
-        index: instances
-    :param pd.Series ser_y:
-        index: instances
-        values: class
-    :param float max_corr: maximum correlation
-        between a new feature an an existing feature
-    """
-    # Private
-    self._df_X = df_X
-    self._ser_y = ser_y
-    self._classes = list(self._ser_y.uniquie())
-    self._max_corr = max_corr
-    self._df_corr = np.corrcoef(self._df_X)
-    # Public
-    # Features in descending order
-    # f-statistics for features by class
-    self.ordered_dct, self.fstat_dct = self._makeOrderedDct()
-    # Features selected for each state
-    self.feature_dct = {c: [] for c in self._classes}
-
-  def _makeDct(self):
-    """
-    Constructs features ordered in descending priority
-    and F-statistics for each class.
-    :return dict, dict:
-        First:
-          key: class
-          value: list of features by descending fstat
-        Second:
-          key: class
-          value: Series for fstat
-    """
-    ordered_dct = {}
-    fstat_dct = {}
-    df_fstat = util_classifier.makeFstatDF(
-        self._df_X, self._ser_y)
-    for cls in self._classes:
-      ser_fstat = df_fstat[cls]
-      ser_fstat.sort_values()
-      fstat_dct[cls] = ser_fstat
-      ordered_dct[cls] = ser_fstat.index.tolist()
-    return ordered_dct, fstat_dct
-
-  def getNonFeatures(self, cls):
-    """
-    Sets values of non-features to zero.
-    :return pd.DataFrame: Non-feature columns are 0
-    """
-    df_X_sub = self._df_X.copy()
-    non_features = list(set(self.feature_dct[cls]
-        ).difference(self.feature_dct[cls]))
-    df_X_sub[non_features] = 0
-    return df_X_sub
-
-  def getNextFeatures(self, cls):
-    """
-    Selects the next feature to add for this class.
-    :param object cls:
-    :return str: list-feature
-    """
-    df_corr = copy.deepcopy(self.df_corr)
-    df_corr = df_corr[self.feature_dct[cls]]
-    ser_max = df_corr.max(axis=1)
-    ser_max = ser_max.apply(lambda v: np.abs(v))
-    # Choose the highest priority feature that is
-    # not highly correlated with the existing features.
-    indices = ser_max.index[ser_max < self.max_corr]
-    feature_subset = [f for f in self.ordered_dct[cls]
-        if f in ser_max[sel]]
-    if len(feature_subset) > 0:
-      self.feature_dct[cls].append(feature_subset[0])
-      return self.feature_dct[cls]
-    else:
-      return None
+## Hyperparameters for classifier
+# The following control the stopping criteria
+# in forward selection. The first criteria
+# that is satisfied halts forward selection.
+# 
+MAX_ITER = 20  # Maximum number of features considered
+MAX_DEGRADE = 0.05 # Maximum degradation from best score
+#  The following controls acceptance of a feature
+MIN_INCR_SCORE = 0.02  # Minimum amount by which score
+                       # Score must increase to be included
 
 
 class MultiClassifier(object):
+  """
+  Has several hyperparameters defined in constructor.
+  """
  
   def __init__(self, base_clf=svm.LinearSVC(),
-        feature_selector_cls=FeatureSelector,
-        desired_accuracy=0.9,
+        feature_selector_cls=  \
+        feature_selector.FeatureSelectorResidual,
+        min_incr_score=MIN_INCR_SCORE,
+        max_iter=MAX_ITER, max_degrade=MAX_DEGRADE,
         **kwargs):
     """
     :param Classifier base_clf: 
-    :param FeatureSelector feature_selector:
-    :param float desired_accuracy: accuracy for clf
+    :param FeatureSelector feature_selector_cls:
+    :param float min_incr_score: min amount by which
+        a feature must increase the score to be included
+    :param int max_iter: maximum number of iterations
+    :param float max_degrade: maximum difference between
+        best score and actual
     :param dict kwargs: arguments passed to FeatureSelector
     """
     # Public
+    self.classes = []
     self.clf_dct = {}  # key is cls; value is clf
     self.score_dct = {}  # key is cls; value is score
-    self.feature_selector = None  # Constructed during fit
+    self.best_score_dct = {}  # key is cls; value is score
+    self.selector = None  # Constructed during fit
     # Private
+    self._min_incr_score = min_incr_score
+    self._max_degrade = max_degrade
+    self._max_iter = max_iter
     self._kwargs = kwargs
-    self._desired_accuracy = desired_accuracy
-    self.feature_selector_cls = feature_selector_cls
+    self._feature_selector_cls = feature_selector_cls
     self._base_clf = base_clf
-    self._classes = []
 
+  # FIXME: Select features so as to minimize the
+  #        degradation in accuracy w.r.t. all features.
   def fit(self, df_X, ser_y):
     """
     Selects the top features for each class and fits
@@ -161,27 +88,55 @@ class MultiClassifier(object):
     ASSIGNED INSTANCE VARIABLES
         _classes, clf_dct, score_dct
     """
-    self.feature_selector = self.feature_selector_cls(
+    def makeArrays(df_X, df_y):
+      arr_X = df_X.values[indices_score, :]
+      arr_y = ser_y_cls.values[indices_score]
+      return arr_X, arr_y
+    #
+    self.selector = self._feature_selector_cls(
         df_X, ser_y, **self._kwargs)
-    self._classes = ser_y.unique()
-    for cls in self._classes:
+    self.classes = ser_y.unique()
+    for cls in self.classes:
       # Initialize for this class
-      self.clf_dct[cls] = copy.deepcopy(self._base_clf)
+      clf = copy.deepcopy(self._base_clf)
+      self.clf_dct[cls] = clf
       ser_y_cls = util_classifier.makeOneStateSer(ser_y,
           cls)
       last_score = 0
+      # Select the indices to be used for prediction
+      length = len(ser_y)
+      indices_cls = [i for i, v in enumerate(ser_y_cls)
+          if v == 1]
+      indices_non_cls = set(
+          range(length)).difference(indices_cls)
+      indices_score = random.sample(indices_non_cls,
+          len(indices_non_cls))
+      indices_score.extend(indices_cls)
+      # Find maximum accuracy achievable for this class
+      clf.fit(df_X, ser_y_cls)  # Fit for all features
+      arr_X, arr_y = makeArrays(df_X, ser_y_cls)
+      self.best_score_dct[cls] = clf.score(arr_X, arr_y)
       # Use enough features to obtain the desired accuracy
       # This may not be possible
-      for rank in range(len(features_cls)):
-        if self.feature_selector.getNextFeatures(cls) is None:
+      length = len(self.selector.all_features)
+      for num_iter, rank in enumerate(range(length)):
+        if num_iter > self._max_iter:
           break
-        df_X_rank = self.feature_selector.getNonFeatures(cls)
+        if not self.selector.add(cls):
+          break
+        df_X_rank = self.selector.zeroValues(cls)
         self.clf_dct[cls].fit(df_X_rank, ser_y_cls)
-        self.score_dct[cls] = self.clf_dct[cls].score(
-            df_X, ser_y_cls)
-        if self.score_dct[cls] >= self._desired_accuracy:
+        arr_X, arr_y = makeArrays(df_X_rank, ser_y_cls)
+        new_score = self.clf_dct[cls].score(arr_X, arr_y)
+        if new_score - last_score > self._min_incr_score:
+            self.score_dct[cls] = new_score
+            last_score = new_score
+        else:
+          # Remove the feature
+          self.selector.remove(cls)
+        if self.best_score_dct[cls]  \
+            - self.score_dct[cls]  < self._max_degrade:
           break
-      self.clf_dct[cls] = clf
 
   def predict(self, df_X):
     """
@@ -195,10 +150,13 @@ class MultiClassifier(object):
         values: fraction
     """
     df_pred = pd.DataFrame()
-    for cls in self._classes:
+    for cls in self.classes:
       df_pred[cls] = self.clf_dct[cls].predict(df_X)
+    df_pred.index = df_X.index
     ser_tot = df_pred.sum(axis=1)
-    df_pred = df_pred/ser_tot
+    for cls in self.classes:
+      df_pred[cls] = df_pred[cls]/ser_tot
+    df_pred = df_pred.fillna(0)
     return df_pred
 
   def score(self, df_X, ser_y):
@@ -215,7 +173,7 @@ class MultiClassifier(object):
     score = 0
     total = 0
     df_predict = self.predict(df_X)
-    for cls in self._classes:
+    for cls in self.classes:
       sel = ser_y == cls
       df_predict_sub = df_predict.loc[sel, :]
       score += df_predict_sub[cls].sum()

@@ -119,7 +119,7 @@ def makeOneStateSer(ser, state):
   result = ser.map(lambda v: 1 if v==state else 0)
   return result
 
-def makeFstatDF(df_X, ser_y):
+def makeFstatDF(df_X, ser_y, ser_weight=None):
   """
   Constructs the state F-static for gene features
   by state.
@@ -130,6 +130,9 @@ def makeFstatDF(df_X, ser_y):
   :param pd.Series ser_y:
       row: instance
       value: state
+  :param pd.Series ser_weight: weight for instances
+      row: instance
+      value: multiplier for instance
   :return pd.DataFrame:
      columns: state
      index: gene
@@ -137,11 +140,16 @@ def makeFstatDF(df_X, ser_y):
      ordered by descending magnitude of sum(value)
   """
   MAX = "max"
+  if ser_weight is None:
+    ser_weight = ser_y.copy()
+    ser_weight[:] = 1
+  df_X_adj = df_X.copy()
+  df_X_adj = df_X_adj.apply(lambda col: col*ser_weight)
   states = ser_y.unique()
   df = pd.DataFrame()
   for state in states:
-    ser = makeFstatSer(df_X, makeOneStateSer(ser_y, state),
-        is_prune=False)
+    ser = makeFstatSer(df_X_adj,
+         makeOneStateSer(ser_y, state), is_prune=False)
     df[state] = ser
   df[MAX] = df.max(axis=1)
   df = df.sort_values(MAX, ascending=False)
