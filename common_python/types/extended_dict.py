@@ -24,6 +24,14 @@ class ExtendedDict(dict):
           "Deserialization path does not exist.")
     return persister.get()
 
+  def toCsv(self, csv_path):
+    """
+    Writes the dictionary to a CSV file.
+    :param str path: path to CSV file to write
+    """
+    ser = pd.Series(self)
+    ser.to_csv(csv_path)
+
   def equals(self, other):
     """
     Checks if two dictionaries have the same
