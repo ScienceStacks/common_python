@@ -8,7 +8,7 @@ import copy
 import os
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 TEST_PATH_PCL = os.path.join(cn.TEST_DIR,
     "test_extended_dict.pcl")
 TEST_PATH_CSV = os.path.join(cn.TEST_DIR,
@@ -63,6 +63,13 @@ class TestExtendedDict(unittest.TestCase):
     self._remove(path=TEST_PATH_CSV)
     self.extended_dict.toCsv(TEST_PATH_CSV)
     self.assertTrue(os.path.isfile(TEST_PATH_CSV))
+
+  def testStr(self):
+    # TESTING
+    stg = str(self.extended_dict)
+    trues = ["%s:" % k in stg for k 
+        in self.extended_dict.keys()]
+    self.assertTrue(all(trues))
 
 
 if __name__ == '__main__':

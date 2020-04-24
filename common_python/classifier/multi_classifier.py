@@ -19,6 +19,8 @@ Technical notes:
 from common_python.classifier import util_classifier
 from common_python.classifier import feature_selector
 from common_python.util.persister import Persister
+from common_python.types.extended_dict  \
+    import ExtendedDict
 
 import copy
 import numpy as np
@@ -40,7 +42,7 @@ MIN_INCR_SCORE = 0.02  # Minimum amount by which score
 
 # Files
 # Serialize results
-DIR = os.path.dirname("__file__")
+DIR = os.path.abspath(os.path.dirname("__file__"))
 SERIALIZE_PATH = os.path.join(DIR, "multi_classifier.pcl")
 PERSISTER_INTERVAL = 5
 
@@ -218,7 +220,8 @@ class MultiClassifier(object):
   @classmethod
   def doQualityFit(cls, df_X, ser_y,
        max_iter=5000,
-       path=SERIALIZE_PATH):
+       path=SERIALIZE_PATH,
+       is_report=True):
     """
     :param pd.DataFrame df_X:
         columns: features
@@ -232,11 +235,22 @@ class MultiClassifier(object):
     """
     persister = Persister(path)
     if persister.isExist():
-      print ("Previous state found.")
+      if is_report:
+        print ("\n***Previous state found: %s\n" % path)
       multi = persister.get()
     else:
-      print ("No previous state found.")
+      if is_report:
+        print ("\n***No previous state. Creating: %s\n"
+            % path)
       multi = MultiClassifier(feature_selector_cls=  \
           feature_selector.FeatureSelector,
           max_iter=max_iter, max_degrade=0.01)
     multi.fit(df_X, ser_y, persister=persister)
+
+  @classmethod
+  def getClassifier(cls, path=SERIALIZE_PATH):
+    persister = Persister(path)
+    if persister.isExist():
+      return persister.get()
+    else:
+      return None

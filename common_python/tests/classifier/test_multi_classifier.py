@@ -14,12 +14,14 @@ import numpy as np
 from sklearn import svm
 import unittest
 
-IGNORE_TEST = True
-
+IGNORE_TEST = False
 
 DIR_PATH = os.path.abspath(os.path.dirname(__file__))
 TEST_DATA_PATH = os.path.join(DIR_PATH,
     "test_multi_classifier.pcl")
+TEST_SERIALIZE_PATH  \
+    = os.path.join(DIR_PATH, "test_multi_serialize.pcl")
+
 PERSISTER = Persister(TEST_DATA_PATH)
 
 if not PERSISTER.isExist():
@@ -36,11 +38,19 @@ else:
 
 
 class TestMultiClass(unittest.TestCase):
+
+  def _remove(self):
+    if os.path.isfile(TEST_SERIALIZE_PATH):
+      os.remove(TEST_SERIALIZE_PATH)
   
   def setUp(self):
+    self._remove()
     self.df_X, self.ser_y = DF_X, SER_Y
     self.clf = multi_classifier.MultiClassifier()
     self.clf_fitted = copy.deepcopy(CLF)
+
+  def tearDown(self):
+    self._remove()
 
   def testConstructor(self):
     if IGNORE_TEST:
@@ -77,21 +87,40 @@ class TestMultiClass(unittest.TestCase):
         expected_columns=self.ser_y.unique()))
 
   def testDoQualityFit(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     multi_classifier.MultiClassifier.doQualityFit(
-        self.df_X, self.ser_y, max_iter=1)
-    persister = Persister(multi_classifier.SERIALIZE_PATH)
+        self.df_X, self.ser_y, max_iter=1,
+        path=TEST_SERIALIZE_PATH, is_report=False)
+    persister = Persister(TEST_SERIALIZE_PATH)
     self.assertTrue(persister.isExist())
     clf1 = persister.get()
     self.assertTrue(isinstance(clf1.ser_y_cls, pd.Series))
     #
     multi_classifier.MultiClassifier.doQualityFit(
-        self.df_X, self.ser_y, max_iter=1)
-    persister = Persister(multi_classifier.SERIALIZE_PATH)
+        self.df_X, self.ser_y, max_iter=1,
+        is_report=False)
     clf2 = persister.get()
     for cls in clf1.classes:
       self.assertTrue(clf1.selector.feature_dct[cls]
           == clf2.selector.feature_dct[cls])
+
+  def testGetClassifier(self):
+    if IGNORE_TEST:
+      return
+    multi_clf =  \
+        multi_classifier.MultiClassifier.getClassifier(
+        path=TEST_SERIALIZE_PATH)
+    self.assertIsNone(multi_clf)
+    #
+    multi_classifier.MultiClassifier.doQualityFit(
+        self.df_X, self.ser_y, max_iter=1,
+        path=TEST_SERIALIZE_PATH, is_report=False)
+    multi_clf =  \
+        multi_classifier.MultiClassifier.getClassifier(
+        path=TEST_SERIALIZE_PATH)
+    self.assertTrue(isinstance(multi_clf,
+        multi_classifier.MultiClassifier))
     
 
 if __name__ == '__main__':

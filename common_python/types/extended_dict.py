@@ -13,6 +13,12 @@ class ExtendedDict(dict):
     persister = Persister(path)
     persister.set(self)
 
+  def __str__(self):
+    stg = ""
+    for key in self.keys():
+      stg += "%s: %s\n" % (key, self[key])
+    return stg
+
   @ classmethod
   def deserialize(cls, path):
     """
