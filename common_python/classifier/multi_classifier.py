@@ -22,6 +22,7 @@ from common_python.util.persister import Persister
 
 import copy
 import numpy as np
+import os
 import pandas as pd
 import random
 from sklearn import svm
@@ -39,7 +40,8 @@ MIN_INCR_SCORE = 0.02  # Minimum amount by which score
 
 # Files
 # Serialize results
-SERIALIZE_PATH = "multi_classifier.pcl" 
+DIR = os.path.dirname("__file__")
+SERIALIZE_PATH = os.path.join(DIR, "multi_classifier.pcl")
 PERSISTER_INTERVAL = 5
 
 
@@ -98,20 +100,23 @@ class MultiClassifier(object):
       arr_y = self.ser_y_cls.values[indices_score]
       return arr_X, arr_y
     #
-    self.selector = self._feature_selector_cls(
-        df_X, ser_y, **self._kwargs)
     self.classes = ser_y.unique()
     finished_dct = {c: False for c in self.classes}
     initialized_dct = {c: False for c in self.classes}
     # Handle restart of a fit, detecting which have
-    for cls in self.classes:
-      if cls in self.clf_dct:
-        pos = self.classes.index(cls)
-        if pos > 0:
-          # Completed the previous class
-          finished_dct[self.classes[pos - 1]] = True
-        if cls in self.clf_dct.keys():
-          initialized_dct[cls] = True
+    if self.selector is not None:
+      # Previously run fit
+      for cls in self.classes:
+        if cls in self.clf_dct:
+          pos = list(self.classes).index(cls)
+          if pos > 0:
+            # Completed the previous class
+            finished_dct[self.classes[pos - 1]] = True
+          if cls in self.clf_dct.keys():
+            initialized_dct[cls] = True
+    else:
+      self.selector = self._feature_selector_cls(
+          df_X, ser_y, **self._kwargs)
     # Do fit by class
     for cls in self.classes:
       if finished_dct[cls]:
@@ -144,6 +149,9 @@ class MultiClassifier(object):
       num_iter = len(self.selector.feature_dct[cls])  \
           + len(self.selector.remove_dct[cls])
       for rank in range(num_iter, length):
+        if num_iter % PERSISTER_INTERVAL == 0:
+          if persister is not None:
+            persister.set(self)
         num_iter += 1
         if num_iter > self._max_iter:
           break
@@ -162,9 +170,6 @@ class MultiClassifier(object):
         if self.best_score_dct[cls]  \
             - self.score_dct[cls]  < self._max_degrade:
           break
-        if num_iter % PERSISTER_INTERVAL == 0:
-          if persister is not None:
-            persister.set(self)
 
   def predict(self, df_X):
     """
@@ -211,7 +216,8 @@ class MultiClassifier(object):
     return score/len(df_X)
 
   @classmethod
-  def doHighQualityFit(cls, df_X, ser_y,
+  def doQualityFit(cls, df_X, ser_y,
+       max_iter=5000,
        path=SERIALIZE_PATH):
     """
     :param pd.DataFrame df_X:
@@ -221,15 +227,16 @@ class MultiClassifier(object):
         index: instances
         values: class
     :param str path: serialization file
+    :param int max_iter: used for tests
     :return MultiClassifier:
     """
     persister = Persister(path)
     if persister.isExist():
-      print ("No previous state found.")
+      print ("Previous state found.")
       multi = persister.get()
     else:
-      print ("Previous state found.")
+      print ("No previous state found.")
       multi = MultiClassifier(feature_selector_cls=  \
           feature_selector.FeatureSelector,
-          max_iter=5000, max_degrade=0.01)
+          max_iter=max_iter, max_degrade=0.01)
     multi.fit(df_X, ser_y, persister=persister)

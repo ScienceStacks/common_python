@@ -1,4 +1,5 @@
 import common_python.constants as cn
+from common_python.util.persister import Persister
 from common_python.testing import helpers
 from common_python.tests.classifier import helpers as test_helpers
 from common_python.classifier import multi_classifier
@@ -48,7 +49,8 @@ class TestMultiClass(unittest.TestCase):
         svm.LinearSVC))
 
   def testFit(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     for fs in [
         feature_selector.FeatureSelector,
         feature_selector.FeatureSelectorCorr,
@@ -73,6 +75,23 @@ class TestMultiClass(unittest.TestCase):
     df_pred = self.clf_fitted.predict(self.df_X)
     self.assertTrue(helpers.isValidDataFrame(df_pred,
         expected_columns=self.ser_y.unique()))
+
+  def testDoQualityFit(self):
+    # TESTING
+    multi_classifier.MultiClassifier.doQualityFit(
+        self.df_X, self.ser_y, max_iter=1)
+    persister = Persister(multi_classifier.SERIALIZE_PATH)
+    self.assertTrue(persister.isExist())
+    clf1 = persister.get()
+    self.assertTrue(isinstance(clf1.ser_y_cls, pd.Series))
+    #
+    multi_classifier.MultiClassifier.doQualityFit(
+        self.df_X, self.ser_y, max_iter=1)
+    persister = Persister(multi_classifier.SERIALIZE_PATH)
+    clf2 = persister.get()
+    for cls in clf1.classes:
+      self.assertTrue(clf1.selector.feature_dct[cls]
+          == clf2.selector.feature_dct[cls])
     
 
 if __name__ == '__main__':
