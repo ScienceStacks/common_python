@@ -18,6 +18,7 @@ Technical notes:
 
 from common_python.classifier import util_classifier
 from common_python.classifier import feature_selector
+from common_python.util.persister import Persister
 
 import copy
 import numpy as np
@@ -35,6 +36,11 @@ MAX_DEGRADE = 0.05 # Maximum degradation from best score
 #  The following controls acceptance of a feature
 MIN_INCR_SCORE = 0.02  # Minimum amount by which score
                        # Score must increase to be included
+
+# Files
+# Serialize results
+SERIALIZE_PATH = "multi_classifier.pcl" 
+PERSISTER_INTERVAL = 5
 
 
 class MultiClassifier(object):
@@ -72,9 +78,7 @@ class MultiClassifier(object):
     self._feature_selector_cls = feature_selector_cls
     self._base_clf = base_clf
 
-  # FIXME: Select features so as to minimize the
-  #        degradation in accuracy w.r.t. all features.
-  def fit(self, df_X, ser_y):
+  def fit(self, df_X, ser_y, persister=None):
     """
     Selects the top features for each class and fits
     a classifier with the desired accuracy by including
@@ -85,27 +89,45 @@ class MultiClassifier(object):
     :param pd.Series ser_y:
         index: instances
         values: class
+    :param Persister persister: used to save state
     ASSIGNED INSTANCE VARIABLES
         _classes, clf_dct, score_dct
     """
     def makeArrays(df_X, df_y):
       arr_X = df_X.values[indices_score, :]
-      arr_y = ser_y_cls.values[indices_score]
+      arr_y = self.ser_y_cls.values[indices_score]
       return arr_X, arr_y
     #
     self.selector = self._feature_selector_cls(
         df_X, ser_y, **self._kwargs)
     self.classes = ser_y.unique()
+    finished_dct = {c: False for c in self.classes}
+    initialized_dct = {c: False for c in self.classes}
+    # Handle restart of a fit, detecting which have
     for cls in self.classes:
-      # Initialize for this class
-      clf = copy.deepcopy(self._base_clf)
-      self.clf_dct[cls] = clf
-      ser_y_cls = util_classifier.makeOneStateSer(ser_y,
-          cls)
+      if cls in self.clf_dct:
+        pos = self.classes.index(cls)
+        if pos > 0:
+          # Completed the previous class
+          finished_dct[self.classes[pos - 1]] = True
+        if cls in self.clf_dct.keys():
+          initialized_dct[cls] = True
+    # Do fit by class
+    for cls in self.classes:
+      if finished_dct[cls]:
+        continue
+      if not initialized_dct[cls]:
+        # Initialize for this class
+        clf = copy.deepcopy(self._base_clf)
+        self.clf_dct[cls] = clf
+        self.ser_y_cls = util_classifier.makeOneStateSer(ser_y,
+            cls)
+      else:
+        clf = self.clf_dct[cls]
       last_score = 0
       # Select the indices to be used for prediction
       length = len(ser_y)
-      indices_cls = [i for i, v in enumerate(ser_y_cls)
+      indices_cls = [i for i, v in enumerate(self.ser_y_cls)
           if v == 1]
       indices_non_cls = set(
           range(length)).difference(indices_cls)
@@ -113,20 +135,23 @@ class MultiClassifier(object):
           len(indices_non_cls))
       indices_score.extend(indices_cls)
       # Find maximum accuracy achievable for this class
-      clf.fit(df_X, ser_y_cls)  # Fit for all features
-      arr_X, arr_y = makeArrays(df_X, ser_y_cls)
+      clf.fit(df_X, self.ser_y_cls)  # Fit for all features
+      arr_X, arr_y = makeArrays(df_X, self.ser_y_cls)
       self.best_score_dct[cls] = clf.score(arr_X, arr_y)
       # Use enough features to obtain the desired accuracy
       # This may not be possible
       length = len(self.selector.all_features)
-      for num_iter, rank in enumerate(range(length)):
+      num_iter = len(self.selector.feature_dct[cls])  \
+          + len(self.selector.remove_dct[cls])
+      for rank in range(num_iter, length):
+        num_iter += 1
         if num_iter > self._max_iter:
           break
         if not self.selector.add(cls):
           break
         df_X_rank = self.selector.zeroValues(cls)
-        self.clf_dct[cls].fit(df_X_rank, ser_y_cls)
-        arr_X, arr_y = makeArrays(df_X_rank, ser_y_cls)
+        self.clf_dct[cls].fit(df_X_rank, self.ser_y_cls)
+        arr_X, arr_y = makeArrays(df_X_rank, self.ser_y_cls)
         new_score = self.clf_dct[cls].score(arr_X, arr_y)
         if new_score - last_score > self._min_incr_score:
             self.score_dct[cls] = new_score
@@ -137,6 +162,9 @@ class MultiClassifier(object):
         if self.best_score_dct[cls]  \
             - self.score_dct[cls]  < self._max_degrade:
           break
+        if num_iter % PERSISTER_INTERVAL == 0:
+          if persister is not None:
+            persister.set(self)
 
   def predict(self, df_X):
     """
@@ -181,3 +209,27 @@ class MultiClassifier(object):
     if total != len(df_X):
       raise RuntimeError("Should process each row once.")
     return score/len(df_X)
+
+  @classmethod
+  def doHighQualityFit(cls, df_X, ser_y,
+       path=SERIALIZE_PATH):
+    """
+    :param pd.DataFrame df_X:
+        columns: features
+        index: instances
+    :param pd.Series ser_y:
+        index: instances
+        values: class
+    :param str path: serialization file
+    :return MultiClassifier:
+    """
+    persister = Persister(path)
+    if persister.isExist():
+      print ("No previous state found.")
+      multi = persister.get()
+    else:
+      print ("Previous state found.")
+      multi = MultiClassifier(feature_selector_cls=  \
+          feature_selector.FeatureSelector,
+          max_iter=5000, max_degrade=0.01)
+    multi.fit(df_X, ser_y, persister=persister)

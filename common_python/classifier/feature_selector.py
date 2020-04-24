@@ -50,12 +50,12 @@ class FeatureSelector(object):
     self._df_X = df_X
     self._ser_y = ser_y
     self._classes = list(self._ser_y.unique())
-    self._remove_dct = {c: [] for c in self._classes}
     # Public
     # Features selected for each state
     self.all_features = df_X.columns.tolist()
     self.feature_dct = {c: [] for c in self._classes}
     self.ordered_dct, self.fstat_dct = self.makeDct()
+    self.remove_dct = {c: [] for c in self._classes}
 
   def orderFeatures(self, cls, df_fstat=None, ser_weight=None):
     """
@@ -124,7 +124,7 @@ class FeatureSelector(object):
     """
     ordereds = [f for f in self.ordered_dct[cls]
         if (not f in self.feature_dct[cls]) and
-        (not f in self._remove_dct[cls])]
+        (not f in self.remove_dct[cls])]
     if len(ordereds) > 0:
       self.feature_dct[cls].append(ordereds[0])
       return True
@@ -136,7 +136,7 @@ class FeatureSelector(object):
     Removes the last feature added.
     :param object cls:
     """
-    self._remove_dct[cls].append(
+    self.remove_dct[cls].append(
         self.feature_dct[cls][-1])
     self.feature_dct[cls] = self.feature_dct[cls][:-1]
 
@@ -184,7 +184,7 @@ class FeatureSelectorCorr(FeatureSelector):
       indices = ser_max.index[ser_max < self._max_corr]
       ordered = list(set(
           self.ordered_dct[cls]).difference(
-          self._remove_dct[cls]))
+          self.remove_dct[cls]))
       feature_subset = [f for f in ordered
           if f in ser_max[indices]]
     else:
@@ -239,7 +239,7 @@ class FeatureSelectorResidual(FeatureSelector):
         ser_weight=ser_weight)
     ordereds = [f for f in ordereds
         if (not f in self.feature_dct[cls]) and
-        (not f in self._remove_dct[cls])]
+        (not f in self.remove_dct[cls])]
     if len(ordereds) == 0:
       return False
     else:
