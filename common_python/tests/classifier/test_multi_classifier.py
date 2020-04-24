@@ -16,7 +16,7 @@ import unittest
 
 IGNORE_TEST = False
 
-DIR_PATH = os.path.abspath(os.path.dirname(__file__))
+DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 TEST_DATA_PATH = os.path.join(DIR_PATH,
     "test_multi_classifier.pcl")
 TEST_SERIALIZE_PATH  \

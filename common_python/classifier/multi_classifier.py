@@ -42,7 +42,7 @@ MIN_INCR_SCORE = 0.02  # Minimum amount by which score
 
 # Files
 # Serialize results
-DIR = os.path.abspath(os.path.dirname("__file__"))
+DIR = os.path.dirname(os.path.abspath(__file__))
 SERIALIZE_PATH = os.path.join(DIR, "multi_classifier.pcl")
 PERSISTER_INTERVAL = 5
 
@@ -101,6 +101,16 @@ class MultiClassifier(object):
       arr_X = df_X.values[indices_score, :]
       arr_y = self.ser_y_cls.values[indices_score]
       return arr_X, arr_y
+    def evaluateClassifier(cls):
+      """
+      Evaluates the classifier for its current features.
+      :param int cls:
+      :return float: score for classifier
+      """
+      df_X_rank = self.selector.zeroValues(cls)
+      self.clf_dct[cls].fit(df_X_rank, self.ser_y_cls)
+      arr_X, arr_y = makeArrays(df_X_rank, self.ser_y_cls)
+      return self.clf_dct[cls].score(arr_X, arr_y)
     #
     self.classes = ser_y.unique()
     finished_dct = {c: False for c in self.classes}
@@ -150,6 +160,7 @@ class MultiClassifier(object):
       length = len(self.selector.all_features)
       num_iter = len(self.selector.feature_dct[cls])  \
           + len(self.selector.remove_dct[cls])
+      # Forward selection of features
       for rank in range(num_iter, length):
         if num_iter % PERSISTER_INTERVAL == 0:
           if persister is not None:
@@ -159,10 +170,7 @@ class MultiClassifier(object):
           break
         if not self.selector.add(cls):
           break
-        df_X_rank = self.selector.zeroValues(cls)
-        self.clf_dct[cls].fit(df_X_rank, self.ser_y_cls)
-        arr_X, arr_y = makeArrays(df_X_rank, self.ser_y_cls)
-        new_score = self.clf_dct[cls].score(arr_X, arr_y)
+        new_score = evaluateClassifier(cls)
         if new_score - last_score > self._min_incr_score:
             self.score_dct[cls] = new_score
             last_score = new_score
@@ -172,6 +180,23 @@ class MultiClassifier(object):
         if self.best_score_dct[cls]  \
             - self.score_dct[cls]  < self._max_degrade:
           break
+      # Backwards elimination to delete unneeded feaures
+      # Eliminate features that do not affect accuracy
+      do while True:
+        is_done = True
+        for feature in self.selector.feature_dct[cls]:
+          self.selector.remove(feature)
+          new_score = evaluateClassifier(cls)
+          if self.score_dct[cls] - new_score  \
+              > self._min_incr_score:
+            # Restore the feature
+            self.selector.add(cls, feature=feature)
+          else:
+            # Have deleted the feature
+            self.score_dct[cls] = new_score
+            is_done = False
+          if not is_done:
+            break
 
   def predict(self, df_X):
     """

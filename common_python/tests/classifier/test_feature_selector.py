@@ -76,6 +76,17 @@ class TestFeatureSelector(unittest.TestCase):
       return
     addTest(self)
 
+  def testAddSpecific(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    FEATURE = "DUMMY"
+    CLS = 0
+    self.selector.add(CLS)
+    self.selector.add(CLS, feature=FEATURE)
+    self.assertEqual(self.selector.feature_dct[CLS][-1],
+        FEATURE)
+
   def testZeroValues(self):
     if IGNORE_TEST:
       return
@@ -94,16 +105,36 @@ class TestFeatureSelector(unittest.TestCase):
   def testRemove(self):
     if IGNORE_TEST:
       return
-    self.selector.add(0)
-    self.assertEqual(len(self.selector.feature_dct[0]), 1)
-    self.selector.add(0)
-    self.assertEqual(len(self.selector.feature_dct[0]), 2)
-    last_feature = self.selector.feature_dct[0][-1]
-    self.selector.remove(0)
-    self.assertEqual(len(self.selector.feature_dct[0]), 1)
-    self.selector.add(0)
+    CLS = 0
+    self.selector.add(CLS)
+    self.assertEqual(len(self.selector.feature_dct[CLS]), 1)
+    self.selector.add(CLS)
+    self.assertEqual(len(self.selector.feature_dct[CLS]),
+        2)
+    last_feature = self.selector.feature_dct[CLS][-1]
+    self.selector.remove(CLS)
+    self.assertEqual(len(self.selector.feature_dct[CLS]),
+        1)
+    self.selector.add(CLS)
     self.assertNotEqual(last_feature,
-        self.selector.feature_dct[0][-1])
+        self.selector.feature_dct[CLS][-1])
+
+  def testRemoveSpecifiedFeature(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    CLS = 0
+    self.selector.add(CLS)
+    self.selector.add(CLS)
+    feature_remove = self.selector.feature_dct[CLS][0]
+    feature_stay = self.selector.feature_dct[CLS][1]
+    self.selector.remove(CLS, feature=feature_remove)
+    self.assertEqual(len(self.selector.feature_dct[CLS]),
+        1)
+    self.assertEqual(self.selector.feature_dct[CLS][0],
+        feature_stay)
+    self.assertEqual(self.selector.remove_dct[CLS][0],
+        feature_remove)
 
 
 ##################################################

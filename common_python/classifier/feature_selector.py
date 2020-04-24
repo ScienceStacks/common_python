@@ -115,30 +115,50 @@ class FeatureSelector(object):
     df_X_sub[non_features] = 0
     return df_X_sub
 
-  def add(self, cls, **kwargs):
+  def add(self, cls, feature=None, **kwargs):
     """
     Adds a feature for the class selecting
     the top feature not yet chosen.
     :param object cls:
+    :param object feature: specific feature to add
     :return bool: True if a feature was added.
+    """
+    if feature is None:
+      feature = self._add(cls, **kwargs)
+    if feature is not None:
+      self.feature_dct[cls].append(feature)
+      return True
+    else:
+      return False
+
+  def _add(self, cls, **kwargs):
+    """
+    Adds a feature for the class selecting
+    the top feature not yet chosen.
+    :param object cls:
+    :return object: feature to add
+    Should be overridden is in subclasses
     """
     ordereds = [f for f in self.ordered_dct[cls]
         if (not f in self.feature_dct[cls]) and
         (not f in self.remove_dct[cls])]
     if len(ordereds) > 0:
-      self.feature_dct[cls].append(ordereds[0])
-      return True
+      feature = ordereds[0]
     else:
-      return False
+      feature = None
+    return feature
 
-  def remove(self, cls):
+  def remove(self, cls, feature=None):
     """
-    Removes the last feature added.
+    Removes a specified feature, or the
+    last one added if none is specified.
     :param object cls:
+    :param object feature:
     """
-    self.remove_dct[cls].append(
-        self.feature_dct[cls][-1])
-    self.feature_dct[cls] = self.feature_dct[cls][:-1]
+    if feature is None:
+      feature = self.feature_dct[cls][-1]
+    self.remove_dct[cls].append(feature)
+    self.feature_dct[cls].remove(feature)
 
 
 ########### Select based on correations #################
@@ -167,9 +187,9 @@ class FeatureSelectorCorr(FeatureSelector):
     # f-statistics for features by class
     self.ordered_dct, self.fstat_dct = self.makeDct()
 
-  def add(self, cls):
+  def _add(self, cls, **kwargs):
     """
-    Adds a feature for the class.
+    Finds feature to add for class.
     :param object cls:
     :return bool: True if a feature was added.
     """
@@ -191,10 +211,10 @@ class FeatureSelectorCorr(FeatureSelector):
       # Handle first feature
       feature_subset = self.ordered_dct[cls]
     if len(feature_subset) > 0:
-      self.feature_dct[cls].append(feature_subset[0])
-      return True
+      feature = feature_subset[0]
     else:
-      return False
+      feature = None
+    return feature
 
 
 ####### Select based on classification residuals #######
@@ -219,12 +239,12 @@ class FeatureSelectorResidual(FeatureSelector):
     super().__init__(df_X, ser_y)
     self._weight = weight
 
-  def add(self, cls, ser_pred=None):
+  def _add(self, cls, ser_pred=None):
     """
-    Adds a feature for the class.
+    Finds feature to add.
     :param object cls:
     :param pd.Series ser_pred: predicted classes
-    :return bool: True if a feature was added.
+    :return object: feature
     """
     indices_miss = self._ser_y.index[self._ser_y != ser_pred]
     ser_weight = self._ser_y.copy()
@@ -241,7 +261,7 @@ class FeatureSelectorResidual(FeatureSelector):
         if (not f in self.feature_dct[cls]) and
         (not f in self.remove_dct[cls])]
     if len(ordereds) == 0:
-      return False
+      feature = None
     else:
-      self.feature_dct[cls].append(ordereds[0])
-      return True
+      feature = ordereds[0]
+    return feature
