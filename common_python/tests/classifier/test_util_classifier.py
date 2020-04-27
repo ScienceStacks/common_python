@@ -1,3 +1,4 @@
+from common_python import constants as cn
 from common_python.classifier import util_classifier
 from common_python.tests.classifier  \
     import helpers as test_helpers
@@ -7,6 +8,7 @@ from common_python.testing import helpers
 import pandas as pd
 import random
 import numpy as np
+from sklearn import svm
 import unittest
 
 
@@ -33,6 +35,13 @@ DF_PRED = pd.DataFrame({
   2: [0, 0, 1],
   })
 DF_PRED = DF_PRED.T
+DF_X_BINARY, SER_Y_ALL = test_helpers.getDataLong()
+CLASS = 1
+SER_Y_BINARY = pd.Series([
+    cn.PCLASS if v == CLASS else cn.NCLASS
+    for v in SER_Y_ALL],
+    index=SER_Y_ALL.index)
+CLF = svm.LinearSVC()
 
 
 class TestFunctions(unittest.TestCase):
@@ -133,6 +142,49 @@ class TestFunctions(unittest.TestCase):
         ser_weight=ser_weight)
     self.assertTrue(helpers.isValidDataFrame(df2,
         self.ser_y_long.unique()))
+
+  def testMakeArrays(self):
+    if IGNORE_TEST:
+      return
+    SIZE = 10
+    arr_X, arr_y = util_classifier.makeArrays(
+        DF_X_BINARY, SER_Y_BINARY,
+        DF_X_BINARY.index[:SIZE])
+    self.assertEqual(len(arr_X), SIZE)
+    self.assertEqual(len(arr_y), SIZE)
+
+  def testScoreFeatures(self):
+    if IGNORE_TEST:
+      return
+    SIZE = 5
+    all_features = DF_X_BINARY.columns.tolist()
+    score_all = util_classifier.scoreFeatures(
+        CLF, DF_X_BINARY, SER_Y_BINARY)
+    self.assertEqual(score_all, 1)
+    #
+    features = random.sample(all_features, SIZE)
+    score = util_classifier.scoreFeatures(
+        CLF, DF_X_BINARY, SER_Y_BINARY,
+        features=features)
+    self.assertGreater(score_all, score)
+    #
+    train_idxs = SER_Y_BINARY[
+        SER_Y_BINARY==cn.PCLASS].index.tolist()
+    train_idxs.extend(random.sample(
+        DF_X_BINARY.index.tolist(), len(train_idxs)))
+    score = util_classifier.scoreFeatures(
+        CLF, DF_X_BINARY, SER_Y_BINARY,
+        train_idxs=train_idxs)
+    self.assertGreater(score_all, score)
+    #
+    test_idxs = SER_Y_BINARY[
+        SER_Y_BINARY==cn.PCLASS].index.tolist()
+    test_idxs.extend(random.sample(
+        DF_X_BINARY.index.tolist(), len(test_idxs)))
+    score = util_classifier.scoreFeatures(
+        CLF, DF_X_BINARY, SER_Y_BINARY,
+        test_idxs=test_idxs)
+    self.assertTrue(np.isclose(score_all, score))
     
 
 

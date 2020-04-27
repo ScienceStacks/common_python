@@ -40,3 +40,7 @@ PLT_TITLE = "title"
 
 # Letters
 UPPER_CASE = [x for x in map(chr, range(65, 91))]
+
+# Values
+PCLASS = 1  # Positive class
+NCLASS = 0  # Negative class

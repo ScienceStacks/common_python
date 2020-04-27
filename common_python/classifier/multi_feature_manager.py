@@ -67,6 +67,20 @@ class MultiFeatureManager(object):
     ########### PUBLIC ##########
     self.binary_dct = {}
 
+  def _makeBinaryClass(self, cls):
+    """
+    Constructs binary features from multiclass data.
+    :param object cls:
+    :return pd.Series: ser_y
+      indices: same as original, in same sort order
+      values: PCLASS if == cls; else NCLASS
+    """
+    ser = pd.Series([
+        cn.PCLASS if v == cls else cn.NCLASS
+        for v in self._ser_y],
+        index=self._ser_y.index)
+    return ser
+
   def run(self):
     """
     Construct the features, handling restarts by saving
@@ -74,10 +88,11 @@ class MultiFeatureManager(object):
     """
     for cls in self._ser_y.unique():
       if not cls in self.binary_dct:
+        ser_y = self._makeBinaryClass(cls)
         selector = self.feature_selector_cls(self._df_X,
-            self._ser_y, **self._sel_kwargs)
+            ser_y, **self._sel_kwargs)
         self.binary_dct[cls] =  \
-            BinaryFeatureSelector(self._df_X, self._ser_y,
+            BinaryFeatureSelector(self._df_X, ser_y,
                 checkpoint_cb=checkpoint,
                 **self._bfm_kwargs)
       if self.binary_dct[cls].is_done:
@@ -88,6 +103,8 @@ class MultiFeatureManager(object):
   def _getPersister(cls)
     if os.path.isfile(PERSISTER_PATH):
       return Persister(PERSISTER_PATH)
+    else:
+      return None
 
   @staticmethod
   def _removePersister(cls)
@@ -108,8 +125,8 @@ class MultiFeatureManager(object):
     if persister is not None:
       manager = persister.get()
     else:
-      trinary = trinary_data.TrinaryData(is_averaged=False,
-          is_dropT1=False)
+      trinary = trinary_data.TrinaryData(
+          is_averaged=False, is_dropT1=False)
       manager = MultiFeatureManager(trinary.df_X, trinary.ser_y,
           **kwargs)
     manager.run()
@@ -117,5 +134,8 @@ class MultiFeatureManager(object):
 
   @classmethod
   def get(cls):
+    """
+    Provides the MultiFeatureManager in a persister file.
+    """
     persister = Persister(PERSISTER_PATH)
     return persister.get()

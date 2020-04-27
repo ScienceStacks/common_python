@@ -1,8 +1,9 @@
 """
-Classifier for data with multiple classes using
-a base classifier.
-The classifier is provided with features for
-each class.
+Classifier for data with multiple classes. The
+classifier is constructed from a binary classier,
+which is referred to as the base classifier.
+Classifier features are selected using a
+FeatureSelector instance.
 
 The base classifier must expose methods for fit,
 predict, score. Fitting is done by forward selection
@@ -10,9 +11,16 @@ of features to achieve a desired accuracy.
 This is a "soft" constraint, and it is checked
 without the use of cross validation (for performance
 reasons).
+
+Technical notes:
+1. cls is the name used for a class
 """
 
 from common_python.classifier import util_classifier
+from common_python.classifier import feature_selector
+from common_python.util.persister import Persister
+from common_python.types.extended_dict  \
+    import ExtendedDict
 
 import copy
 import numpy as np
@@ -21,20 +29,75 @@ import pandas as pd
 import random
 from sklearn import svm
 
+## Hyperparameters for classifier
+# The following control the stopping criteria
+# in forward selection. The first criteria
+# that is satisfied halts forward selection.
+# 
+MAX_ITER = 20  # Maximum number of features considered
+MAX_DEGRADE = 0.05 # Maximum degradation from best score
+#  The following controls acceptance of a feature
+MIN_INCR_SCORE = 0.02  # Minimum amount by which score
+                       # Score must increase to be included
+
+# Files
+# Serialize results
+DIR = os.path.dirname(os.path.abspath(__file__))
+SERIALIZE_PATH = os.path.join(DIR, "multi_classifier.pcl")
+PERSISTER_INTERVAL = 5
+
 
 class MultiClassifier(object):
+  """
+  Has several hyperparameters defined in constructor.
+  """
  
   def __init__(self, base_clf=svm.LinearSVC(),
-        feature_dct={}):
+        feature_selector=None,
+        feature_selector_cls=  \
+        feature_selector.FeatureSelectorResidual,
+        persister=None,
+        min_incr_score=MIN_INCR_SCORE,
+        max_iter=MAX_ITER, max_degrade=MAX_DEGRADE,
+        **kwargs):
     """
     :param Classifier base_clf: 
-    :param dict feature_dct: Features for each class
+    :param FeatureSelector feature_selector:
+    :param type=FeatureSelector feature_selector_cls:
+    :param Persister persister: used to save state
+    :param float min_incr_score: min amount by which
+        a feature must increase the score to be included
+    :param int max_iter: maximum number of iterations
+    :param float max_degrade: maximum difference between
+        best score and actual
+    :param dict kwargs: arguments passed to FeatureSelector
     """
-    ###### PRIVATE ##### 
-    ###### PUBLIC ##### 
+    # Public
+    self.classes = []
     self.clf_dct = {}  # key is cls; value is clf
     self.score_dct = {}  # key is cls; value is score
     self.best_score_dct = {}  # key is cls; value is score
+    if feature_selector is None:
+      self.selector = None  # Constructed during fit
+    else:
+      self.selector = selector # Constructed during fit
+    # Private
+    self._min_incr_score = min_incr_score
+    self._max_degrade = max_degrade
+    self._max_iter = max_iter
+    self._kwargs = kwargs
+    self._feature_selector_cls = feature_selector_cls
+    self._base_clf = base_clf
+    if feature_selector is None:
+      self._processed_classes = []
+      self._is_provided_selector = False
+    else:
+      self._processed_classes = self.selector.classes
+      self._is_provided_selector = True
+    self._persister = persister
+    # Used in per class fits
+    self._ser_y_cls = None
+    self._indices_score_cls = None
 
   def fit(self, df_X, ser_y):
     """
@@ -47,6 +110,11 @@ class MultiClassifier(object):
     :param pd.Series ser_y:
         index: instances
         values: class
+    Notes
+      1. If a selector was provided in the constructor
+         then the features in df_X and the classes
+         in ser_y must be the same as those used
+         to make the selector.
     """
     self.classes = ser_y.unique()
     # Do fit for each class

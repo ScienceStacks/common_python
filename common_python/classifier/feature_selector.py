@@ -1,4 +1,12 @@
 '''Selects features based on classifier results.'''
+"""
+A FeatureSelector implements the following:
+  add() - add a feature to features
+  remove() - remove a feature from features
+  choose() - choose a feature to add
+A FeatureSelector exposes a list of features
+  features
+"""
 
 from common_python.classifier import util_classifier
 
@@ -6,117 +14,46 @@ import copy
 import numpy as np
 import pandas as pd
 
-CLASSES = [0, 1]
 MAX_CORR = 0.5  # Maxium correlation with an existing feature
+CLASSES = [0, 1]
 
 
-class BinaryFeatureSelector(object):
-  """
-  Does feature selection for binary classes.
-  by using features in order.
-  FeatureSelector responsibilities
-    1. feature_manager - object that contains features
-    2. score - score achieved
-    3  best_score
-    4. identifier - identifies this instance
-    5. is_done - indicates have completed.
-  This is a computationally intensive activity and so
-  the implementation allows for restarts.
-  """
+################### Base Class #################
+class FeatureSelector(object):
 
-  def __init__(self, df_X, ser_y,
-      checkpoint_function,
-      feature_manager_class,
-      classifier,
-      min_incr_score=MIN_INCR_SCORE,
-      max_iter=MAX_ITER, 
-      max_degrade=MAX_DEGRADE,
-      ):
+  def __init__(self, df_X, ser_y, **kwargs):
     """
     :param pd.DataFrame df_X:
         columns: features
         index: instances
     :param pd.Series ser_y:
         index: instances
-        values: binary class values (0, 1)
-    :param type-FeatureManager feature_manager_class:
-    :param Classifier classifier:
-    :param float min_incr_score: min amount by which
-        a feature must increase the score to be included
-    :param int max_iter: maximum number of iterations
-    :param float max_degrade: maximum difference between
-        best score and actual
+        values: binary class values: 0, 1
     """
-    # Private
+    ###### PRIVATE ####
     self._df_X = df_X
     self._ser_y = ser_y
-    self._classes = list(self._ser_y.unique())
-    # Public
-    # Features selected for each state
-    self.all_features = df_X.columns.tolist()
-    self.feature_dct = {c: [] for c in self._classes}
-    self.ordered_dct, self.fstat_dct = self.makeDct()
-    self.remove_dct = {c: [] for c in self._classes}
+    ###### PUBLIC ####
+    # Features ordered by descending value
+    self.all = self._order(self).index.tolist()
+    self.chosens = []  # Features chosen
+    self.removes = []  # Features rejected
 
-  def orderFeatures(self, cls, df_fstat=None, ser_weight=None):
+  def _order(self, ser_weight=None):
     """
     Constructs features ordered in descending priority
-    and F-statistics for each class.
     :param object cls: class
-    :param pd.DataFrame df_fstat: used, else computed
     :param pd.Series ser_weight: weights applied to instances
-    :return dict, pd.DataFrame:
-      dict
-          key: class
-          value: list of features by descending fstat
-      pd.DataFrame
-          index: feature
-          column: class
-          value: F-statistic
+    :return pd.Series:
+        index: feature
+        value: F-statistic
     """
-    if df_fstat is None:
-      df_fstat = util_classifier.makeFstatDF(
-          self._df_X, self._ser_y, ser_weight=ser_weight)
-    ser_fstat = df_fstat[cls]
-    ser_fstat.sort_values()
-    return df_fstat, ser_fstat.index.tolist()
+    ser_fstat = util_classifier.makeFstatDF(
+        self._df_X, self._ser_y, ser_weight=ser_weight)[1]
+    ser_fstat.sort_values(acending=False)
+    return ser_fstat.index
 
-  def makeDct(self, ser_weight=None):
-    """
-    Constructs features ordered in descending priority
-    and F-statistics for each class.
-    :return dict, dict:
-        First:
-          key: class
-          value: list of features by descending fstat
-        Second:
-          key: class
-          value: Series for fstat
-    """
-    ordered_dct = {}
-    fstat_dct = {}
-    df_fstat = None
-    for cls in self._classes:
-      df_fstat, ordered = self.orderFeatures(cls,
-          df_fstat=df_fstat, ser_weight=ser_weight)
-      ser_fstat = df_fstat[cls]
-      ser_fstat.sort_values()
-      fstat_dct[cls] = ser_fstat
-      ordered_dct[cls] = ordered
-    return ordered_dct, fstat_dct
-
-  def zeroValues(self, cls):
-    """
-    Sets values of non-features to zero.
-    :return pd.DataFrame: Non-feature columns are 0
-    """
-    df_X_sub = self._df_X.copy()
-    non_features = list(set(self.all_features
-        ).difference(self.feature_dct[cls]))
-    df_X_sub[non_features] = 0
-    return df_X_sub
-
-  def add(self, cls, feature=None, **kwargs):
+  def add(self, feature=None, **kwargs):
     """
     Adds a feature for the class selecting
     the top feature not yet chosen.
@@ -125,29 +62,39 @@ class BinaryFeatureSelector(object):
     :return bool: True if a feature was added.
     """
     if feature is None:
-      feature = self.findFeature(cls, **kwargs)
-    if feature is not None:
+      feature = self.choose(cls, **kwargs)
+      return False
+    else:
       self.feature_dct[cls].append(feature)
       return True
-    else:
-      return False
 
-  def findFeature(self, cls, **kwargs):
+  def choose(self, ordereds=None, **kwargs):
     """
-    Adds a feature for the class selecting
-    the top feature not yet chosen.
-    :param object cls:
+    Chooses a feature to add from
+    those not chosen already.
+    The default implementation chooses features
+    by descending value of F-Statistic.
+    :param list-object ordereds: ordered features
     :return object: feature to add
     Should be overridden is in subclasses
     """
-    ordereds = [f for f in self.ordered_dct[cls]
-        if (not f in self.feature_dct[cls]) and
-        (not f in self.remove_dct[cls])]
-    if len(ordereds) > 0:
-      feature = ordereds[0]
+    candidates = self.getCandidates(ordereds=ordereds)
+    if len(candidates) > 0:
+      feature = candidates[0]
     else:
       feature = None
     return feature
+
+  def getCandidates(self, ordereds=None):
+    """
+    Get the candidate features in order.
+    :param list-object ordereds:
+    :return list-object:
+    """
+    if ordereds is None:
+      orderds = self.all
+    excludes = set(self.chosens).union(self.removes)
+    return [f for f in ordereds if not f excludes]
 
   def remove(self, cls, feature=None):
     """
@@ -157,9 +104,9 @@ class BinaryFeatureSelector(object):
     :param object feature:
     """
     if feature is None:
-      feature = self.feature_dct[cls][-1]
-    self.remove_dct[cls].append(feature)
-    self.feature_dct[cls].remove(feature)
+      feature = self.chosens[-1]
+    self.removes.append(feature)
+    self.chosens.remove(feature)
 
 
 ########### Select based on correations #################
@@ -183,34 +130,32 @@ class FeatureSelectorCorr(FeatureSelector):
     # Private
     self._max_corr = max_corr
     self._df_corr = self._df_X.corr()
-    # Public
-    # Features in descending order
-    # f-statistics for features by class
-    self.ordered_dct, self.fstat_dct = self.makeDct()
 
-  def findFeature(self, cls, **kwargs):
+  def choose(self, **kwargs):
     """
     Finds feature to add for class.
-    :param object cls:
     :return bool: True if a feature was added.
     """
-    if len(self.feature_dct[cls]) > 0:
+    if len(self.chosens) > 0:
       # Not the first feature
+      # Correlate chosen features with those not considered
+      # Columns are chosens; rows are new candidates
       df_corr = copy.deepcopy(self._df_corr)
-      df_corr = df_corr[self.feature_dct[cls]]
+      df_corr = df_corr[self.chosens]
+      candidates = super().choose()
+      df_corr = df_corr.loc[candidates, :]
+      # Find candidates with sufficiently low correlation
+      # with chosens
+      df_corr = df_corr.apply(lambda v: np.abs(v))
       ser_max = df_corr.max(axis=1)
-      ser_max = ser_max.apply(lambda v: np.abs(v))
+      candidates = ser_max.index[
+          ser_max < self._max_corr].tolist()
       # Choose the highest priority feature that is
       # not highly correlated with the existing features.
-      indices = ser_max.index[ser_max < self._max_corr]
-      ordered = list(set(
-          self.ordered_dct[cls]).difference(
-          self.remove_dct[cls]))
-      feature_subset = [f for f in ordered
-          if f in ser_max[indices]]
+      features = [f for f in self.all if f in candidates]
     else:
       # Handle first feature
-      feature_subset = self.ordered_dct[cls]
+      feature_subset = self.all
     if len(feature_subset) > 0:
       feature = feature_subset[0]
     else:
@@ -221,7 +166,9 @@ class FeatureSelectorCorr(FeatureSelector):
 ####### Select based on classification residuals #######
 class FeatureSelectorResidual(FeatureSelector):
   """
-  Selects features for a class using differences in classification.
+  Selects features by using a residual idea for classification.
+  The residual is the set of misclassified instances.
+  Extra weight is used for these instances.
   """
 
   def __init__(self, df_X, ser_y, weight=None):
@@ -240,15 +187,16 @@ class FeatureSelectorResidual(FeatureSelector):
     super().__init__(df_X, ser_y)
     self._weight = weight
 
-  def findFeature(self, cls, ser_pred=None):
+  def choose(self, cls, ser_pred=None):
     """
     Finds feature to add.
     :param object cls:
-    :param pd.Series ser_pred: predicted classes
+    :param pd.Series ser_pred: predicted class
     :return object: feature
     """
     indices_miss = self._ser_y.index[
         self._ser_y != ser_pred]
+    # Construct the weight for each instance
     ser_weight = self._ser_y.copy()
     ser_weight[:] = 1
     if self._weight is None:
@@ -257,11 +205,9 @@ class FeatureSelectorResidual(FeatureSelector):
     else:
       weight - self._weight
     ser_weight.loc[indices_miss] = weight
-    _, ordereds = self.orderFeatures(cls,
-        ser_weight=ser_weight)
-    ordereds = [f for f in ordereds
-        if (not f in self.feature_dct[cls]) and
-        (not f in self.remove_dct[cls])]
+    #
+    weighteds = self._order(ser_weight=ser_weight)
+    candidates = super().choose(ordereds=candidates)
     if len(ordereds) == 0:
       feature = None
     else:

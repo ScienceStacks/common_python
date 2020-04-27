@@ -22,6 +22,7 @@ parts.
 """
 
 from common_python.classifier import util_classifier
+import common_python.constants as cn
 
 import copy
 import numpy as np
@@ -31,9 +32,7 @@ import random
 
 # Default checkpoint callback
 CHECKPOINT_CB = lambda : None
-PCLASS = 1  # Positive class
-NCLASS = 0  # Negative class
-BINARY_CLASSES = [NCLASS, PCLASS]
+BINARY_CLASSES = [cn.NCLASS, cn.PCLASS]
 MAX_BACKTRACK_ITERATIONS = 100
 
 
@@ -110,8 +109,8 @@ class BinaryFeatureManager(object):
     Notes
       1. Assumes that number of PCLASS < NCLASS
     """
-    pclass_idxs = self._ser_y[ser_ser_y == PCLASS].index
-    nclass_idxs = self._ser_y[ser_ser_y == NCLASS].index
+    pclass_idxs = self._ser_y[ser_ser_y==cn.PCLASS].index
+    nclass_idxs = self._ser_y[ser_ser_y==cn.NCLASS].index
     # Sample w/o replacement from the larger set
     if len(pclass_idxs) < len(nclass_idxs):
       length = len(pclass_idxs)

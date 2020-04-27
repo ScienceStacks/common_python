@@ -12,6 +12,7 @@ how well it distinguishes between states.
 """
 
 import collections
+import copy
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -264,6 +265,16 @@ def plotInstancePredictions(ser_y, ser_pred,
   if is_plot:
     plt.show()
 
+def makeArrays(df, ser, indices):
+  """
+  Constructs numpy arrays for the dataframe and series.
+  :param pd.DataFrame df:
+  :param pd.Series ser:
+  :return ndarray, ndarray:
+  """
+  return df.loc[indices, :].values,  \
+      ser.loc[indices].values
+
 def scoreFeatures(clf, df_X, ser_y,
     features=None, train_idxs=None, test_idxs=None):
   """
@@ -300,12 +311,3 @@ def scoreFeatures(clf, df_X, ser_y,
   score = clf.score(arr_X, arr_y)
   #
   return score
-
-def makeArrays(df, ser, indices):
-  """
-  Constructs numpy arrays for the dataframe and series.
-  :param pd.DataFrame df:
-  :param pd.Series ser:
-  :return ndarray, ndarray:
-  """
-  return df[indices, :].values, ser[indices].values
