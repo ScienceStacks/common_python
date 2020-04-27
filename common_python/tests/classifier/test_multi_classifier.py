@@ -86,25 +86,6 @@ class TestMultiClass(unittest.TestCase):
     self.assertTrue(helpers.isValidDataFrame(df_pred,
         expected_columns=self.ser_y.unique()))
 
-  def testDoQualityFit(self):
-    if IGNORE_TEST:
-      return
-    multi_classifier.MultiClassifier.doQualityFit(
-        self.df_X, self.ser_y, max_iter=1,
-        path=TEST_SERIALIZE_PATH, is_report=False)
-    persister = Persister(TEST_SERIALIZE_PATH)
-    self.assertTrue(persister.isExist())
-    clf1 = persister.get()
-    self.assertTrue(isinstance(clf1.ser_y_cls, pd.Series))
-    #
-    multi_classifier.MultiClassifier.doQualityFit(
-        self.df_X, self.ser_y, max_iter=1,
-        is_report=False)
-    clf2 = persister.get()
-    for cls in clf1.classes:
-      self.assertTrue(clf1.selector.feature_dct[cls]
-          == clf2.selector.feature_dct[cls])
-
   def testGetClassifier(self):
     if IGNORE_TEST:
       return

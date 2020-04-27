@@ -263,3 +263,49 @@ def plotInstancePredictions(ser_y, ser_pred,
   _ = plt.ylabel("Predicted State", fontsize=18)
   if is_plot:
     plt.show()
+
+def scoreFeatures(clf, df_X, ser_y,
+    features=None, train_idxs=None, test_idxs=None):
+  """
+  Evaluates the classifier for the set of features and the
+  training and test indices provided (or all if None are
+  provided).
+  :param Classifier clf: Exposes
+      fit, score
+  :param pd.DataFrame df_X:
+      columns: features
+      indicies: instances
+  :param pd.Series ser_y:
+      indices: instances
+      values: classes
+  :param list-object features:
+  :param list-object train_idxs: indices for training
+  :param list-object test_idxs: indices for testing
+  :return float: score for classifier using features
+  """
+  if train_idxs is None:
+    train_idxs = df_X.index
+  if test_idxs is None:
+    test_idxs = df_X.index
+  if features is None:
+    features = df_X.columns.tolist()
+  #
+  clf = copy.deepcopy(clf)
+  arr_X, arr_y = makeArrays(df_X[features], ser_y,
+      train_idxs)
+  clf.fit(arr_X, arr_y)
+  #
+  arr_X, arr_y = makeArrays(df_X[features], ser_y,
+      test_idxs)
+  score = clf.score(arr_X, arr_y)
+  #
+  return score
+
+def makeArrays(df, ser, indices):
+  """
+  Constructs numpy arrays for the dataframe and series.
+  :param pd.DataFrame df:
+  :param pd.Series ser:
+  :return ndarray, ndarray:
+  """
+  return df[indices, :].values, ser[indices].values

@@ -1,10 +1,4 @@
-"""
-Selects features to use in a classifier.
-The classifier may have multiple classes.
-
-Technical notes:
-1. cls is the name used for a class
-"""
+'''Selects features based on classifier results.'''
 
 from common_python.classifier import util_classifier
 
@@ -12,39 +6,46 @@ import copy
 import numpy as np
 import pandas as pd
 
+CLASSES = [0, 1]
 MAX_CORR = 0.5  # Maxium correlation with an existing feature
 
 
-################### Base Class #################
-class FeatureSelector(object):
+class BinaryFeatureSelector(object):
   """
-  Selects features for a class for a classifier
+  Does feature selection for binary classes.
   by using features in order.
   FeatureSelector responsibilities
-    1. feature_dct
-       Container for features chosen for each class.
-    2. add(cls)
-       Updates feature_dct to include
-       the next best feature for forward
-       feature selection. This is done by eliminating
-       from consideration features that are too highly
-       correlated with features that are already selected.
-    3. zeroValues(cls)
-       Set to 0 the values of unselected features.
-    4. remove(cls)
-       Removes the last feature added
+    1. feature_manager - object that contains features
+    2. score - score achieved
+    3  best_score
+    4. identifier - identifies this instance
+    5. is_done - indicates have completed.
+  This is a computationally intensive activity and so
+  the implementation allows for restarts.
   """
 
-  def __init__(self, df_X, ser_y):
+  def __init__(self, df_X, ser_y,
+      checkpoint_function,
+      feature_manager_class,
+      classifier,
+      min_incr_score=MIN_INCR_SCORE,
+      max_iter=MAX_ITER, 
+      max_degrade=MAX_DEGRADE,
+      ):
     """
     :param pd.DataFrame df_X:
         columns: features
         index: instances
     :param pd.Series ser_y:
         index: instances
-        values: class
-    :param float max_corr: maximum correlation
-        between a new feature an an existing feature
+        values: binary class values (0, 1)
+    :param type-FeatureManager feature_manager_class:
+    :param Classifier classifier:
+    :param float min_incr_score: min amount by which
+        a feature must increase the score to be included
+    :param int max_iter: maximum number of iterations
+    :param float max_degrade: maximum difference between
+        best score and actual
     """
     # Private
     self._df_X = df_X
@@ -124,14 +125,14 @@ class FeatureSelector(object):
     :return bool: True if a feature was added.
     """
     if feature is None:
-      feature = self._add(cls, **kwargs)
+      feature = self.findFeature(cls, **kwargs)
     if feature is not None:
       self.feature_dct[cls].append(feature)
       return True
     else:
       return False
 
-  def _add(self, cls, **kwargs):
+  def findFeature(self, cls, **kwargs):
     """
     Adds a feature for the class selecting
     the top feature not yet chosen.
@@ -187,7 +188,7 @@ class FeatureSelectorCorr(FeatureSelector):
     # f-statistics for features by class
     self.ordered_dct, self.fstat_dct = self.makeDct()
 
-  def _add(self, cls, **kwargs):
+  def findFeature(self, cls, **kwargs):
     """
     Finds feature to add for class.
     :param object cls:
@@ -239,14 +240,15 @@ class FeatureSelectorResidual(FeatureSelector):
     super().__init__(df_X, ser_y)
     self._weight = weight
 
-  def _add(self, cls, ser_pred=None):
+  def findFeature(self, cls, ser_pred=None):
     """
     Finds feature to add.
     :param object cls:
     :param pd.Series ser_pred: predicted classes
     :return object: feature
     """
-    indices_miss = self._ser_y.index[self._ser_y != ser_pred]
+    indices_miss = self._ser_y.index[
+        self._ser_y != ser_pred]
     ser_weight = self._ser_y.copy()
     ser_weight[:] = 1
     if self._weight is None:
