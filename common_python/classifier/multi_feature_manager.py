@@ -67,20 +67,6 @@ class MultiFeatureManager(object):
     ########### PUBLIC ##########
     self.binary_dct = {}
 
-  def _makeBinaryClass(self, cls):
-    """
-    Constructs binary features from multiclass data.
-    :param object cls:
-    :return pd.Series: ser_y
-      indices: same as original, in same sort order
-      values: PCLASS if == cls; else NCLASS
-    """
-    ser = pd.Series([
-        cn.PCLASS if v == cls else cn.NCLASS
-        for v in self._ser_y],
-        index=self._ser_y.index)
-    return ser
-
   def run(self):
     """
     Construct the features, handling restarts by saving
@@ -88,7 +74,7 @@ class MultiFeatureManager(object):
     """
     for cls in self._ser_y.unique():
       if not cls in self.binary_dct:
-        ser_y = self._makeBinaryClass(cls)
+        ser_y = self.util_classifier(self._ser_y, cls)
         selector = self.feature_selector_cls(self._df_X,
             ser_y, **self._sel_kwargs)
         self.binary_dct[cls] =  \

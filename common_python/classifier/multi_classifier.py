@@ -25,16 +25,27 @@ from sklearn import svm
 class MultiClassifier(object):
  
   def __init__(self, base_clf=svm.LinearSVC(),
-        feature_dct={}):
+        feature_dct=None):
     """
     :param Classifier base_clf: 
     :param dict feature_dct: Features for each class
     """
     ###### PRIVATE ##### 
+    self._feature_dct = feature_dct
+    self._base_clf = base_clf
     ###### PUBLIC ##### 
-    self.clf_dct = {}  # key is cls; value is clf
+    # key is cls; value is clf
+    self.classes = None
+    self.clf_dct = {}
     self.score_dct = {}  # key is cls; value is score
     self.best_score_dct = {}  # key is cls; value is score
+
+  def _makeXArray(self, cls, df_X):
+    return df_X[self._features_dct[cls]].values
+
+  def _makeYArray(self, cls, ser_y):
+    ser_y_1 = util_classifiermakeOneStateSer(ser_y, cls)
+    return ser_y_1.values
 
   def fit(self, df_X, ser_y):
     """
@@ -49,126 +60,15 @@ class MultiClassifier(object):
         values: class
     """
     self.classes = ser_y.unique()
-    # Do fit for each class
+    columns = df_X.columns.tolist()
+    if self._feature_dct is None:
+      self._feature_dct = {c: columns for c in self.classes}
+    # Do fit for each class using class specific features
     for cls in self.classes:
-      self._initializeCls(cls, df_X, ser_y)
-      if cls in self._processed_classes:
-        self.score_dct[cls] = self._fitAndEvaluate(cls)
-      else:
-        self.makeFeatureSelector(cls, df_X, ser_y)
-        self._processed_classes.append(cls)
-
-  def _initializeCls(self, cls, df_X, ser_y):
-    """
-    Initializes for fit for a class.
-    Instance variables initialized
-        self.best_score_dct
-        self._ser_y_cls
-        self.clf_dct
-        self._indices_score_cls
-    """
-    if not cls in self.clf_dct.keys():
-      # Initialize for this class
-      clf = copy.deepcopy(self._base_clf)
-      self.clf_dct[cls] = clf
-      self._ser_y_cls = util_classifier.makeOneStateSer(ser_y,
-          cls)
-    else:
-      # Resuming a previous invocation
-      clf = self.clf_dct[cls]
-    # Select the indices to be used for prediction
-    length = len(ser_y)
-    indices_cls = [i for i, v in enumerate(self._ser_y_cls)
-        if v == 1]
-    indices_non_cls = set(
-        range(length)).difference(indices_cls)
-    self._indices_score_cls = random.sample(indices_non_cls,
-        len(indices_non_cls))
-    self._indices_score_cls.extend(indices_cls)
-    # Find maximum accuracy achievable for this class
-    clf.fit(df_X, self._ser_y_cls)  # Fit for all features
-    arr_X, arr_y = _makeArrays(df_X, self._ser_y_cls)
-    self.best_score_dct[cls] = clf.score(arr_X, arr_y)
-
-  def _makeArrays(self, df_X, df_y, cls):
-    """
-    Requires: _initializeCls
-    """
-    arr_X = df_X.values[self._indices_score_cls, :]
-    arr_y = self._ser_y_cls.values[self._indices_score_cls]
-    return arr_X, arr_y
-
-  def _fitAndEvaluate(self, cls):
-    """
-    Evaluates the classifier for its current features.
-    :param int cls:
-    :return float: score for classifier
-    Requires: _initializeCls
-    """
-    # FIXME: Must use df_X in fit, not that stored in selector
-    # FIXME: Should this take df_X, ser_y?
-    df_X_rank = self.selector.zeroValues(cls)
-    self.clf_dct[cls].fit(df_X_rank, self._ser_y_cls)
-    arr_X, arr_y = _makeArrays(df_X_rank, self._ser_y_cls)
-    return self.clf_dct[cls].score(arr_X, arr_y)
-
-  def _makeFeatureSelector(self, cls, df_X, ser_y):
-    """
-    Constructs the feature selector based on forward
-    selection of features and backwards elimination.
-    :param pd.DataFrame df_X:
-        columns: features
-        index: instances
-    :param pd.Series ser_y:
-        index: instances
-        values: class
-    ASSIGNED INSTANCE VARIABLES
-        _classes, clf_dct, score_dct
-    Requires: _initializeCls
-    """
-    # Use enough features to obtain the desired accuracy
-    # This may not be possible
-    length = len(self.selector.all_features)
-    num_iter = len(self.selector.feature_dct[cls])  \
-        + len(self.selector.remove_dct[cls])
-    # Forward selection of features
-    for rank in range(num_iter, length):
-      if num_iter % PERSISTER_INTERVAL == 0:
-        if self._persister is not None:
-          self._persister.set(self)
-      num_iter += 1
-      if num_iter > self._max_iter:
-        break
-      if not self.selector.add(cls):
-        break
-      new_score = _fitAndEvaluate(cls)
-      if new_score - last_score > self._min_incr_score:
-          self.score_dct[cls] = new_score
-          last_score = new_score
-      else:
-        # Remove the feature
-        self.selector.remove(cls)
-      if self.best_score_dct[cls]  \
-          - self.score_dct[cls]  < self._max_degrade:
-        break
-    # Backwards elimination to delete unneeded feaures
-    # Eliminate features that do not affect accuracy
-    while True:
-      is_done = True
-      for feature in self.selector.feature_dct[cls]:
-        # Temporarily delete the feature
-        self.selector.remove(cls, feature=feature)
-        new_score = _fitAndEvaluate(cls)
-        if self.score_dct[cls] - new_score  \
-            > self._min_incr_score:
-          # Restore the feature
-          self.selector.add(cls, feature=feature)
-        else:
-          # Permanently delete the feature
-          self.score_dct[cls] = new_score
-          is_done = False
-        if not is_done:
-          break
+      self.clf_dct[cls] = copy.deepcopy(self._base_clf)
+      arr_X = self._makeXArray(cls, df_X)
+      arr_y = self._makeYArray(cls, ser_y)
+      self.clf_dct[cls].fit(arr_X, arr_y)
 
   def predict(self, df_X):
     """
@@ -183,7 +83,8 @@ class MultiClassifier(object):
     """
     df_pred = pd.DataFrame()
     for cls in self.classes:
-      df_pred[cls] = self.clf_dct[cls].predict(df_X)
+      arr_X = self._makeXArray(cls, df_X)
+      df_pred[cls] = self.clf_dct[cls].predict(arr_X)
     df_pred.index = df_X.index
     ser_tot = df_pred.sum(axis=1)
     for cls in self.classes:
@@ -206,18 +107,12 @@ class MultiClassifier(object):
     total = 0
     df_predict = self.predict(df_X)
     for cls in self.classes:
+      # Select instances for this class
       sel = ser_y == cls
       df_predict_sub = df_predict.loc[sel, :]
+      # Sum the predictions for the correct class
       score += df_predict_sub[cls].sum()
       total += len(df_pred_sub)
     if total != len(df_X):
       raise RuntimeError("Should process each row once.")
     return score/len(df_X)
-
-  @classmethod
-  def getClassifier(cls, path=SERIALIZE_PATH):
-    persister = Persister(path)
-    if persister.isExist():
-      return persister.get()
-    else:
-      return None

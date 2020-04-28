@@ -143,14 +143,14 @@ def makeFstatDF(df_X, ser_y, ser_weight=None):
   MAX = "max"
   if ser_weight is None:
     ser_weight = ser_y.copy()
-    ser_weight[:] = 1
+    ser_weight.loc[:] = 1
   df_X_adj = df_X.copy()
   df_X_adj = df_X_adj.apply(lambda col: col*ser_weight)
   states = ser_y.unique()
   df = pd.DataFrame()
   for state in states:
-    ser = makeFstatSer(df_X_adj,
-         makeOneStateSer(ser_y, state), is_prune=False)
+    ser_y_1 = makeOneStateSer(ser_y, state)
+    ser = makeFstatSer(df_X_adj, ser_y_1, is_prune=False)
     df[state] = ser
   df[MAX] = df.max(axis=1)
   df = df.sort_values(MAX, ascending=False)
@@ -265,13 +265,15 @@ def plotInstancePredictions(ser_y, ser_pred,
   if is_plot:
     plt.show()
 
-def makeArrays(df, ser, indices):
+def makeArrays(df, ser, indices=None):
   """
   Constructs numpy arrays for the dataframe and series.
   :param pd.DataFrame df:
   :param pd.Series ser:
   :return ndarray, ndarray:
   """
+  if indices is None:
+    indices = df.index
   return df.loc[indices, :].values,  \
       ser.loc[indices].values
 
@@ -303,7 +305,7 @@ def scoreFeatures(clf, df_X, ser_y,
   #
   clf = copy.deepcopy(clf)
   arr_X, arr_y = makeArrays(df_X[features], ser_y,
-      train_idxs)
+      indices=train_idxs)
   clf.fit(arr_X, arr_y)
   #
   arr_X, arr_y = makeArrays(df_X[features], ser_y,

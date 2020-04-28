@@ -16,10 +16,8 @@ CLASS = 1
 
 DF_X, SER_Y_ALL = test_helpers.getDataLong()
 SER_Y = pd.Series([
-    binary_feature_manager.PCLASS if v == CLASS
-    else binary_feature_manager.NCLASS
-    for v in SER_Y_ALL],
-    index=SER_Y_ALL.index)
+    cn.PCLASS if v == CLASS else cn.NCLASS
+    for v in SER_Y_ALL], index=SER_Y_ALL.index)
 
 
 def addTest(instance):
@@ -27,7 +25,7 @@ def addTest(instance):
     instance._init()
     for _ in range(num_iteration):
       instance.selector.add()
-    length = len(instance.selector.features)
+    length = len(instance.selector.chosens)
     if length != num_iteration:
       self.assertEqual(length, num_iteration)
   #
@@ -52,12 +50,12 @@ class TestFeatureSelector(unittest.TestCase):
   def testConstructor(self):
     if IGNORE_TEST:
       return
+    self._init()
     self.assertTrue(self.df_X.equals(
         self.selector._df_X))
     #
-    all_features = self.selector.all
-    diff = set(all_features).symmetric_difference(
-        self.ser_y.unique())
+    diff = set(self.selector.all).symmetric_difference(
+        self.df_X.columns.tolist())
     self.assertEqual(len(diff), 0)
 
   def testAdd(self):
@@ -68,42 +66,40 @@ class TestFeatureSelector(unittest.TestCase):
   def testAddSpecific(self):
     if IGNORE_TEST:
       return
-    self._init()
     FEATURE = "DUMMY"
     self.selector.add()
     self.selector.add(feature=FEATURE)
-    self.assertEqual(self.selector.features[-1],
+    self.assertEqual(self.selector.chosens[-1],
         FEATURE)
 
   def testRemove(self):
     if IGNORE_TEST:
       return
+    self._init()
     self.selector.add()
-    self.assertEqual(len(self.selector.features), 1)
+    self.assertEqual(len(self.selector.chosens), 1)
     self.selector.add()
-    self.assertEqual(len(self.selector.features),
+    self.assertEqual(len(self.selector.chosens),
         2)
-    last_feature = self.selector.features[-1]
+    last_feature = self.selector.chosens[-1]
     self.selector.remove()
-    self.assertEqual(len(self.selector.features),
+    self.assertEqual(len(self.selector.chosens),
         1)
     self.selector.add()
     self.assertNotEqual(last_feature,
-        self.selector.features[-1])
+        self.selector.chosens[-1])
 
   def testRemoveSpecifiedFeature(self):
     if IGNORE_TEST:
       return
-    self._init()
-    CLS = 0
     self.selector.add()
     self.selector.add()
-    feature_remove = self.selector.features[0]
-    feature_stay = self.selector.features[1]
-    self.selector.remove(CLS, feature=feature_remove)
-    self.assertEqual(len(self.selector.features),
+    feature_remove = self.selector.chosens[0]
+    feature_stay = self.selector.chosens[1]
+    self.selector.remove(feature=feature_remove)
+    self.assertEqual(len(self.selector.chosens),
         1)
-    self.assertEqual(self.selector.features[0],
+    self.assertEqual(self.selector.chosens[0],
         feature_stay)
     self.assertEqual(self.selector.removes[0],
         feature_remove)
@@ -126,17 +122,7 @@ class TestFeatureSelectorCorr(unittest.TestCase):
   def testAdd(self):
     if IGNORE_TEST:
       return
-    def test(num_iteration, max_corr, expected_size):
-      selector = feature_selector.FeatureSelectorCorr(
-          self.df_X, self.ser_y, max_corr=max_corr)
-      for _ in range(num_iteration):
-        if not selector.add():
-          break
-      self.assertEqual(len(selector.feature_dct[cls]),
-          expected_size)
-    #
-    test(5, 0, 1)
-    test(5, 1, 5)
+    addTest(self)
 
 
 ##################################################
@@ -157,6 +143,7 @@ class TestFeatureSelectorResidual(unittest.TestCase):
   def testAdd(self):
     if IGNORE_TEST:
       return
+    self._init()
     addTest(self)
     
 
