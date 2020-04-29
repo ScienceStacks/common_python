@@ -1,9 +1,19 @@
 '''Constructs features for a binary classifier.'''
 
 """
-BinaryFeatureManager constructs the set of features
-for a binary classifier. The algorithm has two
-parts.
+BinaryFeatureClassifierOptimizer selects a
+set of features that optimize a binary classifier.
+The software constraints of the optimization are:
+  Minimize the number of features
+  The features selected result in a classifier
+      that only have a a small degradation in accuracy
+      compared with using all features (see max_degrade)
+The hard constraints are:
+  Maximum number of features considered (see max_iter)
+  Minimum increase in accuracy when including the
+      feature (see min_incr_score)
+
+The algorithm operates in two phases.
 1. Forward selection. Choose features that increase
    the classification score up to a small difference
    from the score achieved using all features
@@ -36,7 +46,7 @@ BINARY_CLASSES = [cn.NCLASS, cn.PCLASS]
 MAX_BACKTRACK_ITERATIONS = 100
 
 
-class BinaryFeatureManager(object):
+class BinaryFeatureClassifierOptimizer(object):
   """
   Does feature selection for binary classes.
   Exposes the following instance variables
@@ -50,7 +60,7 @@ class BinaryFeatureManager(object):
 
   def __init__(self, df_X, ser_y, clf,
       checkpoint_cb=CHECKPOINT_CB,
-      feature_selector=None,
+      feature_collection=None,
       min_incr_score=MIN_INCR_SCORE,
       max_iter=MAX_ITER, 
       max_degrade=MAX_DEGRADE,
@@ -64,7 +74,7 @@ class BinaryFeatureManager(object):
         values: binary class values (0, 1)
     :param Classifier clf:
         Exposes: fit, score, predict
-    :param FeatureSelector feature_selector:
+    :param FeatureCollection feature_collection:
     :param float min_incr_score: min amount by which
         a feature must increase the score to be included
     :param int max_iter: maximum number of iterations
@@ -76,7 +86,7 @@ class BinaryFeatureManager(object):
     self._clf = clf
     self._df_X = df_X
     self._ser_y = ser_y
-    self._selector = feature_selector
+    self._collection = feature_collection
     self._min_incr_score = min_incr_score
     self._max_iter = max_iter
     self._max_degrade = max_degrade
@@ -86,7 +96,7 @@ class BinaryFeatureManager(object):
     self.best_score = util_classifier.scoreFeatures(
         clf, self._df_X, self._ser_y,
         test_idxs=self._test_idxs)
-    # Score achieved for features in selector
+    # Score achieved for features in collection
     self.score = 0
     # Features found
     self.features = []
@@ -94,8 +104,8 @@ class BinaryFeatureManager(object):
   @property
   def _completed_iterations(self):
     # Has begin running fit
-    return len(self._selector.features)  \
-        + len(self._selector.removes)
+    return len(self._collection.features)  \
+        + len(self._collection.removes)
 
   @property
   def is_done(self):
@@ -131,24 +141,24 @@ class BinaryFeatureManager(object):
     Result is in self.features.
     """
     # Forward selection of features
-    for _ in range(len(self._selector.getCandidates())):
+    for _ in range(len(self._collection.getCandidates())):
       if self._completed_iterations  \
           % CHECKPOINT_INTERVAL == 0:
         self._checkpoint_cb()  #  Save state
       if self._completed_iterations >= self._max_iter:
         break  # Reached maximum number of iterations
-      if not self.selector.add():
+      if not self.collection.add():
         break  # No more features to add
       new_score = util_classifier.scoreFeatures(
           self._clf, self._df_X, self._ser_y,
-          features=self._selector.features,
+          features=self._collection.features,
           test_idxs=self._test_idxs)
       if new_score - self.score > self._min_incr_score:
           # Feature is acceptable
           self.score = new_score
       else:
         # Remove the feature
-        self.selector.remove(cls)
+        self.collection.remove(cls)
       # See if close enough to best possible score
       if self.best_score - self.score  \
           < self._max_degrade:
@@ -157,16 +167,16 @@ class BinaryFeatureManager(object):
     # Eliminate features that do not affect accuracy
     for _ in range(MAX_BACKTRACK_ITERATIONS):
       is_done = True
-      for feature in self.selector.features:
+      for feature in self.collection.features:
         # Temporarily delete the feature
-        self.selector.remove(feature=feature)
+        self.collection.remove(feature=feature)
         new_score = util_classifier.scoreFeatures(
             self._clf, self._df_X, self._ser_y,
-            features=self._selector.features,
+            features=self._collection.features,
             test_idxs=self._test_idxs)
         if self.score - new_score > self._min_incr_score:
           # Restore the feature
-          self.selector.add(cls, feature=feature)
+          self.collection.add(cls, feature=feature)
         else:
           # Permanently delete the feature
           self.score = new_score
@@ -174,4 +184,4 @@ class BinaryFeatureManager(object):
       if is_done:
         break
     #
-    self.features = self._selector.features
+    self.features = self._collection.features

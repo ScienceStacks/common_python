@@ -51,7 +51,7 @@ class MultiClassifier(object):
     """
     Selects the top features for each class and fits
     a classifier with the desired accuracy by including
-    more features as selected by FeatureSelector.
+    more features as selected by FeatureCollection.
     :param pd.DataFrame df_X:
         columns: features
         index: instances

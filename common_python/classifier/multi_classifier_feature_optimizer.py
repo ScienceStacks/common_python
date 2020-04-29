@@ -1,9 +1,9 @@
-'''Constructs features multi-class classifiers.'''
+'''Optimizes features for multi-class classifiers.'''
 
 """
-MultiFeatureManager handles feature selection for
-classifiers with multiple features by using multiple
-BinaryFeatureManagers.
+MultiFeatureManager optimizes the feature for
+multi-class classifiers. This is implemented by
+using multiple BinaryFeatureManagers.
 """
 
 from common_python.util.persister import Persister
