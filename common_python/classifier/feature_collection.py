@@ -1,10 +1,12 @@
-'''Selects features based on classifier results.'''
+'''Creates a collection of features. Classifier agnostic.
+'''
+
 """
-A FeatureSelector implements the following:
+A FeatureCollection implements the following:
   add() - add a feature to features
   remove() - remove a feature from features
   choose() - choose a feature to add
-A FeatureSelector exposes a list of features
+A FeatureCollection exposes a list of features
   features
 """
 
@@ -19,7 +21,7 @@ CLASSES = [0, 1]
 
 
 ################### Base Class #################
-class FeatureSelector(object):
+class FeatureCollection(object):
 
   def __init__(self, df_X, ser_y, **kwargs):
     """
@@ -109,7 +111,7 @@ class FeatureSelector(object):
 
 
 ########### Select based on correations #################
-class FeatureSelectorCorr(FeatureSelector):
+class FeatureCollectionCorr(FeatureCollection):
   """
   Selects features for a class using correlations.
   """
@@ -165,7 +167,7 @@ class FeatureSelectorCorr(FeatureSelector):
 
 
 ####### Select based on classification residuals #######
-class FeatureSelectorResidual(FeatureSelector):
+class FeatureCollectionResidual(FeatureCollection):
   """
   Selects features by using a residual idea for classification.
   The residual is the set of misclassified instances.

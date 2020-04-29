@@ -1,7 +1,8 @@
 import common_python.constants as cn
 from common_python.testing import helpers
-from common_python.tests.classifier import helpers as test_helpers
-from common_python.classifier import feature_selector
+from common_python.tests.classifier  \
+    import helpers as test_helpers
+from common_python.classifier import feature_collection
 from common_python.testing import helpers
 
 import copy
@@ -24,8 +25,8 @@ def addTest(instance):
   def test(num_iteration):
     instance._init()
     for _ in range(num_iteration):
-      instance.selector.add()
-    length = len(instance.selector.chosens)
+      instance.collection.add()
+    length = len(instance.collection.chosens)
     if length != num_iteration:
       self.assertEqual(length, num_iteration)
   #
@@ -34,7 +35,7 @@ def addTest(instance):
 
 
 ##################################################
-class TestFeatureSelector(unittest.TestCase):
+class TestFeatureCollection(unittest.TestCase):
   
   def setUp(self):
     if IGNORE_TEST:
@@ -44,7 +45,7 @@ class TestFeatureSelector(unittest.TestCase):
   def _init(self):
     self.df_X, self.ser_y = (copy.deepcopy(DF_X),
         copy.deepcopy(SER_Y))
-    self.selector = feature_selector.FeatureSelector(
+    self.collection = feature_collection.FeatureCollection(
       DF_X, SER_Y)
 
   def testConstructor(self):
@@ -52,9 +53,9 @@ class TestFeatureSelector(unittest.TestCase):
       return
     self._init()
     self.assertTrue(self.df_X.equals(
-        self.selector._df_X))
+        self.collection._df_X))
     #
-    diff = set(self.selector.all).symmetric_difference(
+    diff = set(self.collection.all).symmetric_difference(
         self.df_X.columns.tolist())
     self.assertEqual(len(diff), 0)
 
@@ -67,46 +68,46 @@ class TestFeatureSelector(unittest.TestCase):
     if IGNORE_TEST:
       return
     FEATURE = "DUMMY"
-    self.selector.add()
-    self.selector.add(feature=FEATURE)
-    self.assertEqual(self.selector.chosens[-1],
+    self.collection.add()
+    self.collection.add(feature=FEATURE)
+    self.assertEqual(self.collection.chosens[-1],
         FEATURE)
 
   def testRemove(self):
     if IGNORE_TEST:
       return
     self._init()
-    self.selector.add()
-    self.assertEqual(len(self.selector.chosens), 1)
-    self.selector.add()
-    self.assertEqual(len(self.selector.chosens),
+    self.collection.add()
+    self.assertEqual(len(self.collection.chosens), 1)
+    self.collection.add()
+    self.assertEqual(len(self.collection.chosens),
         2)
-    last_feature = self.selector.chosens[-1]
-    self.selector.remove()
-    self.assertEqual(len(self.selector.chosens),
+    last_feature = self.collection.chosens[-1]
+    self.collection.remove()
+    self.assertEqual(len(self.collection.chosens),
         1)
-    self.selector.add()
+    self.collection.add()
     self.assertNotEqual(last_feature,
-        self.selector.chosens[-1])
+        self.collection.chosens[-1])
 
   def testRemoveSpecifiedFeature(self):
     if IGNORE_TEST:
       return
-    self.selector.add()
-    self.selector.add()
-    feature_remove = self.selector.chosens[0]
-    feature_stay = self.selector.chosens[1]
-    self.selector.remove(feature=feature_remove)
-    self.assertEqual(len(self.selector.chosens),
+    self.collection.add()
+    self.collection.add()
+    feature_remove = self.collection.chosens[0]
+    feature_stay = self.collection.chosens[1]
+    self.collection.remove(feature=feature_remove)
+    self.assertEqual(len(self.collection.chosens),
         1)
-    self.assertEqual(self.selector.chosens[0],
+    self.assertEqual(self.collection.chosens[0],
         feature_stay)
-    self.assertEqual(self.selector.removes[0],
+    self.assertEqual(self.collection.removes[0],
         feature_remove)
 
 
 ##################################################
-class TestFeatureSelectorCorr(unittest.TestCase):
+class TestFeatureCollectionCorr(unittest.TestCase):
   
   def setUp(self):
     if IGNORE_TEST:
@@ -116,7 +117,7 @@ class TestFeatureSelectorCorr(unittest.TestCase):
   def _init(self):
     self.df_X, self.ser_y = (copy.deepcopy(DF_X),
         copy.deepcopy(SER_Y))
-    self.selector = feature_selector.FeatureSelectorCorr(
+    self.collection = feature_collection.FeatureCollectionCorr(
       DF_X, SER_Y)
 
   def testAdd(self):
@@ -126,7 +127,7 @@ class TestFeatureSelectorCorr(unittest.TestCase):
 
 
 ##################################################
-class TestFeatureSelectorResidual(unittest.TestCase):
+class TestFeatureCollectionResidual(unittest.TestCase):
   
   def setUp(self):
     if IGNORE_TEST:
@@ -136,8 +137,8 @@ class TestFeatureSelectorResidual(unittest.TestCase):
   def _init(self):
     self.df_X, self.ser_y = (copy.deepcopy(DF_X),
         copy.deepcopy(SER_Y))
-    self.selector \
-        = feature_selector.FeatureSelectorResidual(
+    self.collection \
+        = feature_collection.FeatureCollectionResidual(
         DF_X, SER_Y)
 
   def testAdd(self):
