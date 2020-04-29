@@ -12,8 +12,11 @@ Some modules are for evaluating classifiers.
 ## Classifier evaluation
 - hypergrid\_harness creates synthetic data for a hypergrid and evaluates classifier accuracy.
 
-## Meta-classifier for features
-- meta\_classifier provides various techniques for reducing noise including feature replicas and thresholds.
+## Optimizing feature selection
+- feature\_collection creates and manages a collection of features
+- binary\_classifier\_feature\_optimizer chooses a best set of features for a binary classifier
+- multi\_classifier\_feature\_optimizer chooses a best set of features for a multi-classifier
+- multi\_classifier constructs a classifier for multiple classes using binary classifiers
 
 ## Special classifiers
 - plurality\_classifier predicts the most frequently occurring class in the training data
