@@ -32,6 +32,8 @@ The algorithm operates in two phases.
 """
 
 from common_python.classifier import util_classifier
+from common_python.classifier.feature_collection  \
+    import FeatureCollection
 import common_python.constants as cn
 
 import copy
@@ -42,23 +44,27 @@ import random
 
 # Default checkpoint callback
 CHECKPOINT_CB = lambda : None
+CHECKPOINT_INTERVAL = 5
 BINARY_CLASSES = [cn.NCLASS, cn.PCLASS]
-MAX_BACKTRACK_ITERATIONS = 100
+MAX_ITER = 100
+MAX_BACKWARD_ITER = MAX_ITER  # Max
+MIN_INCR_SCORE = 0.01
+MAX_DEGRADE = 0.05
 
 
-class BinaryFeatureClassifierOptimizer(object):
+class BinaryClassifierFeatureOptimizer(object):
   """
   Does feature selection for binary classes.
   Exposes the following instance variables
     1. score - score achieved for features
     2  best_score
-    3. is_done - completed feature construction
-    4. features selected for classifier
+    3. features selected for classifier
+    4. is_done - completed processing
   This is a computationally intensive activity and so
   the implementation allows for restarts.
   """
 
-  def __init__(self, df_X, ser_y, clf,
+  def __init__(self, df_X, ser_y, base_clf,
       checkpoint_cb=CHECKPOINT_CB,
       feature_collection=None,
       min_incr_score=MIN_INCR_SCORE,
@@ -72,7 +78,7 @@ class BinaryFeatureClassifierOptimizer(object):
     :param pd.Series ser_y:
         index: instances
         values: binary class values (0, 1)
-    :param Classifier clf:
+    :param Classifier base_clf:
         Exposes: fit, score, predict
     :param FeatureCollection feature_collection:
     :param float min_incr_score: min amount by which
@@ -81,11 +87,17 @@ class BinaryFeatureClassifierOptimizer(object):
     :param float max_degrade: maximum difference between
         best score and actual
     """
+    if len(ser_y.unique()) != 2:
+      raise ValueError("Must have two classes.")
     ########### PRIVATE ##########
     self._checkpoint_cb = checkpoint_cb
-    self._clf = clf
+    self._base_clf = copy.deepcopy(base_clf)
     self._df_X = df_X
+    self._iteration = -1  # Counts feature evaluations
     self._ser_y = ser_y
+    if feature_collection is None:
+      feature_collection = FeatureCollection(
+          self._df_X, self._ser_y)
     self._collection = feature_collection
     self._min_incr_score = min_incr_score
     self._max_iter = max_iter
@@ -94,22 +106,19 @@ class BinaryFeatureClassifierOptimizer(object):
     ########### PUBLIC ##########
     # Score with all features
     self.best_score = util_classifier.scoreFeatures(
-        clf, self._df_X, self._ser_y,
+        self._base_clf, self._df_X, self._ser_y,
         test_idxs=self._test_idxs)
     # Score achieved for features in collection
     self.score = 0
-    # Features found
+    # Collection of features found
     self.features = []
+    # Flag to indicate completed processing
+    self.is_done = False
 
-  @property
-  def _completed_iterations(self):
-    # Has begin running fit
-    return len(self._collection.features)  \
-        + len(self._collection.removes)
-
-  @property
-  def is_done(self):
-    return len(self.features) > 0
+  def _updateIteration(self):
+    if self._iteration % CHECKPOINT_INTERVAL == 0:
+      self._checkpoint_cb()  #  Save state
+    self._iteration += 1
 
   def _makeTestIndices(self):
     """
@@ -119,17 +128,19 @@ class BinaryFeatureClassifierOptimizer(object):
     Notes
       1. Assumes that number of PCLASS < NCLASS
     """
-    pclass_idxs = self._ser_y[ser_ser_y==cn.PCLASS].index
-    nclass_idxs = self._ser_y[ser_ser_y==cn.NCLASS].index
+    pclass_idxs = self._ser_y[
+        self._ser_y==cn.PCLASS].index
+    nclass_idxs = self._ser_y[
+        self._ser_y==cn.NCLASS].index
     # Sample w/o replacement from the larger set
     if len(pclass_idxs) < len(nclass_idxs):
       length = len(pclass_idxs)
-      test_idxs = pclass_idxs
-      sample_idxs = nclass_idxs
+      test_idxs = pclass_idxs.tolist()
+      sample_idxs = nclass_idxs.tolist()
     else:
       length = len(nclass_idxs)
-      test_idxs = nclass_idxs
-      sample_idxs = pclass_idxs
+      test_idxs = nclass_idxs.tolist()
+      sample_idxs = pclass_idxs.tolist()
     sample_idxs = random.sample(sample_idxs, length)
     test_idxs.extend(sample_idxs)
     return test_idxs
@@ -142,41 +153,41 @@ class BinaryFeatureClassifierOptimizer(object):
     """
     # Forward selection of features
     for _ in range(len(self._collection.getCandidates())):
-      if self._completed_iterations  \
-          % CHECKPOINT_INTERVAL == 0:
-        self._checkpoint_cb()  #  Save state
-      if self._completed_iterations >= self._max_iter:
+      self._updateIteration()
+      if self._iteration >= self._max_iter:
         break  # Reached maximum number of iterations
-      if not self.collection.add():
+      if not self._collection.add():
         break  # No more features to add
       new_score = util_classifier.scoreFeatures(
-          self._clf, self._df_X, self._ser_y,
-          features=self._collection.features,
+          self._base_clf, self._df_X, self._ser_y,
+          features=self._collection.chosens,
           test_idxs=self._test_idxs)
+      import pdb; pdb.set_trace()
       if new_score - self.score > self._min_incr_score:
           # Feature is acceptable
           self.score = new_score
       else:
         # Remove the feature
-        self.collection.remove(cls)
+        self._collection.remove(cls)
       # See if close enough to best possible score
       if self.best_score - self.score  \
           < self._max_degrade:
         break
     # Backwards elimination to delete unneeded feaures
     # Eliminate features that do not affect accuracy
-    for _ in range(MAX_BACKTRACK_ITERATIONS):
+    for _ in range(MAX_BACKWARD_ITER):
       is_done = True
-      for feature in self.collection.features:
+      self._updateIteration()
+      for feature in self._collection.chosens:
         # Temporarily delete the feature
-        self.collection.remove(feature=feature)
+        self._collection.remove(feature=feature)
         new_score = util_classifier.scoreFeatures(
-            self._clf, self._df_X, self._ser_y,
-            features=self._collection.features,
+            self._base_clf, self._df_X, self._ser_y,
+            features=self._collection.chosens,
             test_idxs=self._test_idxs)
         if self.score - new_score > self._min_incr_score:
           # Restore the feature
-          self.collection.add(cls, feature=feature)
+          self._collection.add(cls, feature=feature)
         else:
           # Permanently delete the feature
           self.score = new_score
@@ -184,4 +195,6 @@ class BinaryFeatureClassifierOptimizer(object):
       if is_done:
         break
     #
-    self.features = self._collection.features
+    self.features = list(self._collection.chosens)
+    self._checkpoint_cb()
+    is_done = True

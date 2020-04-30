@@ -32,6 +32,8 @@ class FeatureCollection(object):
         index: instances
         values: binary class values: 0, 1
     """
+    if len(ser_y.unique()) != 2:
+      raise ValueError("Must have two classes.")
     ###### PRIVATE ####
     self._df_X = df_X
     self._ser_y = ser_y

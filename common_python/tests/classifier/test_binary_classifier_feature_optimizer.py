@@ -1,9 +1,10 @@
 import common_python.constants as cn
 from common_python.util.persister import Persister
 from common_python.testing import helpers
+from common_python.classifier  \
+    import binary_classifier_feature_optimizer as bcfo
 from common_python.tests.classifier import helpers as test_helpers
-from common_python.classifier import multi_classifier
-from common_python.classifier import feature_selector
+from common_python.classifier import feature_collection
 from common_python.testing import helpers
 from common_python.util.persister import Persister
 
@@ -14,97 +15,61 @@ import numpy as np
 from sklearn import svm
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 
-DIR_PATH = os.path.dirname(os.path.abspath(__file__))
-TEST_DATA_PATH = os.path.join(DIR_PATH,
-    "test_multi_classifier.pcl")
-TEST_SERIALIZE_PATH  \
-    = os.path.join(DIR_PATH, "test_multi_serialize.pcl")
-
-PERSISTER = Persister(TEST_DATA_PATH)
-
-if not PERSISTER.isExist():
-  DF_X, SER_Y = test_helpers.getDataLong()
-  CLF = multi_classifier.MultiClassifier()
-  CLF.fit(DF_X, SER_Y)
-  PERSISTER.set([DF_X, SER_Y, CLF])
-else:
-  try:
-    [DF_X, SER_Y, CLF] = PERSISTER.get()
-  except:
-    DATA = None
-    DATA_LONG = None
+CLASS = 1
+DF_X, SER_Y = test_helpers.getDataLong()
+CLF = svm.LinearSVC()
+SER_Y = pd.Series([
+    cn.PCLASS if v == CLASS else cn.NCLASS
+    for v in SER_Y], index=SER_Y.index)
 
 
-class TestMultiClass(unittest.TestCase):
-
-  def _remove(self):
-    if os.path.isfile(TEST_SERIALIZE_PATH):
-      os.remove(TEST_SERIALIZE_PATH)
+class TestBinaryClassifierFeatureOptimizer(unittest.TestCase):
   
-  def setUp(self):
-    self._remove()
-    self.df_X, self.ser_y = DF_X, SER_Y
-    self.clf = multi_classifier.MultiClassifier()
-    self.clf_fitted = copy.deepcopy(CLF)
+  def _init(self):
+    self.df_X = copy.deepcopy(DF_X)
+    self.ser_y = copy.deepcopy(SER_Y)
+    self.optimizer =  \
+        bcfo.BinaryClassifierFeatureOptimizer(
+        self.df_X, self.ser_y, CLF)
 
-  def tearDown(self):
-    self._remove()
+  def setUp(self):
+    if IGNORE_TEST:
+      return
+    self._init()
 
   def testConstructor(self):
     if IGNORE_TEST:
       return
-    self.assertTrue(isinstance(self.clf._base_clf,
+    self.assertTrue(isinstance(self.optimizer._base_clf,
         svm.LinearSVC))
 
-  def testFit(self):
+  def testUpdateIteration(self):
     if IGNORE_TEST:
       return
-    for fs in [
-        feature_selector.FeatureSelector,
-        feature_selector.FeatureSelectorCorr,
-        feature_selector.FeatureSelectorResidual,
-        ]:
-      clf = multi_classifier.MultiClassifier(max_iter=2,
-          max_degrade=0.4,
-          feature_selector_cls=fs)
-      clf.fit(self.df_X, self.ser_y)
-      trues = [s >= 0.5 for s in clf.score_dct.values()]
-      self.assertTrue(all(trues))
-      trues = [len(f) > 0 for f 
-          in clf.selector.feature_dct.values()]
-      self.assertTrue(all(trues))
-      trues = [clf.best_score_dct[c] >=
-          clf.score_dct[c] for c in clf.classes]
-      self.assertTrue(all(trues))
+    self.optimizer._updateIteration()
+    self.assertEqual(self.optimizer._iteration, 0)
 
-  def testPredict(self):
+  def testMakeTestIndices(self):
     if IGNORE_TEST:
       return
-    df_pred = self.clf_fitted.predict(self.df_X)
-    self.assertTrue(helpers.isValidDataFrame(df_pred,
-        expected_columns=self.ser_y.unique()))
+    test_idxs = self.optimizer._makeTestIndices()
+    classes = self.ser_y.loc[test_idxs]
+    cls_set = set(classes)
+    self.assertEqual(len(cls_set), 2)
+    p_classes = [c for c in classes if c == cn.PCLASS]
+    n_classes = [c for c in classes if c == cn.NCLASS]
+    self.assertEqual(len(p_classes), len(n_classes))
 
-  def testGetClassifier(self):
-    if IGNORE_TEST:
-      return
-    multi_clf =  \
-        multi_classifier.MultiClassifier.getClassifier(
-        path=TEST_SERIALIZE_PATH)
-    self.assertIsNone(multi_clf)
-    #
-    multi_classifier.MultiClassifier.doQualityFit(
-        self.df_X, self.ser_y, max_iter=1,
-        path=TEST_SERIALIZE_PATH, is_report=False)
-    multi_clf =  \
-        multi_classifier.MultiClassifier.getClassifier(
-        path=TEST_SERIALIZE_PATH)
-    self.assertTrue(isinstance(multi_clf,
-        multi_classifier.MultiClassifier))
-    
+  def testRun(self):
+    # TESTING
+    self._init()
+    optimizer = bcfo.BinaryClassifierFeatureOptimizer(
+        self.df_X, self.ser_y, CLF, max_iter=2)
+    optimizer.run()
+    import pdb; pdb.set_trace()
+
 
 if __name__ == '__main__':
   unittest.main()
-
-
