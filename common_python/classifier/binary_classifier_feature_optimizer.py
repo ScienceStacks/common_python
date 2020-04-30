@@ -4,14 +4,14 @@
 BinaryFeatureClassifierOptimizer selects a
 set of features that optimize a binary classifier.
 The software constraints of the optimization are:
-  Minimize the number of features
-  The features selected result in a classifier
+  (a) Minimize the number of features
+  (b) The features selected result in a classifier
       that only have a a small degradation in accuracy
-      compared with using all features (see max_degrade)
+      compared with using all features (max_degrade)
 The hard constraints are:
-  Maximum number of features considered (see max_iter)
-  Minimum increase in accuracy when including the
-      feature (see min_incr_score)
+  (i)  Maximum number of features considered (max_iter)
+  (ii) Minimum increase in accuracy when including the
+      feature (min_incr_score)
 
 The algorithm operates in two phases.
 1. Forward selection. Choose features that increase
@@ -29,6 +29,11 @@ The algorithm operates in two phases.
    The parameters are:
      min_incr_score (maximum amount by which the
          score can decrease if a feature is eliminated)
+
+Usage:
+  optimizer = BinaryClassifierFeatureOptimizer()
+  optimizer.fit(df_X, ser_y)
+  features = optimizer.features
 """
 
 from common_python.classifier import util_classifier
@@ -64,7 +69,7 @@ class BinaryClassifierFeatureOptimizer(object):
   the implementation allows for restarts.
   """
 
-  def __init__(self, df_X, ser_y, base_clf,
+  def __init__(self, base_clf,
       checkpoint_cb=CHECKPOINT_CB,
       feature_collection=None,
       min_incr_score=MIN_INCR_SCORE,
@@ -72,12 +77,6 @@ class BinaryClassifierFeatureOptimizer(object):
       max_degrade=MAX_DEGRADE,
       ):
     """
-    :param pd.DataFrame df_X:
-        columns: features
-        index: instances
-    :param pd.Series ser_y:
-        index: instances
-        values: binary class values (0, 1)
     :param Classifier base_clf:
         Exposes: fit, score, predict
     :param FeatureCollection feature_collection:
@@ -87,27 +86,18 @@ class BinaryClassifierFeatureOptimizer(object):
     :param float max_degrade: maximum difference between
         best score and actual
     """
-    if len(ser_y.unique()) != 2:
-      raise ValueError("Must have two classes.")
     ########### PRIVATE ##########
-    self._checkpoint_cb = checkpoint_cb
     self._base_clf = copy.deepcopy(base_clf)
-    self._df_X = df_X
+    self._checkpoint_cb = checkpoint_cb
     self._iteration = -1  # Counts feature evaluations
-    self._ser_y = ser_y
-    if feature_collection is None:
-      feature_collection = FeatureCollection(
-          self._df_X, self._ser_y)
     self._collection = feature_collection
     self._min_incr_score = min_incr_score
     self._max_iter = max_iter
     self._max_degrade = max_degrade
-    self._test_idxs = self._makeTestIndices()
+    self._test_idxs = None  # initialized in fit
     ########### PUBLIC ##########
     # Score with all features
-    self.best_score = util_classifier.scoreFeatures(
-        self._base_clf, self._df_X, self._ser_y,
-        test_idxs=self._test_idxs)
+    self.best_score = None  # Assigned in fit
     # Score achieved for features in collection
     self.score = 0
     # Collection of features found
@@ -120,7 +110,7 @@ class BinaryClassifierFeatureOptimizer(object):
       self._checkpoint_cb()  #  Save state
     self._iteration += 1
 
-  def _makeTestIndices(self):
+  def _makeTestIndices(self, ser_y):
     """
     Constructs the test indices so that positive
     and negative classes are equally represented.
@@ -128,10 +118,8 @@ class BinaryClassifierFeatureOptimizer(object):
     Notes
       1. Assumes that number of PCLASS < NCLASS
     """
-    pclass_idxs = self._ser_y[
-        self._ser_y==cn.PCLASS].index
-    nclass_idxs = self._ser_y[
-        self._ser_y==cn.NCLASS].index
+    pclass_idxs = ser_y[ser_y==cn.PCLASS].index
+    nclass_idxs = ser_y[ser_y==cn.NCLASS].index
     # Sample w/o replacement from the larger set
     if len(pclass_idxs) < len(nclass_idxs):
       length = len(pclass_idxs)
@@ -145,12 +133,27 @@ class BinaryClassifierFeatureOptimizer(object):
     test_idxs.extend(sample_idxs)
     return test_idxs
 
-  def run(self):
+  def fit(self, df_X, ser_y):
     """
     Construct the features, handling restarts by saving
     state and checkpointing.
     Result is in self.features.
+    :param pd.DataFrame df_X:
+        columns: features
+        index: instances
+    :param pd.Series ser_y:
+        index: instances
+        values: binary class values (0, 1)
     """
+    if len(ser_y.unique()) != 2:
+      raise ValueError("Must have exactly two classes.")
+    # Initialization
+    if self._collection is None:
+      self._collection = FeatureCollection(df_X, ser_y)
+    self._test_idxs = self._makeTestIndices(ser_y)
+    self.best_score = util_classifier.scoreFeatures(
+        self._base_clf, df_X, ser_y,
+        test_idxs=self._test_idxs)
     # Forward selection of features
     for _ in range(len(self._collection.getCandidates())):
       self._updateIteration()
@@ -159,16 +162,15 @@ class BinaryClassifierFeatureOptimizer(object):
       if not self._collection.add():
         break  # No more features to add
       new_score = util_classifier.scoreFeatures(
-          self._base_clf, self._df_X, self._ser_y,
+          self._base_clf, df_X, ser_y,
           features=self._collection.chosens,
           test_idxs=self._test_idxs)
-      import pdb; pdb.set_trace()
       if new_score - self.score > self._min_incr_score:
           # Feature is acceptable
           self.score = new_score
       else:
         # Remove the feature
-        self._collection.remove(cls)
+        self._collection.remove()
       # See if close enough to best possible score
       if self.best_score - self.score  \
           < self._max_degrade:
@@ -176,23 +178,25 @@ class BinaryClassifierFeatureOptimizer(object):
     # Backwards elimination to delete unneeded feaures
     # Eliminate features that do not affect accuracy
     for _ in range(MAX_BACKWARD_ITER):
-      is_done = True
+      is_changed = False
       self._updateIteration()
       for feature in self._collection.chosens:
+        if len(self._collection.chosens) == 1:
+          break
         # Temporarily delete the feature
         self._collection.remove(feature=feature)
         new_score = util_classifier.scoreFeatures(
-            self._base_clf, self._df_X, self._ser_y,
+            self._base_clf, df_X, ser_y,
             features=self._collection.chosens,
             test_idxs=self._test_idxs)
         if self.score - new_score > self._min_incr_score:
           # Restore the feature
-          self._collection.add(cls, feature=feature)
+          self._collection.add(feature=feature)
         else:
           # Permanently delete the feature
           self.score = new_score
-          is_done = False
-      if is_done:
+          is_changed = True
+      if not is_changed:
         break
     #
     self.features = list(self._collection.chosens)

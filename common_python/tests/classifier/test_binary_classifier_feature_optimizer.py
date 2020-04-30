@@ -31,8 +31,7 @@ class TestBinaryClassifierFeatureOptimizer(unittest.TestCase):
     self.df_X = copy.deepcopy(DF_X)
     self.ser_y = copy.deepcopy(SER_Y)
     self.optimizer =  \
-        bcfo.BinaryClassifierFeatureOptimizer(
-        self.df_X, self.ser_y, CLF)
+        bcfo.BinaryClassifierFeatureOptimizer(CLF)
 
   def setUp(self):
     if IGNORE_TEST:
@@ -54,7 +53,8 @@ class TestBinaryClassifierFeatureOptimizer(unittest.TestCase):
   def testMakeTestIndices(self):
     if IGNORE_TEST:
       return
-    test_idxs = self.optimizer._makeTestIndices()
+    test_idxs = self.optimizer._makeTestIndices(
+        self.ser_y)
     classes = self.ser_y.loc[test_idxs]
     cls_set = set(classes)
     self.assertEqual(len(cls_set), 2)
@@ -62,13 +62,27 @@ class TestBinaryClassifierFeatureOptimizer(unittest.TestCase):
     n_classes = [c for c in classes if c == cn.NCLASS]
     self.assertEqual(len(p_classes), len(n_classes))
 
-  def testRun(self):
+  def testFit(self):
     # TESTING
     self._init()
-    optimizer = bcfo.BinaryClassifierFeatureOptimizer(
-        self.df_X, self.ser_y, CLF, max_iter=2)
-    optimizer.run()
-    import pdb; pdb.set_trace()
+    def test(max_iter, max_degrade=0.01):
+      optimizer = bcfo.BinaryClassifierFeatureOptimizer(
+          CLF, max_iter=max_iter,
+          max_degrade=max_degrade)
+      optimizer.fit(self.df_X, self.ser_y)
+      self.assertTrue(isinstance(optimizer.score, float))
+      self.assertTrue(isinstance(optimizer.best_score,
+          float))
+      self.assertGreaterEqual(optimizer.best_score,
+          optimizer.score)
+      self.assertGreater(len(optimizer.features), 0)
+      return optimizer.score
+    #
+    score1 = test(1)
+    score50 = test(50)
+    self.assertGreater(score50, score1)
+    score50a = test(50, max_degrade=0.5)
+    self.assertEqual(score50a, score1)
 
 
 if __name__ == '__main__':
