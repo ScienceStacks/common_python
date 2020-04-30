@@ -16,6 +16,7 @@ import copy
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import random
 import scipy.stats
 
 
@@ -313,3 +314,28 @@ def scoreFeatures(clf, df_X, ser_y,
   score = clf.score(arr_X, arr_y)
   #
   return score
+
+def partitionByState(ser, holdouts=1):
+  """
+  Creates training and test indexes by randomly selecting
+  a indices for each state.
+  :param pd.DataFrame ser: Classes for instances
+  :param int holdouts: number of holdouts for test
+  :return list-object, list-object: test, train
+  """
+  classes = ser.unique().tolist()
+  classes.sort()
+  test_idxs = []
+  for cls in classes:
+    ser_cls = ser[ser == cls]
+    if len(ser_cls) <= holdouts:
+      raise ValueError(
+          "Class %s has fewer than %d holdouts" %
+          (cls, holdouts))
+    idxs = random.sample(ser_cls.index.tolist(),
+        holdouts)
+    test_idxs.extend(idxs)
+  #
+  train_idxs = set(ser.index).difference(test_idxs)
+  return train_idxs, test_idxs
+  return test_idxs

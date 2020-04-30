@@ -15,7 +15,7 @@ import numpy as np
 from sklearn import svm
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 
 CLASS = 1
 DF_X, SER_Y = test_helpers.getDataLong()
@@ -63,7 +63,8 @@ class TestBinaryClassifierFeatureOptimizer(unittest.TestCase):
     self.assertEqual(len(p_classes), len(n_classes))
 
   def testFit(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     self._init()
     def test(max_iter, max_degrade=0.01):
       optimizer = bcfo.BinaryClassifierFeatureOptimizer(
@@ -76,13 +77,15 @@ class TestBinaryClassifierFeatureOptimizer(unittest.TestCase):
       self.assertGreaterEqual(optimizer.best_score,
           optimizer.score)
       self.assertGreater(len(optimizer.features), 0)
-      return optimizer.score
+      return optimizer
     #
-    score1 = test(1)
-    score50 = test(50)
-    self.assertGreater(score50, score1)
-    score50a = test(50, max_degrade=0.5)
-    self.assertEqual(score50a, score1)
+    opt1 = test(1)
+    opt50 = test(50)
+    self.assertGreater(opt50.score, opt1.score)
+    opt50a = test(50, max_degrade=0.5)
+    diff = set(opt50a.features).symmetric_difference(
+        opt1.features)
+    self.assertEqual(len(diff), 0)
 
 
 if __name__ == '__main__':

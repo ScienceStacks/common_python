@@ -185,6 +185,25 @@ class TestFunctions(unittest.TestCase):
         CLF, DF_X_BINARY, SER_Y_BINARY,
         test_idxs=test_idxs)
     self.assertTrue(np.isclose(score_all, score))
+
+  def testPartitionByState(self):
+    if IGNORE_TEST:
+      return
+    train_idxs, test_idxs =  \
+        util_classifier.partitionByState(SER_Y,
+        holdouts=1)
+    # all classes are present?
+    classes = SER_Y.unique()
+    test_classes = SER_Y.loc[test_idxs]
+    diff = set(classes).symmetric_difference(
+        test_classes)
+    self.assertEqual(len(diff), 0)
+    # Cover all indices in the data?
+    all_indices = set(train_idxs).union(test_idxs)
+    diff = set(SER_Y.index).symmetric_difference(
+        all_indices)
+    self.assertEqual(len(diff), 0)
+    
     
 
 
