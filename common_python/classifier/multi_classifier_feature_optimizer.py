@@ -6,12 +6,13 @@ multi-class classifiers. This is implemented by
 using multiple BinaryFeatureManagers.
 """
 
+import common_python.constants as cn
 from common_python.util.persister import Persister
 from common.trinary_data import TrinaryData
 from common_python.classifier import util_classifier
-from common_python.classifier import feature_selector
+from common_python.classifier import feature_collection
 from common_python.classifier import  \
-    binary_feature_manager
+    binary_classifier_feature_optimizer as bcfo
 
 import copy
 import numpy as np
@@ -27,48 +28,39 @@ PERSISTER_PATH = os.path.join(DIR,
     "multi_feature_manager.pcl")
 
 
-class MultiFeatureManager(object):
+class MultiClassifierFeatureOptimizer(object):
   """
   Does feature selection for binary classes.
-  Exposes the following instance variables
-    1. binary_dct - dict
-         key: class, value binary_feature_manager
-    2. MultiFeatureManager.get()
-         return: instance from serialization
-    3. MultiFeatureManager.run()
-         Acquires data and runs
   """
 
-  def __init__(self, df_X, ser_y,
-      feature_selector_cls=FeatureSelector
-      base_clf=svm.LinearSVC(), sel_kwargs,
-      **bfm_kwargs)
-      ):
+  def __init__(self,
+      feature_collection_cl=\
+      feature_collection.FeatureCollection,
+      base_clf=svm.LinearSVC(), collection_kwargs={},
+      bcfo_kwargs={}):
     """
-    :param pd.DataFrame df_X:
-        columns: features
-        index: instances
-    :param pd.Series ser_y:
-        index: instances
-        values: binary class values (0, 1)
     :param Classifier base_clf:  base classifier
         Exposes: fit, score, predict
-    :param type-FeatureSelector feature_selector_cls:
-    :param dict sel_kwargs: FeatureSelector parameters
-    :param dict bfm_kwargs: BinaryFeatureManager params
+    :param type-FeatureCollection feature_collection_cl:
+    :param dict sel_kwargs: FeatureCollection parameters
+    :param dict bcfo_kwargs: BinaryFeatureManager params
     """
     ########### PRIVATE ##########
-    self._clf = base_clf
-    self._df_X = df_X
-    self._ser_y = ser_y
-    self._selector_cls = feature_selector_cls
-    self._sel_kwargs = sel_kwargs
-    self._bfm_kwargs = bfm_kwargs
+    self._clf = copy.deepcopy(base_clf)
+    self._feature_collection_cl = feature_collection_cl
+    self._collection_kwargs = collection_kwargs
+    self._bcfo_kwargs = bcfo_kwargs
     self._persister = Persister(PERSISTER_PATH)
     self._result_dct = {cn.FEATURE: [], cn.CLASS: [],
         cn.SCORE: []}
+    self._binary_dct = {}  # binary classifier optimizers
     ########### PUBLIC ##########
-    self.binary_dct = {}
+    self.feature_dct = {}  # key: class; value: features
+    self.score_dct = {}
+    self.best_score_dct = {}
+
+  def checkpoint(self):
+    self._persister.set(self)
 
   def fit(self, df_X, ser_y):
     """
@@ -81,19 +73,26 @@ class MultiFeatureManager(object):
         index: instances
         values: binary class values (0, 1)
     """
-    for cls in ser_y.unique():
-      if not cls in self.binary_dct:
-        ser_y_cls = self.util_classifier.makeOneStateSer(
-            ser_y, cls)
-        selector = self.feature_selector_cls(df_X,
-            ser_y_cls, **self._sel_kwargs)
-        self.binary_dct[cls] =  \
-            BinaryFeatureSelector(df_X, ser_y_cls
-                checkpoint_cb=checkpoint,
-                **self._bfm_kwargs)
-      if self.binary_dct[cls].is_done:
+    for cl in ser_y.unique():
+      if not cl in self._binary_dct:
+        self._binary_dct[cl] =  \
+            bcfo.BinaryClassifierFeatureOptimizer(
+                checkpoint_cb=self.checkpoint,
+                **self._bcfo_kwargs)
+      if self._binary_dct[cl].is_done:
         continue
-      self.binary_dct[cls].run()
+      else:
+        ser_y_cl = util_classifier.makeOneStateSer(
+            ser_y, cl)
+        collection = self._feature_collection_cl(df_X,
+            ser_y_cl, **self._collection_kwargs)
+        self._binary_dct[cl].fit(df_X, ser_y_cl)
+        self.feature_dct[cl] =  \
+            self._binary_dct[cl].features
+        self.score_dct[cl] =  \
+            self._binary_dct[cl].score
+        self.best_score_dct[cl] =  \
+            self._binary_dct[cl].best_score
 
   # FIXME: Is organized for persister
   @classmethod
@@ -148,15 +147,15 @@ class MultiFeatureManager(object):
     return df_result
 
   @staticmethod
-  def _getPersister(cls)
+  def getPersister(cls):
     if os.path.isfile(PERSISTER_PATH):
       return Persister(PERSISTER_PATH)
     else:
       return None
 
   @staticmethod
-  def _removePersister(cls)
-    if cls._getPersister() is not None:
+  def removePersister(cls):
+    if cls.getPersister() is not None:
       os.remove(PERSISTER_PATH)
 
   @classmethod
@@ -168,8 +167,8 @@ class MultiFeatureManager(object):
     ;return MultiFeatureManager:
     """
     if is_restart:
-      cls._removePersister()
-    persister = cls._getPersister()
+      cls.removePersister()
+    persister = cls.getPersister()
     if persister is not None:
       manager = persister.get()
     else:

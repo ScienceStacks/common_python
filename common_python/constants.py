@@ -7,7 +7,9 @@ TEST_DIR = os.path.join(CODE_DIR, "tests")
 ENSEMBLE_PATH = os.path.join(CODE_DIR, "ensemble_file.pcl")
 
 # Column names
+CLASS = "class"
 COUNT = "count"  # A count
+FEATURE = "feature"
 FRAC = "frac"  # A fractiona
 KEGG_DESCRIPTION = "kegg_description"
 KEGG_PATHWAY = "kegg_pathway"
@@ -15,6 +17,7 @@ KEGG_GENE = "kegg_gene"
 KEGG_EC = "kegg_ec"  # EC number
 KEGG_KO = "kgg_ko"  # KEGG orthology
 MEAN = "mean"
+SCORE = "score"
 STERR = "sterr"  # Standard error (std of mean)
 STD = "std"  # Standard deviation of population
 VALUE = "value"  # General value

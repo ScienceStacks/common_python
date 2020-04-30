@@ -1,4 +1,4 @@
-'''Constructs features for a binary classifier.'''
+'Constructs features for a binary classifier.'''
 
 """
 BinaryFeatureClassifierOptimizer selects a
@@ -45,6 +45,7 @@ import copy
 import numpy as np
 import pandas as pd
 import random
+from sklearn import svm
 
 
 # Default checkpoint callback
@@ -54,7 +55,7 @@ BINARY_CLASSES = [cn.NCLASS, cn.PCLASS]
 MAX_ITER = 100
 MAX_BACKWARD_ITER = MAX_ITER  # Max
 MIN_INCR_SCORE = 0.01
-MAX_DEGRADE = 0.05
+MAX_DEGRADE = 0.01
 
 
 class BinaryClassifierFeatureOptimizer(object):
@@ -69,7 +70,7 @@ class BinaryClassifierFeatureOptimizer(object):
   the implementation allows for restarts.
   """
 
-  def __init__(self, base_clf,
+  def __init__(self, base_clf=svm.LinearSVC(),
       checkpoint_cb=CHECKPOINT_CB,
       feature_collection=None,
       min_incr_score=MIN_INCR_SCORE,

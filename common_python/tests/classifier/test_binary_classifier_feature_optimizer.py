@@ -19,7 +19,6 @@ IGNORE_TEST = False
 
 CLASS = 1
 DF_X, SER_Y = test_helpers.getDataLong()
-CLF = svm.LinearSVC()
 SER_Y = pd.Series([
     cn.PCLASS if v == CLASS else cn.NCLASS
     for v in SER_Y], index=SER_Y.index)
@@ -31,7 +30,7 @@ class TestBinaryClassifierFeatureOptimizer(unittest.TestCase):
     self.df_X = copy.deepcopy(DF_X)
     self.ser_y = copy.deepcopy(SER_Y)
     self.optimizer =  \
-        bcfo.BinaryClassifierFeatureOptimizer(CLF)
+        bcfo.BinaryClassifierFeatureOptimizer()
 
   def setUp(self):
     if IGNORE_TEST:
@@ -65,11 +64,9 @@ class TestBinaryClassifierFeatureOptimizer(unittest.TestCase):
   def testFit(self):
     if IGNORE_TEST:
       return
-    self._init()
     def test(max_iter, max_degrade=0.01):
       optimizer = bcfo.BinaryClassifierFeatureOptimizer(
-          CLF, max_iter=max_iter,
-          max_degrade=max_degrade)
+          max_iter=max_iter, max_degrade=max_degrade)
       optimizer.fit(self.df_X, self.ser_y)
       self.assertTrue(isinstance(optimizer.score, float))
       self.assertTrue(isinstance(optimizer.best_score,
