@@ -46,9 +46,11 @@ class TestMultiClassifierFeatureOptimizer(
     self._init()
     self.optimizer.fit(self.df_X, self.ser_y)
     for cl in self.optimizer.feature_dct.keys():
-      self.assertGreaterEqual(self.best_score_dct[cl],
-          self.score_dct[cl])
-      self.assertGreaterEqual(len(self.features[cl]), 1)
+      self.assertGreaterEqual(
+          self.optimizer.best_score_dct[cl],
+          self.optimizer.score_dct[cl])
+      self.assertGreaterEqual(
+          len(self.optimizer.feature_dct[cl]), 1)
 
 
 

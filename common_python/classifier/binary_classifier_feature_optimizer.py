@@ -30,7 +30,8 @@ The algorithm operates in two phases.
      min_incr_score (maximum amount by which the
          score can decrease if a feature is eliminated)
 
-Usage:
+Usage: Fits are one-shot. Create a new instance
+for each fit.
   optimizer = BinaryClassifierFeatureOptimizer()
   optimizer.fit(df_X, ser_y)
   features = optimizer.features
@@ -56,6 +57,8 @@ MAX_ITER = 100
 MAX_BACKWARD_ITER = MAX_ITER  # Max
 MIN_INCR_SCORE = 0.01
 MAX_DEGRADE = 0.01
+NUM_HOLDOUTS = 1  # Holdouts in cross validation
+NUM_CROSS_ITER = 20  # Cross validation iterations
 
 
 class BinaryClassifierFeatureOptimizer(object):
@@ -76,6 +79,8 @@ class BinaryClassifierFeatureOptimizer(object):
       min_incr_score=MIN_INCR_SCORE,
       max_iter=MAX_ITER, 
       max_degrade=MAX_DEGRADE,
+      num_holdouts=NUM_HOLDOUTS,
+      num_cross_iter=NUM_CROSS_ITER
       ):
     """
     :param Classifier base_clf:
@@ -86,6 +91,9 @@ class BinaryClassifierFeatureOptimizer(object):
     :param int max_iter: maximum number of iterations
     :param float max_degrade: maximum difference between
         best score and actual
+    :param int num_holdouts: holdouts in cross validation
+    :param int num_cross_iter: number of iterations
+        in cross validation
     """
     ########### PRIVATE ##########
     self._base_clf = copy.deepcopy(base_clf)
@@ -95,7 +103,9 @@ class BinaryClassifierFeatureOptimizer(object):
     self._min_incr_score = min_incr_score
     self._max_iter = max_iter
     self._max_degrade = max_degrade
-    self._test_idxs = None  # initialized in fit
+    self._num_holdouts = num_holdouts
+    self._num_cross_iter = num_cross_iter
+    self._partitions = None  # list of train, test data
     ########### PUBLIC ##########
     # Score with all features
     self.best_score = None  # Assigned in fit
@@ -134,6 +144,31 @@ class BinaryClassifierFeatureOptimizer(object):
     test_idxs.extend(sample_idxs)
     return test_idxs
 
+  def _evaluate(self, df_X, ser_y, features=None):
+    """
+    Constructs cross validated features.
+    :param pd.DataFrame df_X:
+        columns: features
+        index: instances
+    :param pd.Series ser_y:
+        index: instances
+        values: binary class values (0, 1)
+    """
+    if self._partitions is None:
+      self._partitions =  \
+          [util_classifier.partitionByState(
+          ser_y, holdouts=self._num_holdouts)
+          for _ in range(self._num_cross_iter)]
+    if features is None:
+      features = self._collection.chosens
+    scores = []
+    for train_idxs, test_idxs in self._partitions:
+      scores.append(util_classifier.scoreFeatures(
+          self._base_clf, df_X, ser_y,
+          features=features,
+          train_idxs=train_idxs, test_idxs=test_idxs))
+    return np.mean(scores)
+
   def fit(self, df_X, ser_y):
     """
     Construct the features, handling restarts by saving
@@ -151,21 +186,16 @@ class BinaryClassifierFeatureOptimizer(object):
     # Initialization
     if self._collection is None:
       self._collection = FeatureCollection(df_X, ser_y)
-    self._test_idxs = self._makeTestIndices(ser_y)
-    self.best_score = util_classifier.scoreFeatures(
-        self._base_clf, df_X, ser_y,
-        test_idxs=self._test_idxs)
+    self.best_score = self._evaluate(df_X, ser_y,
+        features=df_X.columns.tolist())
     # Forward selection of features
     for _ in range(len(self._collection.getCandidates())):
-      self._updateIteration()
+      self._updateIteration()  # Handles checkpoint
       if self._iteration >= self._max_iter:
         break  # Reached maximum number of iterations
       if not self._collection.add():
         break  # No more features to add
-      new_score = util_classifier.scoreFeatures(
-          self._base_clf, df_X, ser_y,
-          features=self._collection.chosens,
-          test_idxs=self._test_idxs)
+      new_score = self._evaluate(df_X, ser_y)
       if new_score - self.score > self._min_incr_score:
           # Feature is acceptable
           self.score = new_score
@@ -186,10 +216,7 @@ class BinaryClassifierFeatureOptimizer(object):
           break
         # Temporarily delete the feature
         self._collection.remove(feature=feature)
-        new_score = util_classifier.scoreFeatures(
-            self._base_clf, df_X, ser_y,
-            features=self._collection.chosens,
-            test_idxs=self._test_idxs)
+        new_score = self._evaluate(df_X, ser_y)
         if self.score - new_score > self._min_incr_score:
           # Restore the feature
           self._collection.add(feature=feature)

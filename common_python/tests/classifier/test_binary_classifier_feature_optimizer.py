@@ -24,7 +24,8 @@ SER_Y = pd.Series([
     for v in SER_Y], index=SER_Y.index)
 
 
-class TestBinaryClassifierFeatureOptimizer(unittest.TestCase):
+class TestBinaryClassifierFeatureOptimizer(
+    unittest.TestCase):
   
   def _init(self):
     self.df_X = copy.deepcopy(DF_X)
@@ -49,21 +50,21 @@ class TestBinaryClassifierFeatureOptimizer(unittest.TestCase):
     self.optimizer._updateIteration()
     self.assertEqual(self.optimizer._iteration, 0)
 
-  def testMakeTestIndices(self):
+  def testEvaluate(self):
     if IGNORE_TEST:
       return
-    test_idxs = self.optimizer._makeTestIndices(
-        self.ser_y)
-    classes = self.ser_y.loc[test_idxs]
-    cls_set = set(classes)
-    self.assertEqual(len(cls_set), 2)
-    p_classes = [c for c in classes if c == cn.PCLASS]
-    n_classes = [c for c in classes if c == cn.NCLASS]
-    self.assertEqual(len(p_classes), len(n_classes))
+    score = self.optimizer._evaluate(self.df_X,
+        self.ser_y, features=self.df_X.columns.tolist())
+    self.assertGreater(score, 0.85)
+    score2 = self.optimizer._evaluate(self.df_X,
+        self.ser_y,
+        features=self.df_X.columns.tolist()[0:1])
+    self.assertGreater(score, score2)
 
   def testFit(self):
     if IGNORE_TEST:
       return
+    self._init()
     def test(max_iter, max_degrade=0.01):
       optimizer = bcfo.BinaryClassifierFeatureOptimizer(
           max_iter=max_iter, max_degrade=max_degrade)

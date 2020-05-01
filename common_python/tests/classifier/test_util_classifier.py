@@ -203,9 +203,14 @@ class TestFunctions(unittest.TestCase):
     diff = set(SER_Y.index).symmetric_difference(
         all_indices)
     self.assertEqual(len(diff), 0)
+    # Successive calls yield different indices?
+    train_idxs2, test_idxs2 =  \
+        util_classifier.partitionByState(SER_Y,
+        holdouts=1)
+    diff = set(train_idxs).symmetric_difference(
+        train_idxs2)
+    self.assertGreater(len(diff), 0)
     
-    
-
 
 if __name__ == '__main__':
   unittest.main()

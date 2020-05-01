@@ -336,6 +336,6 @@ def partitionByState(ser, holdouts=1):
         holdouts)
     test_idxs.extend(idxs)
   #
-  train_idxs = set(ser.index).difference(test_idxs)
+  train_idxs = list(set(ser.index).difference(test_idxs))
   return train_idxs, test_idxs
   return test_idxs
