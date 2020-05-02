@@ -91,9 +91,6 @@ class MultiClassifierFeatureOptimizer(object):
   def checkpoint(self):
     self._persister.set(self)
 
-  # FIXME: (1) Accumulating results by excludes
-  #        (2) Eliminate dcts in this code
-  #        (3) Fix tests
   def fit(self, df_X, ser_y):
     """
     Construct the features, handling restarts by saving
