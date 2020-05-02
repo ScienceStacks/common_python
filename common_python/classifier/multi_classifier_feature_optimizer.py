@@ -38,10 +38,10 @@ NUM_EXCLUDE_ITER = 5  # Number of exclude iterations
 
 
 FitResult = collections.namedtuple("FitResult",
-    "iteration selects selects_score all_score excludes")
-#    iteration: of excludes
-#    selects: list of features selected
-#    selects_score: score for classifier with selects
+    "idx sels sels_score all_score excludes")
+#    idx: index of the interaction of excludes
+#    sels: list of features selected
+#    sels_score: score for classifier with selects
 #    all_score: score for classifier with all non-excludes
 #    excludes: list of features excluded
 
@@ -81,7 +81,6 @@ class MultiClassifierFeatureOptimizer(object):
       self._bcfo_kwargs = bcfo_kwargs
       self._result_dct = {cn.FEATURE: [], cn.CLASS: [],
           cn.SCORE: []}
-      self._binary_dct = {}  # binary classifier optimizers
       self._num_exclude_iter = num_exclude_iter
       ########### PUBLIC ##########
       self.fit_result_dct = {}  # list of FitResult
@@ -108,40 +107,33 @@ class MultiClassifierFeatureOptimizer(object):
     """
     for cl in ser_y.unique():
       self.fit_result_dct[cl] = []
-      for count_exclude_iter in range(
+      excludes = []
+      num_completed = len(self.fit_result_dct[cl])
+      for idx in range(num_completed,
           self._num_exclude_iter):
-        excludes = []
-        [excludes.extend(f.selects) 
+        # Find excluded features
+        [excludes.extend(f.sels) 
             for f in self.fit_result_dct[cl]]
+        sel_features =  \
+            list(set(df_X.columns).difference(excludes))
         ser_y_cl = util_classifier.makeOneStateSer(
             ser_y, cl)
-        if not cl in self._binary_dct:
-          collection = self._feature_collection_cl(df_X,
-              ser_y_cl, **self._collection_kwargs)
-          self._binary_dct[cl] =  \
-              bcfo.BinaryClassifierFeatureOptimizer(
-                  base_clf=self._base_clf,
-                  checkpoint_cb=self.checkpoint,
-                  feature_collection=collection,
-                  **self._bcfo_kwargs)
-        if self._binary_dct[cl].is_done:
-          continue
-        else:
-          sel_features =  \
-              list(set(df_X.columns).difference(excludes))
-          self._binary_dct[cl].fit(
-              df_X[sel_features], ser_y_cl)
-          self.feature_dct[cl] =  \
-              self._binary_dct[cl].selects
-          self.score_dct[cl] =  \
-              self._binary_dct[cl].score
-          self.all_score_dct[cl] =  \
-              self._binary_dct[cl].all_score
-      fit_result = FitResult(
-          iteration=count_exclude_iter,
-          selects=self._binary_dct[cl].selects,
-          selects_score = self._binary_dct[cl].score,
-          all_score=self._binary_dct[cl].all_score,
-          excludes=excludes)
-      self.fit_result_dct[cl].append(fit_result)
-    self.checkpoint()
+        # Construct the FeatureCollection
+        collection = self._feature_collection_cl(
+            df_X[sel_features],
+            ser_y_cl, **self._collection_kwargs)
+        optimizer = bcfo.BinaryClassifierFeatureOptimizer(
+                base_clf=self._base_clf,
+                checkpoint_cb=self.checkpoint,
+                feature_collection=collection,
+                **self._bcfo_kwargs)
+        # Do the fit for this iteration
+        optimizer.fit(df_X[sel_features], ser_y_cl)
+        fit_result = FitResult(
+            idx=idx,
+            sels=optimizer.selecteds,
+            sels_score = optimizer.score,
+            all_score=optimizer.all_score,
+            excludes=excludes)
+        self.fit_result_dct[cl].append(fit_result)
+      self.checkpoint()

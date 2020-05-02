@@ -45,9 +45,29 @@ class TestMultiClassifierFeatureOptimizer(
     if IGNORE_TEST:
       return
     self.optimizer.fit(self.df_X, self.ser_y)
-    for cl in self.optimizer.feature_dct.keys():
+    for cl in self.optimizer.fit_result_dct.keys():
+      self.assertEqual(
+          len(self.optimizer.fit_result_dct[cl]), 1)
+      fit_results = self.optimizer.fit_result_dct[cl]
       self.assertGreaterEqual(
-          len(self.optimizer.feature_dct[cl]), 1)
+          len(fit_results[0].sels), 1)
+
+  def testFit2(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    CLS = 0
+    NUM_EXCLUDE_ITER = 3
+    optimizer = mcfo.MultiClassifierFeatureOptimizer(
+        num_exclude_iter=NUM_EXCLUDE_ITER,
+        bcfo_kwargs=dict(max_iter=2))
+    optimizer.fit(self.df_X, self.ser_y)
+    fit_results = optimizer.fit_result_dct[CLS]
+    self.assertEqual(len(fit_results), NUM_EXCLUDE_ITER)
+    features0 = fit_results[0].sels
+    features1 = fit_results[1].sels
+    sames = set(features0).intersection(features1)
+    self.assertEqual(len(sames), 0)
 
 
 

@@ -1,7 +1,7 @@
 'Constructs features for a binary classifier.'''
 
 """
-BinaryFeatureClassifierOptimizer selects a
+BinaryFeatureClassifierOptimizer selecteds a
 set of features that optimize a binary classifier.
 The software constraints of the optimization are:
   (a) Minimize the number of features
@@ -112,7 +112,7 @@ class BinaryClassifierFeatureOptimizer(object):
     # Score achieved for features in collection
     self.score = 0
     # Collection of features selected for classifier
-    self.selects = []
+    self.selecteds = []
     # Flag to indicate completed processing
     self.is_done = False
 
@@ -226,6 +226,6 @@ class BinaryClassifierFeatureOptimizer(object):
       if not is_changed:
         break
     #
-    self.selects = list(self._collection.chosens)
+    self.selecteds = list(self._collection.chosens)
     self._checkpoint_cb()
     is_done = True
