@@ -27,6 +27,7 @@ class TestMultiClassifierFeatureOptimizer(
     self.ser_y = copy.deepcopy(SER_Y)
     self.optimizer =  \
         mcfo.MultiClassifierFeatureOptimizer(
+        num_exclude_iter=1,
         bcfo_kwargs=dict(max_iter=100))
 
   def setUp(self):
@@ -43,12 +44,8 @@ class TestMultiClassifierFeatureOptimizer(
   def testFit(self):
     if IGNORE_TEST:
       return
-    self._init()
     self.optimizer.fit(self.df_X, self.ser_y)
     for cl in self.optimizer.feature_dct.keys():
-      self.assertGreaterEqual(
-          self.optimizer.best_score_dct[cl],
-          self.optimizer.score_dct[cl])
       self.assertGreaterEqual(
           len(self.optimizer.feature_dct[cl]), 1)
 

@@ -66,7 +66,7 @@ class BinaryClassifierFeatureOptimizer(object):
   Does feature selection for binary classes.
   Exposes the following instance variables
     1. score - score achieved for features
-    2  best_score
+    2  all_score
     3. features selected for classifier
     4. is_done - completed processing
   This is a computationally intensive activity and so
@@ -108,11 +108,11 @@ class BinaryClassifierFeatureOptimizer(object):
     self._partitions = None  # list of train, test data
     ########### PUBLIC ##########
     # Score with all features
-    self.best_score = None  # Assigned in fit
+    self.all_score = None  # Assigned in fit
     # Score achieved for features in collection
     self.score = 0
-    # Collection of features found
-    self.features = []
+    # Collection of features selected for classifier
+    self.selects = []
     # Flag to indicate completed processing
     self.is_done = False
 
@@ -173,7 +173,6 @@ class BinaryClassifierFeatureOptimizer(object):
     """
     Construct the features, handling restarts by saving
     state and checkpointing.
-    Result is in self.features.
     :param pd.DataFrame df_X:
         columns: features
         index: instances
@@ -186,7 +185,7 @@ class BinaryClassifierFeatureOptimizer(object):
     # Initialization
     if self._collection is None:
       self._collection = FeatureCollection(df_X, ser_y)
-    self.best_score = self._evaluate(df_X, ser_y,
+    self.all_score = self._evaluate(df_X, ser_y,
         features=df_X.columns.tolist())
     # Forward selection of features
     for _ in range(len(self._collection.getCandidates())):
@@ -203,7 +202,7 @@ class BinaryClassifierFeatureOptimizer(object):
         # Remove the feature
         self._collection.remove()
       # See if close enough to best possible score
-      if self.best_score - self.score  \
+      if self.all_score - self.score  \
           < self._max_degrade:
         break
     # Backwards elimination to delete unneeded feaures
@@ -227,6 +226,6 @@ class BinaryClassifierFeatureOptimizer(object):
       if not is_changed:
         break
     #
-    self.features = list(self._collection.chosens)
+    self.selects = list(self._collection.chosens)
     self._checkpoint_cb()
     is_done = True

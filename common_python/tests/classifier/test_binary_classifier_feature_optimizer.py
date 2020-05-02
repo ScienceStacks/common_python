@@ -55,7 +55,7 @@ class TestBinaryClassifierFeatureOptimizer(
       return
     score = self.optimizer._evaluate(self.df_X,
         self.ser_y, features=self.df_X.columns.tolist())
-    self.assertGreater(score, 0.85)
+    self.assertGreater(score, 0.80)
     score2 = self.optimizer._evaluate(self.df_X,
         self.ser_y,
         features=self.df_X.columns.tolist()[0:1])
@@ -70,19 +70,19 @@ class TestBinaryClassifierFeatureOptimizer(
           max_iter=max_iter, max_degrade=max_degrade)
       optimizer.fit(self.df_X, self.ser_y)
       self.assertTrue(isinstance(optimizer.score, float))
-      self.assertTrue(isinstance(optimizer.best_score,
+      self.assertTrue(isinstance(optimizer.all_score,
           float))
-      self.assertGreaterEqual(optimizer.best_score,
+      self.assertGreaterEqual(optimizer.all_score,
           optimizer.score)
-      self.assertGreater(len(optimizer.features), 0)
+      self.assertGreater(len(optimizer.selects), 0)
       return optimizer
     #
     opt1 = test(1)
     opt50 = test(50)
     self.assertGreater(opt50.score, opt1.score)
     opt50a = test(50, max_degrade=0.5)
-    diff = set(opt50a.features).symmetric_difference(
-        opt1.features)
+    diff = set(opt50a.selects).symmetric_difference(
+        opt1.selects)
     self.assertEqual(len(diff), 0)
 
 
