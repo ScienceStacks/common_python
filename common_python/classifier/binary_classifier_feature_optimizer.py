@@ -6,8 +6,7 @@ set of features that optimize a binary classifier.
 The software constraints of the optimization are:
   (a) Minimize the number of features
   (b) The features selected result in a classifier
-      that only have a a small degradation in accuracy
-      compared with using all features (max_degrade)
+      with a desired accuracy (desired_accuracy)
 The hard constraints are:
   (i)  Maximum number of features considered (max_iter)
   (ii) Minimum increase in accuracy when including the
@@ -21,7 +20,7 @@ The algorithm operates in two phases.
    The parameters are:
      min_incr_score (minimum increase in score achieved
          by each feature)
-     max_degrade (degradation from best score)
+     desired_accuracy (degradation from best score)
      max_iterations (maximum number of features
          considered)
 2. Backwards elimination. Drop those features that
@@ -56,7 +55,7 @@ BINARY_CLASSES = [cn.NCLASS, cn.PCLASS]
 MAX_ITER = 100
 MAX_BACKWARD_ITER = MAX_ITER  # Max
 MIN_INCR_SCORE = 0.01
-MAX_DEGRADE = 0.01
+DESIRED_ACCURACY = 1.0
 NUM_HOLDOUTS = 1  # Holdouts in cross validation
 NUM_CROSS_ITER = 20  # Cross validation iterations
 
@@ -78,7 +77,7 @@ class BinaryClassifierFeatureOptimizer(object):
       feature_collection=None,
       min_incr_score=MIN_INCR_SCORE,
       max_iter=MAX_ITER, 
-      max_degrade=MAX_DEGRADE,
+      desired_accuracy=DESIRED_ACCURACY,
       num_holdouts=NUM_HOLDOUTS,
       num_cross_iter=NUM_CROSS_ITER
       ):
@@ -89,7 +88,7 @@ class BinaryClassifierFeatureOptimizer(object):
     :param float min_incr_score: min amount by which
         a feature must increase the score to be included
     :param int max_iter: maximum number of iterations
-    :param float max_degrade: maximum difference between
+    :param float desired_accuracy: maximum difference between
         best score and actual
     :param int num_holdouts: holdouts in cross validation
     :param int num_cross_iter: number of iterations
@@ -102,7 +101,7 @@ class BinaryClassifierFeatureOptimizer(object):
     self._collection = feature_collection
     self._min_incr_score = min_incr_score
     self._max_iter = max_iter
-    self._max_degrade = max_degrade
+    self._desired_accuracy = desired_accuracy
     self._num_holdouts = num_holdouts
     self._num_cross_iter = num_cross_iter
     self._partitions = None  # list of train, test data
@@ -115,6 +114,10 @@ class BinaryClassifierFeatureOptimizer(object):
     self.selecteds = []
     # Flag to indicate completed processing
     self.is_done = False
+
+  @property
+  def num_iteration(self):
+    return self._iteration
 
   def _updateIteration(self):
     if self._iteration % CHECKPOINT_INTERVAL == 0:
@@ -202,8 +205,7 @@ class BinaryClassifierFeatureOptimizer(object):
         # Remove the feature
         self._collection.remove()
       # See if close enough to best possible score
-      if self.all_score - self.score  \
-          < self._max_degrade:
+      if self.score >= self._desired_accuracy:
         break
     # Backwards elimination to delete unneeded feaures
     # Eliminate features that do not affect accuracy

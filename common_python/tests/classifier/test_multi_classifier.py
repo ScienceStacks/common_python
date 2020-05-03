@@ -67,7 +67,7 @@ class TestMultiClass(unittest.TestCase):
         feature_selector.FeatureSelectorResidual,
         ]:
       clf = multi_classifier.MultiClassifier(max_iter=2,
-          max_degrade=0.4,
+          desired_accuracy=0.4,
           feature_selector_cls=fs)
       clf.fit(self.df_X, self.ser_y)
       trues = [s >= 0.5 for s in clf.score_dct.values()]

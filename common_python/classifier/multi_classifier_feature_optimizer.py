@@ -38,12 +38,13 @@ NUM_EXCLUDE_ITER = 5  # Number of exclude iterations
 
 
 FitResult = collections.namedtuple("FitResult",
-    "idx sels sels_score all_score excludes")
+    "idx sels sels_score all_score excludes n_eval")
 #    idx: index of the interaction of excludes
 #    sels: list of features selected
 #    sels_score: score for classifier with selects
 #    all_score: score for classifier with all non-excludes
 #    excludes: list of features excluded
+#    n_eval: number of features evaluated
 
 
 class MultiClassifierFeatureOptimizer(object):
@@ -104,10 +105,11 @@ class MultiClassifierFeatureOptimizer(object):
     """
     for cl in ser_y.unique():
       self.fit_result_dct[cl] = []
-      excludes = []
       num_completed = len(self.fit_result_dct[cl])
+      evals = []
       for idx in range(num_completed,
           self._num_exclude_iter):
+        excludes = []
         # Find excluded features
         [excludes.extend(f.sels) 
             for f in self.fit_result_dct[cl]]
@@ -131,6 +133,8 @@ class MultiClassifierFeatureOptimizer(object):
             sels=optimizer.selecteds,
             sels_score = optimizer.score,
             all_score=optimizer.all_score,
-            excludes=excludes)
+            excludes=excludes,
+            n_eval=optimizer.num_iteration,
+            )
         self.fit_result_dct[cl].append(fit_result)
       self.checkpoint()

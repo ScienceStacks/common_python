@@ -65,24 +65,22 @@ class TestBinaryClassifierFeatureOptimizer(
     if IGNORE_TEST:
       return
     self._init()
-    def test(max_iter, max_degrade=0.01):
+    def test(max_iter, desired_accuracy=1.0):
       optimizer = bcfo.BinaryClassifierFeatureOptimizer(
-          max_iter=max_iter, max_degrade=max_degrade)
+          max_iter=max_iter, desired_accuracy=desired_accuracy)
       optimizer.fit(self.df_X, self.ser_y)
       self.assertTrue(isinstance(optimizer.score, float))
       self.assertTrue(isinstance(optimizer.all_score,
           float))
-      self.assertGreaterEqual(optimizer.all_score,
-          optimizer.score)
-      self.assertGreater(len(optimizer.selects), 0)
+      self.assertGreater(len(optimizer.selecteds), 0)
       return optimizer
     #
     opt1 = test(1)
     opt50 = test(50)
     self.assertGreater(opt50.score, opt1.score)
-    opt50a = test(50, max_degrade=0.5)
-    diff = set(opt50a.selects).symmetric_difference(
-        opt1.selects)
+    opt50a = test(50, desired_accuracy=0.5)
+    diff = set(opt50a.selecteds).symmetric_difference(
+        opt1.selecteds)
     self.assertEqual(len(diff), 0)
 
 
