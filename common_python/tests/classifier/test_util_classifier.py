@@ -5,6 +5,7 @@ from common_python.tests.classifier  \
 from common_python.classifier import classifier_ensemble
 from common_python.testing import helpers
 
+import math
 import pandas as pd
 import random
 import numpy as np
@@ -36,6 +37,8 @@ DF_PRED = pd.DataFrame({
   })
 DF_PRED = DF_PRED.T
 DF_X_BINARY, SER_Y_ALL = test_helpers.getDataLong()
+DF_X_BINARY = DF_X_BINARY.sort_index()
+SER_Y = SER_Y.sort_index()
 CLASS = 1
 SER_Y_BINARY = pd.Series([
     cn.PCLASS if v == CLASS else cn.NCLASS

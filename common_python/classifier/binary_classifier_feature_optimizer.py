@@ -185,6 +185,10 @@ class BinaryClassifierFeatureOptimizer(object):
     """
     if len(ser_y.unique()) != 2:
       raise ValueError("Must have exactly two classes.")
+    df_X = copy.deepcopy(df_X)
+    ser_y = copy.deepcopy(ser_y)
+    df_X = df_X.sort_index()
+    ser_y = ser_y.sort_index()
     # Initialization
     if self._collection is None:
       self._collection = FeatureCollection(df_X, ser_y)

@@ -275,8 +275,8 @@ def makeArrays(df, ser, indices=None):
   """
   if indices is None:
     indices = df.index
-  return df.loc[indices, :].values,  \
-      ser.loc[indices].values
+  return df.loc[indices, :].to_numpy(),  \
+      ser.loc[indices].to_numpy()
 
 def scoreFeatures(clf, df_X, ser_y,
     features=None, train_idxs=None, test_idxs=None):
