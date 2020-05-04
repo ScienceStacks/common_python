@@ -104,7 +104,8 @@ class MultiClassifierFeatureOptimizer(object):
         values: binary class values (0, 1)
     """
     for cl in ser_y.unique():
-      self.fit_result_dct[cl] = []
+      if not cl in self.fit_result_dct.keys():
+        self.fit_result_dct[cl] = []
       num_completed = len(self.fit_result_dct[cl])
       evals = []
       for idx in range(num_completed,
