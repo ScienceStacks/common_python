@@ -22,12 +22,15 @@ from common_python.classifier import  \
 from common_python.util.persister import Persister
 
 import collections
+import concurrent.futures
 import copy
+import logging
 import numpy as np
 import os
 import pandas as pd
 import random
 from sklearn import svm
+import threading
 
 
 # Default checkpoint callback
@@ -35,6 +38,8 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 PERSISTER_PATH = os.path.join(DIR,
     "multi_feature_manager.pcl")
 NUM_EXCLUDE_ITER = 5  # Number of exclude iterations
+LOCK = threading.Lock()
+MAX_WORKER_THREADS = 6
 
 
 FitResult = collections.namedtuple("FitResult",
@@ -95,7 +100,8 @@ class MultiClassifierFeatureOptimizer(object):
   def fit(self, df_X, ser_y):
     """
     Construct the features, handling restarts by saving
-    state and checkpointing.
+    state and checkpointing. Creates a separate thread
+    for each class.
     :param pd.DataFrame df_X:
         columns: features
         index: instances
@@ -103,39 +109,59 @@ class MultiClassifierFeatureOptimizer(object):
         index: instances
         values: binary class values (0, 1)
     """
-    for cl in ser_y.unique():
-      if not cl in self.fit_result_dct.keys():
-        self.fit_result_dct[cl] = []
-      num_completed = len(self.fit_result_dct[cl])
-      evals = []
-      for idx in range(num_completed,
-          self._num_exclude_iter):
-        excludes = []
-        # Find excluded features
-        [excludes.extend(f.sels) 
-            for f in self.fit_result_dct[cl]]
-        sel_features =  \
-            list(set(df_X.columns).difference(excludes))
-        ser_y_cl = util_classifier.makeOneStateSer(
-            ser_y, cl)
-        # Construct the FeatureCollection
-        collection = self._feature_collection_cl(
-            df_X[sel_features],
-            ser_y_cl, **self._collection_kwargs)
-        optimizer = bcfo.BinaryClassifierFeatureOptimizer(
-                base_clf=self._base_clf,
-                checkpoint_cb=self.checkpoint,
-                feature_collection=collection,
-                **self._bcfo_kwargs)
-        # Do the fit for this iteration
-        optimizer.fit(df_X[sel_features], ser_y_cl)
-        fit_result = FitResult(
-            idx=idx,
-            sels=optimizer.selecteds,
-            sels_score = optimizer.score,
-            all_score=optimizer.all_score,
-            excludes=excludes,
-            n_eval=optimizer.num_iteration,
-            )
-        self.fit_result_dct[cl].append(fit_result)
-      self.checkpoint()
+    format = "%(asctime)s: %(message)s"
+    logging.basicConfig(format=format, 
+        level=logging.INFO, datefmt="%H:%M:%S")
+    args = [(df_X, ser_y, c) for c in ser_y.unique()]
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=MAX_WORKER_THREADS) as executor:
+      executor.map(self._fitClass, args)
+
+  def _fitClass(self, args):
+    """
+    Does fit for a class.
+    """
+    df_X, ser_y, cl = args
+    logging.info("Start processing class %d" % cl)
+    LOCK.acquire()
+    if not cl in self.fit_result_dct.keys():
+      self.fit_result_dct[cl] = []
+    LOCK.release()
+    num_completed = len(self.fit_result_dct[cl])
+    evals = []
+    for idx in range(num_completed,
+        self._num_exclude_iter):
+      excludes = []
+      # Find excluded features
+      [excludes.extend(f.sels) 
+          for f in self.fit_result_dct[cl]]
+      sel_features =  \
+          list(set(df_X.columns).difference(excludes))
+      ser_y_cl = util_classifier.makeOneStateSer(
+          ser_y, cl)
+      # Construct the FeatureCollection
+      collection = self._feature_collection_cl(
+          df_X[sel_features],
+          ser_y_cl, **self._collection_kwargs)
+      optimizer = bcfo.BinaryClassifierFeatureOptimizer(
+              base_clf=self._base_clf,
+              checkpoint_cb=self.checkpoint,
+              feature_collection=collection,
+              **self._bcfo_kwargs)
+      # Do the fit for this iteration
+      optimizer.fit(df_X[sel_features], ser_y_cl)
+      fit_result = FitResult(
+          idx=idx,
+          sels=optimizer.selecteds,
+          sels_score = optimizer.score,
+          all_score=optimizer.all_score,
+          excludes=excludes,
+          n_eval=optimizer.num_iteration,
+          )
+      LOCK.acquire()
+      self.fit_result_dct[cl].append(fit_result)
+      LOCK.release()
+    LOCK.acquire()
+    self.checkpoint()
+    LOCK.release()
+    logging.info("Completed processing class %d" % cl)

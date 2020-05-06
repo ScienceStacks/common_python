@@ -14,7 +14,7 @@ import numpy as np
 from sklearn import svm
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 
 DF_X, SER_Y = test_helpers.getDataLong()
 
@@ -42,8 +42,8 @@ class TestMultiClassifierFeatureOptimizer(
         svm.LinearSVC))
 
   def testFit(self):
-    if IGNORE_TEST:
-      return
+    # TESTING
+    self._init()
     self.optimizer.fit(self.df_X, self.ser_y)
     for cl in self.optimizer.fit_result_dct.keys():
       self.assertEqual(
