@@ -95,7 +95,9 @@ class MultiClassifierFeatureOptimizer(object):
       self.all_score_dct = {}
 
   def checkpoint(self):
+    LOCK.acquire()
     self._persister.set(self)
+    LOCK.release()
 
   def fit(self, df_X, ser_y):
     """
@@ -161,7 +163,5 @@ class MultiClassifierFeatureOptimizer(object):
       LOCK.acquire()
       self.fit_result_dct[cl].append(fit_result)
       LOCK.release()
-    LOCK.acquire()
-    self.checkpoint()
-    LOCK.release()
+      self.checkpoint()  # checkpoint acquires lock
     logging.info("Completed processing class %d" % cl)

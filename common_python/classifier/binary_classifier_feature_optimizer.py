@@ -50,7 +50,7 @@ from sklearn import svm
 
 # Default checkpoint callback
 CHECKPOINT_CB = lambda : None
-CHECKPOINT_INTERVAL = 5
+CHECKPOINT_INTERVAL = 100
 BINARY_CLASSES = [cn.NCLASS, cn.PCLASS]
 MAX_ITER = 100
 MAX_BACKWARD_ITER = MAX_ITER  # Max
