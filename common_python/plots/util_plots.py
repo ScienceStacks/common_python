@@ -98,7 +98,8 @@ def plotCategoricalHeatmap(df, is_plot=False, xoffset=0.5,
     plt.show()
   return heatmap
 
-def plotCorr(df, is_plot=True, **kwargs):
+def plotCorr(df, is_plot=True, is_xticklabels=False,
+    is_yticklabels=False, **kwargs):
   """
   Plots correlation of features (columns).
   :param pd.DataFrame df:  rows are instances; columns are features
@@ -110,12 +111,15 @@ def plotCorr(df, is_plot=True, **kwargs):
   df_corr = df_corr.applymap(lambda v: 0 if np.isnan(v) else v)
   if _getValue(cn.PLT_CMAP, kwargs) is None:
     cmap = "seismic"
-  cg = seaborn.clustermap(df_corr, col_cluster=True, vmin=-1, vmax=1,
+  cg = seaborn.clustermap(df_corr, col_cluster=True,
+      vmin=-1, vmax=1,
       cbar_kws={"ticks":[-1, 0, 1]}, cmap=cmap)
-  _ = cg.ax_heatmap.set_xticklabels([])
-  _ = cg.ax_heatmap.set_xticks([])
-  _ = cg.ax_heatmap.set_yticklabels([])
-  _ = cg.ax_heatmap.set_yticks([])
+  if not is_xticklabels:
+    _ = cg.ax_heatmap.set_xticklabels([])
+    _ = cg.ax_heatmap.set_xticks([])
+  if not is_yticklabels:
+    _ = cg.ax_heatmap.set_yticklabels([])
+    _ = cg.ax_heatmap.set_yticks([])
   _setValue(cn.PLT_TITLE, kwargs, cg.fig.suptitle)
   _setValue(cn.PLT_XLABEL, kwargs, cg.ax_heatmap.set_xlabel)
   _setValue(cn.PLT_YLABEL, kwargs, cg.ax_heatmap.set_ylabel)
