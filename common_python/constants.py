@@ -11,6 +11,7 @@ CLASS = "class"
 COUNT = "count"  # A count
 FEATURE = "feature"
 FRAC = "frac"  # A fractiona
+GROUP = "group"
 KEGG_DESCRIPTION = "kegg_description"
 KEGG_PATHWAY = "kegg_pathway"
 KEGG_GENE = "kegg_gene"
