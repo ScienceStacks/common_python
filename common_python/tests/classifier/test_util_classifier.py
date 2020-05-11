@@ -164,22 +164,20 @@ class TestFunctions(unittest.TestCase):
     score_all = util_classifier.scoreFeatures(
         CLF, DF_X_BINARY, SER_Y_BINARY)
     self.assertEqual(score_all, 1)
-    #
+    # Test on all samples with a subset of features
     features = random.sample(all_features, SIZE)
     score = util_classifier.scoreFeatures(
         CLF, DF_X_BINARY, SER_Y_BINARY,
         features=features)
     self.assertGreater(score_all, score)
-    #
-    train_idxs = SER_Y_BINARY[
-        SER_Y_BINARY==cn.PCLASS].index.tolist()
-    train_idxs.extend(random.sample(
-        DF_X_BINARY.index.tolist(), len(train_idxs)))
+    # Train on all features with a subset of samples
+    train_idxs = random.sample(
+        DF_X_BINARY.index.tolist(), SIZE)
     score = util_classifier.scoreFeatures(
         CLF, DF_X_BINARY, SER_Y_BINARY,
         train_idxs=train_idxs)
     self.assertGreater(score_all, score)
-    #
+    # Test on a subset of samples
     test_idxs = SER_Y_BINARY[
         SER_Y_BINARY==cn.PCLASS].index.tolist()
     test_idxs.extend(random.sample(
