@@ -33,7 +33,6 @@ from common_python.util.persister import Persister
 import collections
 import concurrent.futures
 import copy
-import logging
 import numpy as np
 import os
 import pandas as pd
@@ -45,8 +44,6 @@ import threading
 DIR = os.path.dirname(os.path.abspath(__file__))
 PERSISTER_PATH = os.path.join(DIR,
     "feature_eqivalence_calculator.pcl")
-LOCK = threading.Lock()
-MAX_WORKER_THREADS = 6
 SELECTED_FEATURE = "selected_feature"
 ALTERNATIVE_FEATURE = "alternative_feature"
 NUM_CROSS_ITER = 50
@@ -72,6 +69,7 @@ class FeatureEquivalenceCalculator(object):
     """
     if is_restart:
       ########### PRIVATE ##########
+      self._persister = persister
       self._num_holdouts = num_holdouts
       self._base_clf = copy.deepcopy(base_clf)
       self._df_X = df_X
@@ -85,9 +83,7 @@ class FeatureEquivalenceCalculator(object):
       self.ria_dct = {}  # key: idx, value: df
 
   def checkpoint(self):
-    LOCK.acquire()
     self._persister.set(self)
-    LOCK.release()
 
   def run(self, fit_results):
     """
@@ -99,13 +95,8 @@ class FeatureEquivalenceCalculator(object):
         index: features
         values: m(F, f1, f2)
     """
-    format = "%(asctime)s: %(message)s"
-    logging.basicConfig(format=format, 
-        level=logging.INFO, datefmt="%H:%M:%S")
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=MAX_WORKER_THREADS) as executor:
-      executor.map(self._run_one, fit_results)
-    # Merge the results into a single DataFrame
+    for fit_result in fit_results:
+      self._run_one(fit_result)
 
   def _run_one(self, fit_result):
     """
@@ -115,11 +106,9 @@ class FeatureEquivalenceCalculator(object):
       Columns: SELECTED_FEATURE, ALTERNATIVE_FEATURE
       Values: m(F, f1, f2)
     """
-    logging.info("Start processing SFS %d" % fit_result.idx)
     # Get the dictionary for calculating RIA
-    LOCK.acquire()
     if not fit_result.idx in self.ria_dct.keys():
-      ria_dct[fit_result.idx] =  {
+      ria_dct =  {
           SELECTED_FEATURE: [],
           ALTERNATIVE_FEATURE: [],
           cn.SCORE: [],
@@ -127,12 +116,11 @@ class FeatureEquivalenceCalculator(object):
       self.ria_dct[fit_result.idx] = ria_dct
     else:
       ria_dct = self.ria_dct[fit_result.idx]
-    LOCK.release()
     #
     # Features to compare against
     alternative_features = set(
         self._features).difference(
-        ria_dct[fit_result.idx][ALTERNATIVE_FEATURE])
+        ria_dct[ALTERNATIVE_FEATURE])
     length = len(alternative_features)
     # Process each selected feature
     for selected_feature in fit_result.sels:
@@ -146,10 +134,7 @@ class FeatureEquivalenceCalculator(object):
       self.checkpoint()  # checkpoint acquires lock
     # Save the result
     df = pd.DataFrame(ria_dct)
-    LOCK.acquire()
     self.ria_dct[fit_result.idx] = df
-    LOCK.release()
-    logging.info("Completed processing SFS %d" % fit_result.idx)
 
   def _calculateRIA(self, selected_feature, 
       selected_features, alternative_features):
