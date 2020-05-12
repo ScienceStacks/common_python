@@ -124,29 +124,6 @@ class BinaryClassifierFeatureOptimizer(object):
       self._checkpoint_cb()  #  Save state
     self._iteration += 1
 
-  def _makeTestIndices(self, ser_y):
-    """
-    Constructs the test indices so that positive
-    and negative classes are equally represented.
-    :return list-object:
-    Notes
-      1. Assumes that number of PCLASS < NCLASS
-    """
-    pclass_idxs = ser_y[ser_y==cn.PCLASS].index
-    nclass_idxs = ser_y[ser_y==cn.NCLASS].index
-    # Sample w/o replacement from the larger set
-    if len(pclass_idxs) < len(nclass_idxs):
-      length = len(pclass_idxs)
-      test_idxs = pclass_idxs.tolist()
-      sample_idxs = nclass_idxs.tolist()
-    else:
-      length = len(nclass_idxs)
-      test_idxs = nclass_idxs.tolist()
-      sample_idxs = pclass_idxs.tolist()
-    sample_idxs = random.sample(sample_idxs, length)
-    test_idxs.extend(sample_idxs)
-    return test_idxs
-
   def _evaluate(self, df_X, ser_y, features=None):
     """
     Constructs cross validated features.
@@ -156,6 +133,7 @@ class BinaryClassifierFeatureOptimizer(object):
     :param pd.Series ser_y:
         index: instances
         values: binary class values (0, 1)
+    :return float: score
     """
     if self._partitions is None:
       self._partitions =  \

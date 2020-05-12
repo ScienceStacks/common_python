@@ -211,6 +211,26 @@ class TestFunctions(unittest.TestCase):
     diff = set(train_idxs).symmetric_difference(
         train_idxs2)
     self.assertGreater(len(diff), 0)
+
+  def testBinaryCrossValidate(self):
+    if IGNORE_TEST:
+      return
+    SIZE = 20
+    partitions = [util_classifier.partitionByState(
+        SER_Y_BINARY, holdouts=1)
+        for _ in range(SIZE)]
+    score_one = util_classifier.scoreFeatures(
+        CLF, DF_X_BINARY, SER_Y_BINARY)
+    score_many = util_classifier.binaryCrossValidate(CLF,
+        DF_X_BINARY, SER_Y_BINARY, partitions=partitions)
+    self.assertGreaterEqual(score_one, score_many)
+    #
+    score_many2 = util_classifier.binaryCrossValidate(CLF,
+        DF_X_BINARY, SER_Y_BINARY, num_holdouts=1,
+        num_iterations=SIZE)
+    self.assertLess(np.abs(score_many-score_many2),
+        0.1)
+    
     
 
 if __name__ == '__main__':

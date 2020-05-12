@@ -279,7 +279,8 @@ def makeArrays(df, ser, indices=None):
       ser.loc[indices].to_numpy()
 
 def scoreFeatures(clf, df_X, ser_y,
-    features=None, train_idxs=None, test_idxs=None):
+    features=None, train_idxs=None, test_idxs=None,
+    is_copy=True):
   """
   Evaluates the classifier for the set of features and the
   training and test indices provided (or all if None are
@@ -295,6 +296,7 @@ def scoreFeatures(clf, df_X, ser_y,
   :param list-object features:
   :param list-object train_idxs: indices for training
   :param list-object test_idxs: indices for testing
+  :param bool is_copy: Copy the classifier
   :return float: score for classifier using features
   """
   if train_idxs is None:
@@ -304,7 +306,8 @@ def scoreFeatures(clf, df_X, ser_y,
   if features is None:
     features = df_X.columns.tolist()
   #
-  clf = copy.deepcopy(clf)
+  if is_copy:
+    clf = copy.deepcopy(clf)
   arr_X, arr_y = makeArrays(df_X[features], ser_y,
       indices=train_idxs)
   clf.fit(arr_X, arr_y)
@@ -339,3 +342,36 @@ def partitionByState(ser, holdouts=1):
   train_idxs = list(set(ser.index).difference(test_idxs))
   return train_idxs, test_idxs
   return test_idxs
+
+def binaryCrossValidate(clf, df_X, ser_y, 
+    partitions=None, num_holdouts=1, num_iterations=10):
+  """
+  Constructs a cross validated estimate of the score
+  for a classifier trained on the features in df_X.
+  :param Classifier clf:
+  :param pd.DataFrame df_X:
+      columns: features
+      index: instances
+  :param pd.Series ser_y:
+      index: instances
+      values: binary class values (0, 1)
+  :param list-(list-index, list-index) partitions:
+      list of pairs of indices. Pairs are train, test.
+  :param int num_holdouts: holdouts used if
+      constructing partitions
+  :param int num_iterations: number of iterations in
+      cross validations if constructing partitions
+  :return float: score
+  """
+  if partitions is None:
+    partitions = [partitionByState(
+          ser_y, holdouts=num_holdouts)
+          for _ in range(num_iterations)]
+  scores = []
+  features = df_X.columns.tolist()
+  copy_clf = copy.deepcopy(clf)
+  for train_idxs, test_idxs in partitions:
+    scores.append(scoreFeatures(copy_clf, df_X, ser_y,
+        features=features, is_copy=False,
+        train_idxs=train_idxs, test_idxs=test_idxs))
+  return np.mean(scores)
