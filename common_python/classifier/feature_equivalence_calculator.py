@@ -49,17 +49,7 @@ LOCK = threading.Lock()
 MAX_WORKER_THREADS = 6
 SELECTED_FEATURE = "selected_feature"
 ALTERNATIVE_FEATURE = "alternative_feature"
-NUM_CROSS_ITER = 100
-
-
-FitResult = collections.namedtuple("FitResult",
-    "idx sels sels_score all_score excludes n_eval")
-#    idx: index of the interaction of excludes
-#    sels: list of features selected
-#    sels_score: score for classifier with selects
-#    all_score: score for classifier with all non-excludes
-#    excludes: list of features excluded
-#    n_eval: number of features evaluated
+NUM_CROSS_ITER = 50
 
 
 class FeatureEquivalenceCalculator(object):
@@ -70,6 +60,7 @@ class FeatureEquivalenceCalculator(object):
       base_clf=svm.LinearSVC(),
       num_holdouts=1,
       num_cross_iter=NUM_CROSS_ITER,
+      persister=Persister(PERSISTER_PATH),
       is_restart=True,
       ):
     """
@@ -79,10 +70,6 @@ class FeatureEquivalenceCalculator(object):
     :param Classifier base_clf:  base classifier
         Exposes: fit, score, predict
     """
-    if persister is None:
-      self._persister = Persister(PERSISTER_PATH)
-    else:
-      self._persister = persister
     if is_restart:
       ########### PRIVATE ##########
       self._num_holdouts = num_holdouts
@@ -165,7 +152,7 @@ class FeatureEquivalenceCalculator(object):
     logging.info("Completed processing SFS %d" % fit_result.idx)
 
   def _calculateRIA(self, selected_feature, 
-      seleted_features, alternative_features):
+      selected_features, alternative_features):
     """
     Calculates RIA (relative incremental accuracy) for
     features in a classification group (set of features
@@ -180,26 +167,33 @@ class FeatureEquivalenceCalculator(object):
     score_with_sel =  \
         util_classifier.binaryCrossValidate(
         self._base_clf,
-        self._df_X[selected_feature], self._ser_y,
+        self._df_X[selected_features], self._ser_y,
         partitions=self._partitions)
-    candidate_features = list(selected_features)
-    candidate_features.remove(selected_feature)
+    candidates = list(selected_features)
+    candidates.remove(selected_feature)
     score_without_sel =  \
         util_classifier.binaryCrossValidate(
         self._base_clf,
-        self._df_X[without_feature], self._ser_y,
+        self._df_X[candidates], self._ser_y,
         partitions=self._partitions)
     score_incr_sel =  \
         score_with_sel - score_without_sel
     score_rias = []
-    for alternative_feature in alternative_features:
+    for candidate in alternative_features:
       # Calculate the relative incremental accuracy
-      candidate_features.append(alternative_feature)
-      score_with_alt = util_classifier.scoreFeatures(
+      candidates.append(candidate)
+      score_with_alt =  \
+          util_classifier.binaryCrossValidate(
           self._base_clf,
-          df_X[candidate_features], ser_y,
+          self._df_X[candidates], self._ser_y,
           partitions=self._partitions)
-      candiate_feature.remove(alternative_feature)
-      score_rias.append((score_with_alt
-          - score_without_sel)  / score_incr_sel)
+      candidates.remove(candidate)
+      numr = score_with_alt - score_without_sel
+      if (numr == score_incr_sel):
+        score_ria = 1
+      elif np.isclose(score_incr_sel, 0):
+        score_ria = 0
+      else:
+        score_ria = numr / score_incr_sel
+      score_rias.append(score_ria)
     return score_rias

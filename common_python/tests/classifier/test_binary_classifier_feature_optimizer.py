@@ -6,7 +6,6 @@ from common_python.classifier  \
 from common_python.tests.classifier import helpers as test_helpers
 from common_python.classifier import feature_collection
 from common_python.testing import helpers
-from common_python.util.persister import Persister
 
 import copy
 import os
