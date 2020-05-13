@@ -1,3 +1,4 @@
+import common.constants as xcn
 import common_python.constants as cn
 from common_python.util.persister import Persister
 from common_python.testing import helpers
@@ -15,7 +16,8 @@ from sklearn import svm
 import unittest
 
 IGNORE_TEST = False
-
+TEST_FIT_RESULT_PATH = os.path.join(xcn.DATA_DIR,
+    "fit_result_tf.xlsx")
 DF_X, SER_Y = test_helpers.getDataLong()
 
 
@@ -27,8 +29,9 @@ class TestMultiClassifierFeatureOptimizer(
     self.ser_y = copy.deepcopy(SER_Y)
     self.optimizer =  \
         mcfo.MultiClassifierFeatureOptimizer(
-        num_exclude_iter=1,
-        bcfo_kwargs=dict(max_iter=100))
+        num_exclude_iter=2,
+        is_restart=True,
+        bcfo_kwargs=dict(max_iter=2))
 
   def setUp(self):
     if IGNORE_TEST:
@@ -47,7 +50,7 @@ class TestMultiClassifierFeatureOptimizer(
     self._init()
     self.optimizer.fit(self.df_X, self.ser_y)
     for cl in self.optimizer.fit_result_dct.keys():
-      self.assertEqual(
+      self.assertGreater(
           len(self.optimizer.fit_result_dct[cl]), 1)
       fit_results = self.optimizer.fit_result_dct[cl]
       self.assertGreaterEqual(
@@ -56,7 +59,6 @@ class TestMultiClassifierFeatureOptimizer(
   def testFit2(self):
     if IGNORE_TEST:
       return
-    self._init()
     CLS = 0
     NUM_EXCLUDE_ITER = 3
     optimizer = mcfo.MultiClassifierFeatureOptimizer(
@@ -70,6 +72,17 @@ class TestMultiClassifierFeatureOptimizer(
     sames = set(features0).intersection(features1)
     self.assertEqual(len(sames), 0)
 
+  def testMakeFitResults(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    fit_results = \
+       mcfo.MultiClassifierFeatureOptimizer.makeFitResult(
+       TEST_FIT_RESULT_PATH,
+       lambda r: r["state"] == 1)
+    self.assertGreater(len(fit_results), 0)
+    self.assertTrue(isinstance(fit_results[0],
+        mcfo.FitResult))
 
 
 if __name__ == '__main__':

@@ -38,18 +38,34 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 PERSISTER_PATH = os.path.join(DIR,
     "multi_feature_manager.pcl")
 NUM_EXCLUDE_ITER = 5  # Number of exclude iterations
-LOCK = threading.Lock()
+#LOCK = threading.Lock()
 MAX_WORKER_THREADS = 6
+CSV = "csv"
+XLSX = "xlsx"
+# Columns
+STATE = "state"
+GROUP = "group"
+FEATURE = "feature"
+SCORE = "score"
+COUNT = "count"
 
 
-FitResult = collections.namedtuple("FitResult",
-    "idx sels sels_score all_score excludes n_eval")
-#    idx: index of the interaction of excludes
-#    sels: list of features selected
-#    sels_score: score for classifier with selects
-#    all_score: score for classifier with all non-excludes
-#    excludes: list of features excluded
-#    n_eval: number of features evaluated
+class FitResult(object):
+
+  def __init__(self,
+      idx=None, # index of the interaction of excludes
+      sels=None, # list of features selected
+      sels_score=None, # score for classifier with selects
+      all_score=None, # score with all non-excludes
+      excludes=None, # list of features excluded
+      n_eval=None, # number of features evaluated
+      ):
+    self.idx = idx
+    self.sels = sels
+    self.sels_score = sels_score
+    self.all_score = all_score
+    self.excludes = excludes
+    self.n_eval = n_eval
 
 
 class MultiClassifierFeatureOptimizer(object):
@@ -95,9 +111,9 @@ class MultiClassifierFeatureOptimizer(object):
       self.all_score_dct = {}
 
   def checkpoint(self):
-    LOCK.acquire()
+    #LOCK.acquire()
     self._persister.set(self)
-    LOCK.release()
+    #LOCK.release()
 
   def fit(self, df_X, ser_y):
     """
@@ -111,13 +127,16 @@ class MultiClassifierFeatureOptimizer(object):
         index: instances
         values: binary class values (0, 1)
     """
-    format = "%(asctime)s: %(message)s"
-    logging.basicConfig(format=format, 
-        level=logging.INFO, datefmt="%H:%M:%S")
-    args = [(df_X, ser_y, c) for c in ser_y.unique()]
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=MAX_WORKER_THREADS) as executor:
-      executor.map(self._fitClass, args)
+    if False:
+      format = "%(asctime)s: %(message)s"
+      logging.basicConfig(format=format, 
+          level=logging.INFO, datefmt="%H:%M:%S")
+      args = [(df_X, ser_y, c) for c in ser_y.unique()]
+      with concurrent.futures.ThreadPoolExecutor(
+          max_workers=MAX_WORKER_THREADS) as executor:
+        executor.map(self._fitClass, args)
+    for cl in ser_y.unique():
+      self._fitClass([df_X, ser_y, cl])
 
   def _fitClass(self, args):
     """
@@ -125,10 +144,10 @@ class MultiClassifierFeatureOptimizer(object):
     """
     df_X, ser_y, cl = args
     logging.info("Start processing class %d" % cl)
-    LOCK.acquire()
+    #LOCK.acquire()
     if not cl in self.fit_result_dct.keys():
       self.fit_result_dct[cl] = []
-    LOCK.release()
+    #LOCK.release()
     num_completed = len(self.fit_result_dct[cl])
     evals = []
     for idx in range(num_completed,
@@ -160,8 +179,42 @@ class MultiClassifierFeatureOptimizer(object):
           excludes=excludes,
           n_eval=optimizer.num_iteration,
           )
-      LOCK.acquire()
+      #LOCK.acquire()
       self.fit_result_dct[cl].append(fit_result)
-      LOCK.release()
+      #LOCK.release()
       self.checkpoint()  # checkpoint acquires lock
     logging.info("Completed processing class %d" % cl)
+
+  @classmethod
+  def makeFitResult(cls, path, constraint):
+    """
+    Creates FitResults from results saved in a CSV.
+    :param Function constraint:
+         Argument: row
+         Returns: bool
+    """
+    ext = os.path.split(path)
+    ext =ext[1].split(".")
+    if ext[0] == CSV:
+      df = pd.read_csv(path)
+    elif ext[1] == XLSX:
+      df = pd.read_excel(path)
+    else:
+      raise ValueError("Unsupported file type.")
+    # Process groups
+    dfg_dct = df.groupby(cn.GROUP).groups
+    fit_results = []
+    for group in dfg_dct.keys():
+      indices = dfg_dct[group]
+      is_ok = all([constraint(r)
+           for _, r in df.iterrows() if constraint(r)])
+      if is_ok:
+        sels = df.loc[indices, FEATURE].tolist()
+        group = df.loc[indices[0], GROUP]
+        score = df.loc[indices[0], SCORE]
+        fit_result = FitResult(idx=group,
+            sels=sels, sels_score=score)
+        fit_results.append(fit_result)
+    #
+    return fit_results
+    
