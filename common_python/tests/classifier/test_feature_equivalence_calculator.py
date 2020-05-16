@@ -26,7 +26,12 @@ SER_Y = pd.Series([
     for v in SER_Y], index=SER_Y.index)
 SELECTED_FEATURES = ["Rv2034", "Rv2009"]
 SELECTED_FEATURE = SELECTED_FEATURES[0]
-NUM_ALTERNATIVE_FEATURES = 5
+NUM_ALTERNATIVE_FEATURES = 3
+ALTERNATIVE_FEATURES = DF_X.columns.tolist()
+ALTERNATIVE_FEATURES =  \
+    ALTERNATIVE_FEATURES[:NUM_ALTERNATIVE_FEATURES]
+FEATURES = list(ALTERNATIVE_FEATURES)
+FEATURES.extend(SELECTED_FEATURES)
 IDX = 1
 FIT_RESULT = mcfo.FitResult(
     idx=IDX, sels=SELECTED_FEATURES, sels_score=0.7,
@@ -41,14 +46,12 @@ class TestFeatureEquivalenceCalculator(unittest.TestCase):
   
   def _init(self):
     self.df_X = copy.deepcopy(DF_X)
-    self.features = self.df_X.columns.tolist()
-    self.features = self.features[
-         :NUM_ALTERNATIVE_FEATURES]
-    self.features.extend(SELECTED_FEATURES)
+    self.features = list(FEATURES)
     self.df_X = self.df_X[self.features]
     self.ser_y = copy.deepcopy(SER_Y)
     self.calculator =  \
-        fec.FeatureEquivalenceCalculator(self.df_X,               self.ser_y, num_cross_iter=NUM_CROSS_ITER)
+        fec.FeatureEquivalenceCalculator(self.df_X,
+        self.ser_y, num_cross_iter=NUM_CROSS_ITER)
     self._remove()
 
   def _remove(self):
@@ -72,12 +75,11 @@ class TestFeatureEquivalenceCalculator(unittest.TestCase):
   def testCalculateRIA(self):
     if IGNORE_TEST:
       return
-    alternative_features = ["Rv2250c", "Rv3167c",
-        SELECTED_FEATURE]
+    self._init()
     scores = self.calculator._calculateRIA(
         SELECTED_FEATURE,
-        SELECTED_FEATURES, alternative_features)
-    idx_sel = alternative_features.index(SELECTED_FEATURE)
+        SELECTED_FEATURES, ALTERNATIVE_FEATURES)
+    idx_sel = SELECTED_FEATURES.index(SELECTED_FEATURE)
     for idx, score in enumerate(scores):
       if idx == idx_sel:
         self.assertEqual(score, 1)
@@ -87,7 +89,7 @@ class TestFeatureEquivalenceCalculator(unittest.TestCase):
   def testRunOne(self):
     if IGNORE_TEST:
       return
-    self.calculator._run_one(FIT_RESULT)
+    self.calculator.run([FIT_RESULT])
     for feature in SELECTED_FEATURES:
       df = self.calculator.ria_dct[IDX]   
       self.assertEqual(len(df[df[fec.SELECTED_FEATURE]
@@ -101,7 +103,7 @@ class TestFeatureEquivalenceCalculator(unittest.TestCase):
         fec.ALTERNATIVE_FEATURE]
     self.assertTrue(helpers.isValidDataFrame(df, columns))
 
-  def testRun(self):
+  def testRunMany(self):
     if IGNORE_TEST:
       return
     self._init()

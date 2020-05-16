@@ -40,7 +40,6 @@ from sklearn import svm
 import threading
 
 
-# Default checkpoint callback
 DIR = os.path.dirname(os.path.abspath(__file__))
 PERSISTER_PATH = os.path.join(DIR,
     "feature_eqivalence_calculator.pcl")
@@ -58,6 +57,7 @@ class FeatureEquivalenceCalculator(object):
       num_holdouts=1,
       num_cross_iter=NUM_CROSS_ITER,
       persister=Persister(PERSISTER_PATH),
+      min_score=0.9,
       is_restart=True,
       ):
     """
@@ -66,6 +66,7 @@ class FeatureEquivalenceCalculator(object):
     :param list-object features: set of possible features
     :param Classifier base_clf:  base classifier
         Exposes: fit, score, predict
+    :param float min_score: minimum score for a FitResult
     """
     if is_restart:
       ########### PRIVATE ##########
@@ -82,7 +83,7 @@ class FeatureEquivalenceCalculator(object):
       ########### PUBLIC ##########
       self.ria_dct = {}  # key: idx, value: df
 
-  def checkpoint(self):
+  def _checkpoint(self):
     self._persister.set(self)
 
   def run(self, fit_results):
@@ -94,47 +95,40 @@ class FeatureEquivalenceCalculator(object):
         columns: featuress
         index: features
         values: m(F, f1, f2)
-    """
-    for fit_result in fit_results:
-      self._run_one(fit_result)
-
-  def _run_one(self, fit_result):
-    """
-    Calculates metrics for one set of features constructed
-    by a fitter.
     Places the following dataframe in self.ria_dct
       Columns: SELECTED_FEATURE, ALTERNATIVE_FEATURE
       Values: m(F, f1, f2)
     """
-    # Get the dictionary for calculating RIA
-    if not fit_result.idx in self.ria_dct.keys():
-      ria_dct =  {
-          SELECTED_FEATURE: [],
-          ALTERNATIVE_FEATURE: [],
-          cn.SCORE: [],
-          }
-      self.ria_dct[fit_result.idx] = ria_dct
-    else:
-      ria_dct = self.ria_dct[fit_result.idx]
-    #
-    # Features to compare against
-    alternative_features = set(
-        self._features).difference(
-        ria_dct[ALTERNATIVE_FEATURE])
-    length = len(alternative_features)
-    # Process each selected feature
-    for selected_feature in fit_result.sels:
-      ria_dct[SELECTED_FEATURE].extend(list(
-          np.repeat(selected_feature, length)))
-      ria_dct[ALTERNATIVE_FEATURE].extend(
-          alternative_features)
-      ria_dct[cn.SCORE].extend(
-          self._calculateRIA(selected_feature,
-          fit_result.sels, alternative_features))
-      self.checkpoint()  # checkpoint acquires lock
-    # Save the result
-    df = pd.DataFrame(ria_dct)
-    self.ria_dct[fit_result.idx] = df
+    for fit_result in fit_results:
+      # Get the dictionary for calculating RIA
+      if not fit_result.idx in self.ria_dct.keys():
+        ria_dct =  {
+            SELECTED_FEATURE: [],
+            ALTERNATIVE_FEATURE: [],
+            cn.SCORE: [],
+            }
+        self.ria_dct[fit_result.idx] = ria_dct
+      else:
+        ria_dct = self.ria_dct[fit_result.idx]
+      #
+      # Features to compare against
+      alternative_features = set(
+          self._features).difference(
+          ria_dct[ALTERNATIVE_FEATURE])
+      length = len(alternative_features)
+      # Process each selected feature
+      for selected_feature in fit_result.sels:
+        ria_dct[SELECTED_FEATURE].extend(list(
+            np.repeat(selected_feature, length)))
+        ria_dct[ALTERNATIVE_FEATURE].extend(
+            alternative_features)
+        ria_dct[cn.SCORE].extend(
+            self._calculateRIA(selected_feature,
+            fit_result.sels, alternative_features))
+        self._checkpoint()  # checkpoint acquires lock
+      # Save the result
+      df = pd.DataFrame(ria_dct)
+      self.ria_dct[fit_result.idx] = df
 
   def _calculateRIA(self, selected_feature, 
       selected_features, alternative_features):

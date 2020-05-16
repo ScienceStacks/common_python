@@ -42,6 +42,7 @@ NUM_EXCLUDE_ITER = 5  # Number of exclude iterations
 MAX_WORKER_THREADS = 6
 CSV = "csv"
 XLSX = "xlsx"
+MIN_SCORE = 0.9
 # Columns
 STATE = "state"
 GROUP = "group"
@@ -186,7 +187,8 @@ class MultiClassifierFeatureOptimizer(object):
     logging.info("Completed processing class %d" % cl)
 
   @classmethod
-  def makeFitResult(cls, path, constraint):
+  def makeFitResult(cls, path, constraint,
+      min_score=MIN_SCORE):
     """
     Creates FitResults from results saved in a CSV.
     :param Function constraint:
@@ -202,9 +204,11 @@ class MultiClassifierFeatureOptimizer(object):
     else:
       raise ValueError("Unsupported file type.")
     # Process groups
-    dfg_dct = df.groupby(cn.GROUP).groups
+    import pdb; pdb.set_trace()
+    # FIXME: Generalize beyond using state
+    dfg_dct = df.groupby([cn.GROUP, STATE]).groups
     fit_results = []
-    for group in dfg_dct.keys():
+    for group, state in dfg_dct.keys():
       indices = dfg_dct[group]
       is_ok = all([constraint(r)
            for _, r in df.iterrows() if constraint(r)])
@@ -214,7 +218,8 @@ class MultiClassifierFeatureOptimizer(object):
         score = df.loc[indices[0], SCORE]
         fit_result = FitResult(idx=group,
             sels=sels, sels_score=score)
-        fit_results.append(fit_result)
+        if fit_result.sels_score >= min_score:
+          fit_results.append(fit_result)
     #
     return fit_results
     
