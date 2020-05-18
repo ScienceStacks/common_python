@@ -40,9 +40,6 @@ PERSISTER_PATH = os.path.join(DIR,
 NUM_EXCLUDE_ITER = 5  # Number of exclude iterations
 #LOCK = threading.Lock()
 MAX_WORKER_THREADS = 6
-CSV = "csv"
-XLSX = "xlsx"
-MIN_SCORE = 0.9
 # Columns
 STATE = "state"
 GROUP = "group"
@@ -185,41 +182,4 @@ class MultiClassifierFeatureOptimizer(object):
       #LOCK.release()
       self.checkpoint()  # checkpoint acquires lock
     logging.info("Completed processing class %d" % cl)
-
-  @classmethod
-  def makeFitResult(cls, path, constraint,
-      min_score=MIN_SCORE):
-    """
-    Creates FitResults from results saved in a CSV.
-    :param Function constraint:
-         Argument: row
-         Returns: bool
-    """
-    ext = os.path.split(path)
-    ext =ext[1].split(".")
-    if ext[0] == CSV:
-      df = pd.read_csv(path)
-    elif ext[1] == XLSX:
-      df = pd.read_excel(path)
-    else:
-      raise ValueError("Unsupported file type.")
-    # Process groups
-    import pdb; pdb.set_trace()
-    # FIXME: Generalize beyond using state
-    dfg_dct = df.groupby([cn.GROUP, STATE]).groups
-    fit_results = []
-    for group, state in dfg_dct.keys():
-      indices = dfg_dct[group]
-      is_ok = all([constraint(r)
-           for _, r in df.iterrows() if constraint(r)])
-      if is_ok:
-        sels = df.loc[indices, FEATURE].tolist()
-        group = df.loc[indices[0], GROUP]
-        score = df.loc[indices[0], SCORE]
-        fit_result = FitResult(idx=group,
-            sels=sels, sels_score=score)
-        if fit_result.sels_score >= min_score:
-          fit_results.append(fit_result)
-    #
-    return fit_results
     

@@ -72,18 +72,6 @@ class TestMultiClassifierFeatureOptimizer(
     sames = set(features0).intersection(features1)
     self.assertEqual(len(sames), 0)
 
-  def testMakeFitResults(self):
-    if IGNORE_TEST:
-      return
-    self._init()
-    fit_results = \
-       mcfo.MultiClassifierFeatureOptimizer.makeFitResult(
-       TEST_FIT_RESULT_PATH,
-       lambda r: r["state"] == 1)
-    self.assertGreater(len(fit_results), 0)
-    self.assertTrue(isinstance(fit_results[0],
-        mcfo.FitResult))
-
 
 if __name__ == '__main__':
   unittest.main()

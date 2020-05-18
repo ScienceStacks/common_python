@@ -86,6 +86,7 @@ class FeatureEquivalenceCalculator(object):
   def _checkpoint(self):
     self._persister.set(self)
 
+  # FIXME: NOt producing corret data of feature "correlations"
   def run(self, fit_results):
     """
     Calculates feature equivalences based on the feature sets
