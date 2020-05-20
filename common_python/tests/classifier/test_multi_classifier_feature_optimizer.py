@@ -16,8 +16,6 @@ from sklearn import svm
 import unittest
 
 IGNORE_TEST = False
-TEST_FIT_RESULT_PATH = os.path.join(xcn.DATA_DIR,
-    "fit_result_tf.xlsx")
 DF_X, SER_Y = test_helpers.getDataLong()
 
 

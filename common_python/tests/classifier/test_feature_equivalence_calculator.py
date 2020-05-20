@@ -89,11 +89,12 @@ class TestFeatureEquivalenceCalculator(unittest.TestCase):
   def testRunOne(self):
     if IGNORE_TEST:
       return
+    self._init()
     self.calculator.run([FIT_RESULT])
     for feature in SELECTED_FEATURES:
       df = self.calculator.ria_dct[IDX]   
       self.assertEqual(len(df[df[fec.SELECTED_FEATURE]
-          == feature]), len(self.features))
+          == feature]), len(FIT_RESULT.sels))
       dff = df[df[fec.SELECTED_FEATURE] == feature]
       dff = dff[dff[fec.ALTERNATIVE_FEATURE] == feature]
       score = dff[cn.SCORE].values[0]

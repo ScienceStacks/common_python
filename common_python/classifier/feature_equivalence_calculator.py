@@ -86,7 +86,6 @@ class FeatureEquivalenceCalculator(object):
   def _checkpoint(self):
     self._persister.set(self)
 
-  # FIXME: NOt producing corret data of feature "correlations"
   def run(self, fit_results):
     """
     Calculates feature equivalences based on the feature sets
@@ -100,6 +99,9 @@ class FeatureEquivalenceCalculator(object):
       Columns: SELECTED_FEATURE, ALTERNATIVE_FEATURE
       Values: m(F, f1, f2)
     """
+    # Find all features in the fit results
+    all_features = []
+    [all_features.extend(fr.sels) for fr in fit_results]
     for fit_result in fit_results:
       # Get the dictionary for calculating RIA
       if not fit_result.idx in self.ria_dct.keys():
@@ -108,24 +110,23 @@ class FeatureEquivalenceCalculator(object):
             ALTERNATIVE_FEATURE: [],
             cn.SCORE: [],
             }
-        self.ria_dct[fit_result.idx] = ria_dct
       else:
-        ria_dct = self.ria_dct[fit_result.idx]
-      #
-      # Features to compare against
-      alternative_features = set(
-          self._features).difference(
-          ria_dct[ALTERNATIVE_FEATURE])
-      length = len(alternative_features)
+        keys = [SELECTED_FEATURE, ALTERNATIVE_FEATURE,
+            cn.SCORE]
+        ria_dct = {}
+        for key in keys:
+          ria_dct[key] = self.ria_dct[
+              fit_result.idx][key].tolist()
+      length = len(all_features)
       # Process each selected feature
       for selected_feature in fit_result.sels:
-        ria_dct[SELECTED_FEATURE].extend(list(
-            np.repeat(selected_feature, length)))
+        ria_dct[SELECTED_FEATURE].extend(np.repeat(
+            selected_feature, length).tolist())
         ria_dct[ALTERNATIVE_FEATURE].extend(
-            alternative_features)
+            all_features)
         ria_dct[cn.SCORE].extend(
             self._calculateRIA(selected_feature,
-            fit_result.sels, alternative_features))
+            fit_result.sels, all_features))
         self._checkpoint()  # checkpoint acquires lock
       # Save the result
       df = pd.DataFrame(ria_dct)
@@ -156,8 +157,7 @@ class FeatureEquivalenceCalculator(object):
         self._base_clf,
         self._df_X[candidates], self._ser_y,
         partitions=self._partitions)
-    score_incr_sel =  \
-        score_with_sel - score_without_sel
+    denom = score_with_sel - score_without_sel
     score_rias = []
     for candidate in alternative_features:
       # Calculate the relative incremental accuracy
@@ -169,11 +169,9 @@ class FeatureEquivalenceCalculator(object):
           partitions=self._partitions)
       candidates.remove(candidate)
       numr = score_with_alt - score_without_sel
-      if (numr == score_incr_sel):
-        score_ria = 1
-      elif np.isclose(score_incr_sel, 0):
-        score_ria = 0
+      if np.isclose(denom, 0):
+        score_ria = np.nan
       else:
-        score_ria = numr / score_incr_sel
+        score_ria = numr / denom
       score_rias.append(score_ria)
     return score_rias
