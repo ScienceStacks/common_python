@@ -9,6 +9,8 @@ ENSEMBLE_PATH = os.path.join(CODE_DIR, "ensemble_file.pcl")
 # Column names
 CLASS = "class"
 COUNT = "count"  # A count
+CLS_FEATURE = "cls_feature"
+CMP_FEATURE = "cmp_feature"
 FEATURE = "feature"
 FRAC = "frac"  # A fractiona
 GROUP = "group"

@@ -24,22 +24,23 @@ DF_X, SER_Y = test_helpers.getDataLong()
 SER_Y = pd.Series([
     cn.PCLASS if v == CLASS else cn.NCLASS
     for v in SER_Y], index=SER_Y.index)
-SELECTED_FEATURES = ["Rv2034", "Rv2009"]
-SELECTED_FEATURE = SELECTED_FEATURES[0]
-NUM_ALTERNATIVE_FEATURES = 3
-ALTERNATIVE_FEATURES = DF_X.columns.tolist()
-ALTERNATIVE_FEATURES =  \
-    ALTERNATIVE_FEATURES[:NUM_ALTERNATIVE_FEATURES]
-FEATURES = list(ALTERNATIVE_FEATURES)
-FEATURES.extend(SELECTED_FEATURES)
+CLS_FEATURES = ["Rv0158", "Rv1460"]
+CLS_FEATURE = CLS_FEATURES[0]
+NUM_CMP_FEATURES = 3
+CMP_FEATURES = DF_X.columns.tolist()
+CMP_FEATURES =  \
+    CMP_FEATURES[:NUM_CMP_FEATURES]
+FEATURES = list(CMP_FEATURES)
+FEATURES.extend(CLS_FEATURES)
 IDX = 1
 FIT_RESULT = mcfo.FitResult(
-    idx=IDX, sels=SELECTED_FEATURES, sels_score=0.7,
+    idx=IDX, sels=CLS_FEATURES, sels_score=0.7,
     all_score=1, excludes=[], n_eval=1)
 FIT_RESULT2 = mcfo.FitResult(
-    idx=IDX+1, sels=SELECTED_FEATURES, sels_score=0.7,
+    idx=IDX+1, sels=CLS_FEATURES, sels_score=0.7,
     all_score=1, excludes=[], n_eval=1)
-NUM_CROSS_ITER = 2
+NUM_CROSS_ITER = 5
+NUM_CROSS_ITER_ACCURATE = 50
 
 
 class TestFeatureEquivalenceCalculator(unittest.TestCase):
@@ -76,45 +77,54 @@ class TestFeatureEquivalenceCalculator(unittest.TestCase):
     if IGNORE_TEST:
       return
     self._init()
-    scores = self.calculator._calculateRIA(
-        SELECTED_FEATURE,
-        SELECTED_FEATURES, ALTERNATIVE_FEATURES)
-    idx_sel = SELECTED_FEATURES.index(SELECTED_FEATURE)
-    for idx, score in enumerate(scores):
-      if idx == idx_sel:
-        self.assertEqual(score, 1)
+    cmp_features = list(CMP_FEATURES)
+    cmp_features.insert(0, CLS_FEATURE)
+    calculator =  \
+        fec.FeatureEquivalenceCalculator(self.df_X,
+        self.ser_y,
+        num_cross_iter=NUM_CROSS_ITER_ACCURATE)
+    df_ria = calculator._calculateRIA(
+        CLS_FEATURES, cmp_features)
+    helpers.isValidDataFrame(df_ria, 
+        expected_columns=[cn.CLS_FEATURE, cn.CMP_FEATURE,
+        cn.SCORE], nan_columns=[cn.SCORE])
+    for _, row in df_ria.iterrows():
+      if row[cn.CMP_FEATURE] == row[cn.CLS_FEATURE]:
+        self.assertEqual(row[cn.SCORE], 1)
       else:
-        self.assertFalse(np.isnan(score))
+        self.assertFalse(np.isnan(row[cn.SCORE]))
 
   def testRunOne(self):
     if IGNORE_TEST:
       return
     self._init()
-    self.calculator.run([FIT_RESULT])
-    for feature in SELECTED_FEATURES:
-      df = self.calculator.ria_dct[IDX]   
-      self.assertEqual(len(df[df[fec.SELECTED_FEATURE]
+    calculator =  \
+        fec.FeatureEquivalenceCalculator(self.df_X,
+        self.ser_y,
+        num_cross_iter=NUM_CROSS_ITER_ACCURATE)
+    calculator.run([FIT_RESULT])
+    df = calculator.df_ria
+    for feature in CLS_FEATURES:
+      self.assertEqual(len(df[df[cn.CLS_FEATURE]
           == feature]), len(FIT_RESULT.sels))
-      dff = df[df[fec.SELECTED_FEATURE] == feature]
-      dff = dff[dff[fec.ALTERNATIVE_FEATURE] == feature]
+      dff = df[df[cn.CLS_FEATURE] == feature]
+      dff = dff[dff[cn.CMP_FEATURE] == feature]
       score = dff[cn.SCORE].values[0]
       self.assertEqual(score, 1)
     #
-    columns = [cn.SCORE, fec.SELECTED_FEATURE,
-        fec.ALTERNATIVE_FEATURE]
+    columns = [cn.SCORE, cn.CLS_FEATURE, cn.CMP_FEATURE]
     self.assertTrue(helpers.isValidDataFrame(df, columns))
 
   def testRunMany(self):
     if IGNORE_TEST:
       return
     self._init()
-    fit_results = [FIT_RESULT, FIT_RESULT2]
+    fit_results = [FIT_RESULT, FIT_RESULT]
     self.calculator.run(fit_results)
-    self.assertEqual(len(self.calculator.ria_dct),
-        len(fit_results))
+    num_sels = len(FIT_RESULT.sels)
+    self.assertEqual((2*num_sels)**2,
+        len(self.calculator.df_ria))
     
-    
-
 
 if __name__ == '__main__':
   unittest.main()

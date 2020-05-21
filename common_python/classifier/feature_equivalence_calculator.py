@@ -16,7 +16,10 @@ relative incremental accuracy (RIA):
 m(F, f1, f2), the incremental accuracy of using f2
 compared to the incremental accuracy of using f1.
 m(F, f1, f2) = (a(F-f1+f2) - a(F-f1))/(a(F) - a(F-f1)).
-f1 is equivalent to f2 for F if m(F, f1, f2) ~ 1.
+f1 is equivalent to f2 for F if m(F, f1, f2) = 1.
+A deviaton from 1 indicates a poor substitute. An
+adjusted value in the range [0, 1] is calculated
+exp(-(1 - abs(m(F, f1, f2))).
 
 Since ths is computationally intensive, the calculator is
 restartable and multi-threaded.
@@ -43,9 +46,8 @@ import threading
 DIR = os.path.dirname(os.path.abspath(__file__))
 PERSISTER_PATH = os.path.join(DIR,
     "feature_eqivalence_calculator.pcl")
-SELECTED_FEATURE = "selected_feature"
-ALTERNATIVE_FEATURE = "alternative_feature"
 NUM_CROSS_ITER = 50
+NO_FEATURE_SCORE = 0.5
 
 
 class FeatureEquivalenceCalculator(object):
@@ -81,7 +83,7 @@ class FeatureEquivalenceCalculator(object):
           ser_y, holdouts=num_holdouts)
           for _ in range(num_cross_iter)]
       ########### PUBLIC ##########
-      self.ria_dct = {}  # key: idx, value: df
+      self.df_ria = pd.DataFrame()
 
   def _checkpoint(self):
     self._persister.set(self)
@@ -95,83 +97,85 @@ class FeatureEquivalenceCalculator(object):
         columns: featuress
         index: features
         values: m(F, f1, f2)
-    Places the following dataframe in self.ria_dct
-      Columns: SELECTED_FEATURE, ALTERNATIVE_FEATURE
+    Places the following dataframe in self.df_ria
+      Columns: cn.CLS_FEATURE, cn.CMP_FEATURE
       Values: m(F, f1, f2)
     """
     # Find all features in the fit results
     all_features = []
     [all_features.extend(fr.sels) for fr in fit_results]
+    if len(self.df_ria) == 0:
+      processed_features = []
+    else:
+      processed_features = self.df_ria[cn.CLS_FEATURE]
     for fit_result in fit_results:
-      # Get the dictionary for calculating RIA
-      if not fit_result.idx in self.ria_dct.keys():
-        ria_dct =  {
-            SELECTED_FEATURE: [],
-            ALTERNATIVE_FEATURE: [],
-            cn.SCORE: [],
-            }
-      else:
-        keys = [SELECTED_FEATURE, ALTERNATIVE_FEATURE,
-            cn.SCORE]
-        ria_dct = {}
-        for key in keys:
-          ria_dct[key] = self.ria_dct[
-              fit_result.idx][key].tolist()
-      length = len(all_features)
-      # Process each selected feature
-      for selected_feature in fit_result.sels:
-        ria_dct[SELECTED_FEATURE].extend(np.repeat(
-            selected_feature, length).tolist())
-        ria_dct[ALTERNATIVE_FEATURE].extend(
-            all_features)
-        ria_dct[cn.SCORE].extend(
-            self._calculateRIA(selected_feature,
-            fit_result.sels, all_features))
-        self._checkpoint()  # checkpoint acquires lock
-      # Save the result
-      df = pd.DataFrame(ria_dct)
-      self.ria_dct[fit_result.idx] = df
+      intersection = set(fit_result.sels).intersection(
+          processed_features)
+      if len(intersection) > 0:
+        # Have already prcoessed this fit_result
+        continue
+      # Calculate for this FitResult
+      df = self._calculateRIA(fit_result.sels,
+          all_features)
+      self.df_ria = pd.concat([self.df_ria, df])
+      self._checkpoint()
 
-  def _calculateRIA(self, selected_feature, 
-      selected_features, alternative_features):
+  def _calculateRIA(self, cls_features,
+      cmp_features):
     """
     Calculates RIA (relative incremental accuracy) for
-    features in a classification group (set of features
-    used for a classifier)
-    :param object feature:
-    :param list-object selected_features:
-        features in the RIA
-    :param list-object alternative_features:
-        features to compare with
-    :return list-float: scores for the selected feature
+    features used to train a classifier.
+    :param list-object cls_features:
+        set of features for classifier
+    :param list-object cmp_features:
+        features considered as alternatives 
+        to the classifier features
+    :return pd.DataFrame: columns
+        cn.CLS_FEATURE - 
+            feature removed from cls_features
+        cn.CMP_FEATURE
+            feature added from cmp_features
+        cn.SCORE - score
     """
-    score_with_sel =  \
-        util_classifier.binaryCrossValidate(
-        self._base_clf,
-        self._df_X[selected_features], self._ser_y,
-        partitions=self._partitions)
-    candidates = list(selected_features)
-    candidates.remove(selected_feature)
-    score_without_sel =  \
-        util_classifier.binaryCrossValidate(
-        self._base_clf,
-        self._df_X[candidates], self._ser_y,
-        partitions=self._partitions)
-    denom = score_with_sel - score_without_sel
-    score_rias = []
-    for candidate in alternative_features:
-      # Calculate the relative incremental accuracy
-      candidates.append(candidate)
-      score_with_alt =  \
+    ria_dct =  {
+        cn.CLS_FEATURE: [],
+        cn.CMP_FEATURE: [],
+        cn.SCORE: [],
+        }
+    for ref_feature in cls_features:
+      score_with_ref =  \
           util_classifier.binaryCrossValidate(
           self._base_clf,
-          self._df_X[candidates], self._ser_y,
+          self._df_X[cls_features], self._ser_y,
           partitions=self._partitions)
-      candidates.remove(candidate)
-      numr = score_with_alt - score_without_sel
-      if np.isclose(denom, 0):
-        score_ria = np.nan
+      new_cls_features = list(cls_features)
+      new_cls_features.remove(ref_feature)
+      if len(new_cls_features) == 0:
+        score_without_ref = NO_FEATURE_SCORE
       else:
-        score_ria = numr / denom
-      score_rias.append(score_ria)
-    return score_rias
+        score_without_ref =  \
+            util_classifier.binaryCrossValidate(
+            self._base_clf,
+            self._df_X[new_cls_features],
+            self._ser_y,
+            partitions=self._partitions)
+      denom = score_with_ref - score_without_ref
+      for cmp_feature in cmp_features:
+        # Calculate the relative incremental accuracy
+        new_cls_features.append(cmp_feature)
+        score_with_cmp =  \
+            util_classifier.binaryCrossValidate(
+            self._base_clf,
+            self._df_X[new_cls_features],
+            self._ser_y,
+            partitions=self._partitions)
+        new_cls_features.remove(cmp_feature)
+        numr = score_with_cmp - score_without_ref
+        if np.isclose(denom, 0):
+          ria = np.nan
+        else:
+          ria = numr / denom
+        ria_dct[cn.CLS_FEATURE].append(ref_feature)
+        ria_dct[cn.CMP_FEATURE].append(cmp_feature)
+        ria_dct[cn.SCORE].append(ria)
+    return pd.DataFrame(ria_dct)
