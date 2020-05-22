@@ -28,6 +28,9 @@ STATE = "state"
 # n_dist - # indices to next state
 AdjacentStates = collections.namedtuple(
     "AdjacentStates", "prv cur nxt p_dist n_dist")
+#
+ClassifierDescription = collections.namedtuple(
+    "ClassifierDescription", "clf features")
 
 
 def findAdjacentStates(ser_y, index):
@@ -266,6 +269,26 @@ def plotInstancePredictions(ser_y, ser_pred,
   if is_plot:
     plt.show()
 
+def makeArrayDF(df, indices=None):
+  """
+  Constructs numpy arrays for the dataframe.
+  :param pd.DataFrame df:
+  :return ndarray:
+  """
+  if indices is None:
+    indices = df.index
+  return df.loc[indices, :].to_numpy()
+
+def makeArraySer(ser, indices=None):
+  """
+  Constructs numpy arrays for the dataframe.
+  :param pd.Series ser:
+  :return ndarray:
+  """
+  if indices is None:
+    indices = ser.index
+  return ser.loc[indices].to_numpy()
+
 def makeArrays(df, ser, indices=None):
   """
   Constructs numpy arrays for the dataframe and series.
@@ -275,8 +298,8 @@ def makeArrays(df, ser, indices=None):
   """
   if indices is None:
     indices = df.index
-  return df.loc[indices, :].to_numpy(),  \
-      ser.loc[indices].to_numpy()
+  return makeArrayDF(df, indices=indices),
+      makeArraySer(ser, indices=indices)
 
 def scoreFeatures(clf, df_X, ser_y,
     features=None, train_idxs=None, test_idxs=None,
@@ -375,3 +398,40 @@ def binaryCrossValidate(clf, df_X, ser_y,
         features=features, is_copy=False,
         train_idxs=train_idxs, test_idxs=test_idxs))
   return np.mean(scores)
+
+def correlatePredictions(clf_desc1, clf_desc2,
+    df_X, ser_y, partitions):
+  """
+  Estimates the correlation of predicted classifications
+  between two classifiers.
+  :param ClassifierDescription clf_desc1:
+  :param ClassifierDescription clf_desc2:
+  :param pd.DataFrame df_X:
+      columns: features
+      index: instances
+  :param pd.Series ser_y:
+      index: instances
+      values: binary class values (0, 1)
+  :param list-(list-index, list-index) partitions:
+      list of pairs of indices. Pairs are train, test.
+  :return float: correlation of two predictions
+  """
+  def predict(clf_desc, train_idxs, test_idxs):
+    arr_X_train, arr_y_train = makeArrays(
+        df_X[clf_desc.features], ser_y,
+        indices=train_idxs)
+    clf_desc.clf.fit(arr_X, arr_y)
+    arr_X_test = makeArrayDF(df_X[clf_desc.features],
+        indices=test_idxs)
+    arr_y_pred = clf_desc.clf.predict(arr_X_test)
+    return arr_y_pred
+  #
+  arr1 = np.array([])
+  arr2 = np.array([])
+  for train_idxs, test_idxs in partitions:
+    yv1 = predict(clf_desc1, train_idxs, test_idxs)
+    yv2 = predict(clf_desc2, train_idxs, test_idxs)
+    arr1 = np.concatenate([arr1, yv1])
+    arr2 = np.concatenate([arr2, yv2])
+  result = np.corrcoef(arr1, arr2)
+  return result
