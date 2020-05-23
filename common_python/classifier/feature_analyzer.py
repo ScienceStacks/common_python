@@ -173,6 +173,8 @@ class FeatureAnalyzer(object):
           dct[cn.SCORE].append(score)
           self._reportProgress(CPC,
               len(dct[FEATURE1]), total)
+          self._reportProgress(IPA,
+              len(dct[FEATURE1]), total)
       df = pd.DataFrame(dct)
       self._df_ipa = df.pivot(index=FEATURE1,
           columns=FEATURE2, values=cn.SCORE)
