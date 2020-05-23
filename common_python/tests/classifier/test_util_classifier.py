@@ -5,6 +5,7 @@ from common_python.tests.classifier  \
 from common_python.classifier import classifier_ensemble
 from common_python.testing import helpers
 
+import copy
 import math
 import pandas as pd
 import random
@@ -38,6 +39,7 @@ DF_PRED = pd.DataFrame({
 DF_PRED = DF_PRED.T
 DF_X_BINARY, SER_Y_ALL = test_helpers.getDataLong()
 DF_X_BINARY = DF_X_BINARY.sort_index()
+FEATURES = DF_X_BINARY.columns.tolist()
 SER_Y = SER_Y.sort_index()
 CLASS = 1
 SER_Y_BINARY = pd.Series([
@@ -54,6 +56,7 @@ class TestFunctions(unittest.TestCase):
     self.df_X_short, self.ser_y_short = data
     self.df_X_long, self.ser_y_long =  \
         test_helpers.getDataLong()
+    self.clf = copy.deepcopy(CLF)
  
   def testFindAdjacentStates(self):
     if IGNORE_TEST:
@@ -230,6 +233,31 @@ class TestFunctions(unittest.TestCase):
         num_iterations=SIZE)
     self.assertLess(np.abs(score_many-score_many2),
         0.1)
+
+  def testCorrelatePrediction(self):
+    if IGNORE_TEST:
+      return
+    clf2 = copy.deepcopy(CLF)
+    NUM_PARTITIONS = 10
+    FEATURE = "Rv0081"
+    partitions = [util_classifier.partitionByState(
+        SER_Y_BINARY) for _ in range(NUM_PARTITIONS)]
+    clf_desc1 = util_classifier.ClassifierDescription(
+        clf=self.clf, features=FEATURE)
+    clf_desc2 = util_classifier.ClassifierDescription(
+        clf=self.clf, features=FEATURE)
+    score = util_classifier.correlatePredictions(
+        clf_desc1, clf_desc2, DF_X_BINARY,
+        SER_Y_BINARY, partitions)
+    self.assertGreater(score, 0.98)
+    #
+    clf_desc2 = util_classifier.ClassifierDescription(
+        clf=clf2, features=FEATURES[1])
+    score = util_classifier.correlatePredictions(
+        clf_desc1, clf_desc2, DF_X_BINARY,
+        SER_Y_BINARY, partitions)
+    self.assertTrue(isinstance(score, float))
+    
     
     
 

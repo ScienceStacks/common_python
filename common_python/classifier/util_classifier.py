@@ -277,6 +277,8 @@ def makeArrayDF(df, indices=None):
   """
   if indices is None:
     indices = df.index
+  if isinstance(df, pd.Series):
+    df = pd.DataFrame(df)
   return df.loc[indices, :].to_numpy()
 
 def makeArraySer(ser, indices=None):
@@ -298,7 +300,7 @@ def makeArrays(df, ser, indices=None):
   """
   if indices is None:
     indices = df.index
-  return makeArrayDF(df, indices=indices),
+  return makeArrayDF(df, indices=indices),  \
       makeArraySer(ser, indices=indices)
 
 def scoreFeatures(clf, df_X, ser_y,
@@ -417,12 +419,11 @@ def correlatePredictions(clf_desc1, clf_desc2,
   :return float: correlation of two predictions
   """
   def predict(clf_desc, train_idxs, test_idxs):
+    df_X_sub = pd.DataFrame(df_X[clf_desc.features])
     arr_X_train, arr_y_train = makeArrays(
-        df_X[clf_desc.features], ser_y,
-        indices=train_idxs)
-    clf_desc.clf.fit(arr_X, arr_y)
-    arr_X_test = makeArrayDF(df_X[clf_desc.features],
-        indices=test_idxs)
+        df_X_sub, ser_y, indices=train_idxs)
+    clf_desc.clf.fit(arr_X_train, arr_y_train)
+    arr_X_test = makeArrayDF(df_X_sub, indices=test_idxs)
     arr_y_pred = clf_desc.clf.predict(arr_X_test)
     return arr_y_pred
   #
@@ -433,5 +434,12 @@ def correlatePredictions(clf_desc1, clf_desc2,
     yv2 = predict(clf_desc2, train_idxs, test_idxs)
     arr1 = np.concatenate([arr1, yv1])
     arr2 = np.concatenate([arr2, yv2])
-  result = np.corrcoef(arr1, arr2)
+  is_zero = np.isclose(np.std(arr1), 0) or \
+      np.isclose(np.std(arr2), 0)
+  if is_zero:
+    result = 0.0
+  else:
+    result = np.corrcoef(arr1, arr2)[0,1]
+  if np.isnan(result):
+    result = 0.0
   return result

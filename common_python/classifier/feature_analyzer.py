@@ -28,7 +28,7 @@ import pandas as pd
 from sklearn import svm
 
 
-NUM_CROSS_VALID = 50  # Number of cross validations
+NUM_CROSS_ITER = 50  # Number of cross validations
 FEATURE1 = "feature1"
 FEATURE2 = "feature2"
 
@@ -36,7 +36,7 @@ FEATURE2 = "feature2"
 class FeatureAnalyzer(object):
 
   def __init__(self, clf, df_X, ser_y,
-      num_cross_valid=NUM_CROSS_VALID):
+      num_cross_iter=NUM_CROSS_ITER):
     """
     :param Classifier clf: binary classifier
     :param pd.DataFrame df_X:
@@ -45,6 +45,7 @@ class FeatureAnalyzer(object):
     :param pd.Series ser_y:
         values: 0, 1
         rows: instances
+    :parm int num_cross_iter: iterations in cross valid
     """
     ######### PRIVATE ################
     self._clf = copy.deepcopy(clf)
@@ -53,7 +54,7 @@ class FeatureAnalyzer(object):
     self._features = df_X.columns.tolist()
     self._partitions = [
         util_classifier.partitionByState(self._ser_y)
-        for _ in range(num_cross_valid)]
+        for _ in range(num_cross_iter)]
     # Single feature accuracy
     self._ser_sfa = None
     # classifier prediction correlation
@@ -63,11 +64,15 @@ class FeatureAnalyzer(object):
 
   @property
   def ser_sfa(self):
+    """
+    Construct series for single feature accuracy
+      index: feature
+      value: accuracy in [0, 1]
+    """
     if self._ser_sfa is None:
       scores = []
       for feature in self._features:
-        df_X = pd.DataFrame(
-            self._clf, self._df_X[feature])
+        df_X = pd.DataFrame(self._df_X[feature])
         score = util_classifier.binaryCrossValidate(
             self._clf, df_X, self._ser_y,
             partitions=self._partitions)
@@ -79,13 +84,13 @@ class FeatureAnalyzer(object):
   @property
   def df_cpc(self):
     """
-    creates pd.DataFrame
+    creates classifier predicition correation pd.DataFrame
         row index: features
         columns: features
         scores: correlation
     """
+    dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
     if self._df_cpc is None:
-      dct = {FEATURE1: [], FEATURE2{}, cn.SCORE: []}
       for feature1 in self._features:
         for feature2 in self._features:
           clf_desc1 =  \
@@ -101,7 +106,7 @@ class FeatureAnalyzer(object):
           dct[FEATURE2].append(feature2)
           dct[cn.SCORE].append(score)
       df = pd.DataFrame(dct)
-      self._df_cpc = pd.pivot_table(index=FEATURE1,
+      self._df_cpc = df.pivot(index=FEATURE1,
           columns=FEATURE2, values=cn.SCORE)
     return self._df_cpc
 
@@ -114,13 +119,13 @@ class FeatureAnalyzer(object):
         scores: incremental accuracy
     """
     def predict(features):
-      df_X = pd.DataFrame(self._df_X[feature])
+      df_X = pd.DataFrame(self._df_X[features])
       return util_classifier.binaryCrossValidate(
           self._clf, df_X, self._ser_y,
           partitions=self._partitions)
     #
+    dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
     if self._df_ipa is None:
-      dct = {FEATURE1: [], FEATURE2{}, cn.SCORE: []}
       for feature1 in self._features:
         for feature2 in self._features:
           score1 = predict([feature1])
@@ -131,6 +136,6 @@ class FeatureAnalyzer(object):
           dct[FEATURE2].append(feature2)
           dct[cn.SCORE].append(score)
       df = pd.DataFrame(dct)
-      self._df_ipa = pd.pivot_table(index=FEATURE1,
+      self._df_ipa = df.pivot(index=FEATURE1,
           columns=FEATURE2, values=cn.SCORE)
     return self._df_ipa
