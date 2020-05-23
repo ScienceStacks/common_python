@@ -14,6 +14,7 @@ import unittest
 
 IGNORE_TEST = False
 IS_SCALE = False  # Do scale tests
+IS_REPORT = False
 CLASS = 1
 DF_X, SER_Y = test_helpers.getDataLong()
 # Make binary classes (for CLASS)
@@ -38,6 +39,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     self.clf = copy.deepcopy(CLF)
     self.analyzer = feature_analyzer.FeatureAnalyzer(
         self.clf, self.df_X, self.ser_y,
+        is_report=IS_REPORT,
         num_cross_iter=NUM_CROSS_ITER_ACCURATE)
 
   def testConstructor(self):
@@ -122,6 +124,25 @@ class TestFeatureAnalyzer(unittest.TestCase):
     start = time.time()
     df = analyzer.df_ipa
     self._report("test_df_ipa_scale", start)
+
+  def testReportProgress(self):
+    if IGNORE_TEST:
+      return
+    self.analyzer._reportProgress(
+       feature_analyzer.SFA, 0, 10)
+    self.analyzer._reportProgress(
+       feature_analyzer.SFA, 11, 10)
+    #
+    INTERVAL = 5
+    analyzer = feature_analyzer.FeatureAnalyzer(
+        self.clf, self.df_X, self.ser_y,
+        is_report=IS_REPORT,
+        report_interval = INTERVAL,
+        num_cross_iter=NUM_CROSS_ITER_ACCURATE)
+    analyzer._reportProgress(
+       feature_analyzer.SFA, 0, 10)
+    analyzer._reportProgress(
+       feature_analyzer.SFA, INTERVAL + 1, 10)
 
 
 
