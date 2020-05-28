@@ -29,11 +29,20 @@ FEATURE2 = "Rv1460"
 FEATURES = [FEATURE1, FEATURE2]
 # Number of features used for scaling runs
 NUM_FEATURE_SCALE = 100
+DIR = os.path.dirname(os.path.abspath(__file__))
+TEST_DATA_PATH_BASE = os.path.join(DIR,
+    "test_feature_analyzer_%s.csv")
+TEST_DATA_PATH_BASE1 = os.path.join(DIR,
+    "test_feature_analyzer1_%s.csv")
+TEST_DATA_PATH_DCT = {m: TEST_DATA_PATH_BASE % m
+    for m in feature_analyzer.METRICS}
+TEST_DATA_PATH1_DCT = {m: TEST_DATA_PATH_BASE1 % m
+    for m in feature_analyzer.METRICS}
 
 
 class TestFeatureAnalyzer(unittest.TestCase):
-  
-  def setUp(self):
+
+  def _init(self):
     self.df_X = copy.deepcopy(DF_X[FEATURES])
     self.ser_y = copy.deepcopy(SER_Y)
     self.clf = copy.deepcopy(CLF)
@@ -41,6 +50,22 @@ class TestFeatureAnalyzer(unittest.TestCase):
         self.clf, self.df_X, self.ser_y,
         is_report=IS_REPORT,
         num_cross_iter=NUM_CROSS_ITER_ACCURATE)
+
+  def _remove(self):
+    paths = list(TEST_DATA_PATH1_DCT.values())
+    paths.extend(list(TEST_DATA_PATH_DCT.values()))
+    for path in paths:
+      if os.path.isfile(path):
+        os.remove(path)
+  
+  def setUp(self):
+    if IGNORE_TEST:
+      return
+    self._remove()
+    self._init()
+
+  def tearDown(self):
+    self._remove()
 
   def testConstructor(self):
     if IGNORE_TEST:
@@ -143,6 +168,27 @@ class TestFeatureAnalyzer(unittest.TestCase):
        feature_analyzer.SFA, 0, 10)
     analyzer._reportProgress(
        feature_analyzer.SFA, INTERVAL + 1, 10)
+
+  def testReadWriteMetrics(self):
+    if IGNORE_TEST:
+      return
+    self.analyzer.writeMetrics(TEST_DATA_PATH1_DCT)
+    self.analyzer._data_path_dct = TEST_DATA_PATH1_DCT
+    for metric in feature_analyzer.METRICS:
+      df = self.analyzer.getMetric(metric)
+      dff = self.analyzer.readMetric(metric)
+      dff.index.name = None
+      dff.name = None
+      dff = self.analyzer.readMetric(metric)
+      if isinstance(df, pd.Series):
+        trues = [dff.loc[i] == df.loc[i]
+            for i in dff.index]
+        self.assertTrue(all(trues))
+      else:
+        for idx, row in df.iterrows():
+          for col in df.columns:
+            self.assertTrue(np.isclose(df.loc[idx, col],
+                dff.loc[idx, col]))
 
 
 
