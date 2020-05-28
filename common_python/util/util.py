@@ -227,3 +227,22 @@ def makeTimeInterpolatedMatrix(df, num_interpolation=10):
       matrix.append(arr)
     time_last = time
   return np.array(matrix)
+
+def pruneZeros(df):
+  """
+  Remove columns and rows that are all zero.
+  :param pd.DataFrame:
+  :return pd.DataFrame:
+  """
+  df_prune_col = pd.DataFrame()
+  for col in df.columns:
+      if sum([abs(v) for v in df[col]]) > 0:
+          df_prune_col[col] = df[col]
+  df_prune_col = pd.DataFrame(df_prune_col)
+  idxs = []
+  for idx in df_prune_col.index:
+      sum_of_values = sum([abs(v)
+          for v in df_prune_col.loc[idx, :]])
+      if np.isclose(sum_of_values,  0):
+          idxs.append(idx)
+  return df_prune_col.drop(index=idxs)
