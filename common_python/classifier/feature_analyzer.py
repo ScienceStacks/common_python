@@ -39,6 +39,35 @@ METRICS = [SFA, CPC, IPA]
 
 
 ################## FUNCTIONS ##################### 
+def makeFeatureAnalyzers(clf, df_X, ser_y,
+      data_path_pat=None, **kwargs):
+    """
+    Creates a FeaturAnalyzer for each class.
+    :param Classifier clf: binary classifier
+    :param pd.DataFrame df_X:
+        columns: features
+        rows: instances
+    :param pd.Series ser_y:
+        values: plurality of class values
+        rows: instancea
+    :param Pattern data_path_pat: string pattern
+        arguments are metric, class
+    :parm dict kwargs: Optional arguments for constructor
+    :return dict:
+         key: class
+         value: FeatureAnalyzer
+    """
+    classes = list(ser_y.unique())
+    analyzer_dct = {}
+    for cl in classes:
+      dct = {m: data_path_pat % (m, cl)
+          for m in METRICS}
+      ser_binary = ser_y.apply(lambda v:
+          cn.PCLASS if v==cl else cn.NCLASS)
+      analyzer_dct[cl] = FeatureAnalyzer(clf, df_X,
+          ser_binary, data_path_dct=dct, **kwargs)
+    return analyzer_dct
+
 def plotSFA(analyzers, num_feature=10, is_plot=True):
   """
   Plots SFA for all classes.
@@ -76,8 +105,7 @@ class FeatureAnalyzer(object):
   def __init__(self, clf, df_X, ser_y,
       num_cross_iter=NUM_CROSS_ITER, is_report=True,
       report_interval=None,
-      data_path_dct=None,
-      suffix=None):
+      data_path_dct=None):
     """
     :param Classifier clf: binary classifier
     :param pd.DataFrame df_X:
@@ -102,7 +130,6 @@ class FeatureAnalyzer(object):
         util_classifier.partitionByState(self._ser_y)
         for _ in range(num_cross_iter)]
     self._report_interval = report_interval
-    self._suffix = suffix
     if data_path_dct is None:
        data_path_dct = {}
     self._data_path_dct = data_path_dct

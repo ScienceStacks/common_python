@@ -13,7 +13,7 @@ from sklearn import svm
 import time
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 IS_SCALE = False  # Do scale tests
 IS_REPORT = False
 IS_PLOT = False
@@ -34,6 +34,8 @@ FEATURES = [FEATURE1, FEATURE2]
 NUM_FEATURE_SCALE = 100
 DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(xcn.DATA_DIR, "feature_analyzer")
+TEST_DATA_PATH_PAT = os.path.join(DATA_DIR,
+    "main_feature_analyzer_%s_%d.csv")
 TEST_DATA_PATH_ALL_BASE = os.path.join(DATA_DIR,
     "main_feature_analyzer_%s_%d.csv")
 TEST_DATA_PATH_BASE = os.path.join(DIR,
@@ -212,7 +214,21 @@ class TestFeatureAnalyzer(unittest.TestCase):
       return
     feature_analyzer.plotSFA(ANALYZERS, is_plot=IS_PLOT)
 
-
+  def testMakeFeatureAnalyzers(self):
+    # TESTING
+    analyzer_dct = feature_analyzer.makeFeatureAnalyzers(
+        CLF, DF_X, SER_Y_ALL,
+        data_path_pat=TEST_DATA_PATH_PAT)
+    classes = SER_Y_ALL.values
+    for cl, analyzer in analyzer_dct.items():
+      self.assertTrue(cl in classes)
+      self.assertTrue(isinstance(analyzer,
+          feature_analyzer.FeatureAnalyzer))
+      # Get an exception if invalid path
+      ser = analyzer._readSFA(
+          path=analyzer._data_path_dct[
+          feature_analyzer.SFA])
+      
 
 if __name__ == '__main__':
   unittest.main()
