@@ -38,6 +38,39 @@ IPA = "ipa"
 METRICS = [SFA, CPC, IPA]
 
 
+################## FUNCTIONS ##################### 
+def plotSFA(analyzers, num_feature=10, is_plot=True):
+  """
+  Plots SFA for all classes.
+  :param list-FeatureAnalyzer analyzers:
+      one analyzer for each class to plot
+  :param int num_feature: features per class plotted
+  """
+  num_classes = len(analyzers)
+  fig, ax = plt.subplots(1, num_classes)
+  fig.set_figheight(6)
+  fig.set_figwidth(18)
+  for cl in range(num_classes):
+    analyzer = analyzers[cl]
+    this_ax = ax[cl]
+    xv = analyzer.ser_sfa.index.tolist()[:num_feature]
+    yv = analyzer.ser_sfa.values[:num_feature]
+    this_ax.bar(xv, yv)
+    this_ax.set_title("%d" % cl )
+    this_ax.set_xticklabels(xv, fontsize=14)
+    if cl == 0:
+      this_ax.set_ylabel("Single Feature Accuracy")
+      this_ax.set_ylim([0, 1])
+    else:
+      this_ax.set_yticklabels([])
+    this_ax.set_xticklabels(xv, rotation='vertical')
+    this_ax.set_ylim([0.48, 1])
+    this_ax.yaxis.set_ticks_position('both')
+  if is_plot:
+    plt.show()
+
+
+################## CLASSES ##################### 
 class FeatureAnalyzer(object):
 
   def __init__(self, clf, df_X, ser_y,
@@ -256,28 +289,3 @@ class FeatureAnalyzer(object):
       path = self._data_path_dct[IPA]
     df = pd.read_csv(self._data_path_dct[IPA])
     return df.set_index(FEATURE1)
-  
-  def plotSFA(self, num_gene=10, nrow=1, ncol=6):
-    fig, ax = plt.subplots(nrow, ncol)
-    fig.set_figheight(6)
-    fig.set_figwidth(18)
-    for state in STATES:
-      row = int(state/ncol)
-      col = state - row*ncol
-      if nrow == 1:
-        this_ax = ax[col]
-      else:
-        this_ax = ax[row, col]
-      xv = self._ser_fsa.index.tolist()[:num_gene]
-      yv = self._ser_fsa.values[:num_gene]
-      this_ax.bar(xv, yv)
-      this_ax.set_title("%d" % state)
-      this_ax.set_xticklabels(xv, fontsize=14)
-      if state == 0:
-        this_ax.set_ylabel("Single Feature Accuracy")
-        this_ax.set_ylim([0, 1])
-      else:
-        this_ax.set_yticklabels([])
-      this_ax.set_xticklabels(xv, rotation='vertical')
-      this_ax.set_ylim([0.48, 1])
-      this_ax.yaxis.set_ticks_position('both')

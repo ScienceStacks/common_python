@@ -228,7 +228,7 @@ def makeTimeInterpolatedMatrix(df, num_interpolation=10):
     time_last = time
   return np.array(matrix)
 
-def pruneZeros(df):
+def pruneZeroes(df):
   """
   Remove columns and rows that are all zero.
   :param pd.DataFrame:

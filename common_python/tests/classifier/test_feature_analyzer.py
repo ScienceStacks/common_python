@@ -3,6 +3,7 @@ from common_python.testing import helpers
 from common_python.classifier import feature_analyzer
 from common_python.tests.classifier import helpers as test_helpers
 from common_python.testing import helpers
+import common.constants as xcn
 
 import copy
 import os
@@ -15,12 +16,14 @@ import unittest
 IGNORE_TEST = False
 IS_SCALE = False  # Do scale tests
 IS_REPORT = False
+IS_PLOT = False
 CLASS = 1
-DF_X, SER_Y = test_helpers.getDataLong()
+DF_X, SER_Y_ALL = test_helpers.getDataLong()
+STATES = list(SER_Y_ALL.unique())
 # Make binary classes (for CLASS)
 SER_Y = pd.Series([
     cn.PCLASS if v == CLASS else cn.NCLASS
-    for v in SER_Y], index=SER_Y.index)
+    for v in SER_Y_ALL], index=SER_Y_ALL.index)
 NUM_CROSS_ITER = 5
 NUM_CROSS_ITER_ACCURATE = 50
 CLF = svm.LinearSVC()
@@ -30,6 +33,9 @@ FEATURES = [FEATURE1, FEATURE2]
 # Number of features used for scaling runs
 NUM_FEATURE_SCALE = 100
 DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(xcn.DATA_DIR, "feature_analyzer")
+TEST_DATA_PATH_ALL_BASE = os.path.join(DATA_DIR,
+    "main_feature_analyzer_%s_%d.csv")
 TEST_DATA_PATH_BASE = os.path.join(DIR,
     "test_feature_analyzer_%s.csv")
 TEST_DATA_PATH_BASE1 = os.path.join(DIR,
@@ -38,6 +44,17 @@ TEST_DATA_PATH_DCT = {m: TEST_DATA_PATH_BASE % m
     for m in feature_analyzer.METRICS}
 TEST_DATA_PATH1_DCT = {m: TEST_DATA_PATH_BASE1 % m
     for m in feature_analyzer.METRICS}
+ANALYZERS = []
+for state in STATES:
+  dct = {m: TEST_DATA_PATH_ALL_BASE  % (m, state) 
+      for m in feature_analyzer.METRICS}
+  ser_y = pd.Series([
+      cn.PCLASS if v == CLASS else cn.NCLASS
+      for v in SER_Y_ALL], index=SER_Y_ALL.index)
+  analyzer = feature_analyzer.FeatureAnalyzer(
+      CLF, DF_X, ser_y,
+      data_path_dct=dct)
+  ANALYZERS.append(analyzer)
 
 
 class TestFeatureAnalyzer(unittest.TestCase):
@@ -189,6 +206,11 @@ class TestFeatureAnalyzer(unittest.TestCase):
           for col in df.columns:
             self.assertTrue(np.isclose(df.loc[idx, col],
                 dff.loc[idx, col]))
+
+  def testPlotSFA(self):
+    if IGNORE_TEST:
+      return
+    feature_analyzer.plotSFA(ANALYZERS, is_plot=IS_PLOT)
 
 
 
