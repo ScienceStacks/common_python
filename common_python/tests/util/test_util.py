@@ -7,30 +7,42 @@ import pandas as pd
 import sys
 import unittest
 
+IGNORE_TEST = False
+
 
 class TestFunctions(unittest.TestCase):
 
   def testConvertType(self):
+    if IGNORE_TEST:
+      return
     self.assertEqual(ut.ConvertType('3'), 3)
     self.assertEqual(ut.ConvertType('3s'), '3s')
     self.assertTrue(abs(ut.ConvertType('3.1') - 3.1) < 0.001)
 
   def testConvertTypes(self):
+    if IGNORE_TEST:
+      return
     self.assertEqual(ut.ConvertTypes(['3', '3s', '3.1']),
                                     [ 3 , '3s',  3.1  ])
 
   def testRandomWord(self):
+    if IGNORE_TEST:
+      return
     WORDLEN = 7
     word = ut.randomWord(size=WORDLEN)
     self.assertTrue(isinstance(word, str))
     self.assertEqual(len(word), WORDLEN)
 
   def testGetValue(self):
+    if IGNORE_TEST:
+      return
     dictionary = {'a': 1}
     self.assertEqual(ut.getValue(dictionary, 'a', 0), 1)
     self.assertEqual(ut.getValue(dictionary, 'b', 0), 0)
 
   def testSetValue(self):
+    if IGNORE_TEST:
+      return
     dictionary = {'a': 1}
     new_dict = ut.setValue(dictionary, 'a', 2)
     self.assertEqual(new_dict['a'], 1)
@@ -39,27 +51,37 @@ class TestFunctions(unittest.TestCase):
     self.assertEqual(new_dict['b'], 2)
 
   def testRandomWords(self):
+    if IGNORE_TEST:
+      return
     LEN = 10
     self.assertEqual(len(ut.randomWords(LEN)), LEN)
 
   def testGetFileExtension(self):
+    if IGNORE_TEST:
+      return
     extensions = ['x', 'xy', 'xyz']
     partial_filename = 'dummy'
     for ext in extensions:
-      this_ext = ut.getFileExtension("%s.%s" % (partial_filename, ext))
+      this_ext = ut.getFileExtension("%s.%s" % 
+          (partial_filename, ext))
       self.assertEqual(this_ext, ext)
     # Try with no extension
     this_ext = ut.getFileExtension("%s" % partial_filename)
     self.assertIsNone(this_ext)
 
   def testStripFileExtension(self):
+    if IGNORE_TEST:
+      return
     extensions = ['x', 'xy', 'xyz']
     partial_filename = '/u/dummy/xx'
     for ext in extensions:
-      this_partial = ut.stripFileExtension("%s.%s" % (partial_filename, ext))
+      this_partial = ut.stripFileExtension("%s.%s" % 
+          (partial_filename, ext))
       self.assertEqual(this_partial, partial_filename)
 
   def testStripFileExtensionSingleFile(self):
+    if IGNORE_TEST:
+      return
     extensions = ['x', 'xy', 'xyz']
     partial_filename = 'dummy'
     for ext in extensions:
@@ -67,6 +89,8 @@ class TestFunctions(unittest.TestCase):
       self.assertEqual(this_partial, partial_filename)
 
   def testChangeFileExtension(self):
+    if IGNORE_TEST:
+      return
 
     def createFilepath(ext):
       partial_filename = '/x/y/dummy'
@@ -85,6 +109,8 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(path, to_path)
 
   def testAddPath(self):
+    if IGNORE_TEST:
+      return
     repo_name = "common_python"
     def test(sub_dirs, checker_name):
       cur_path = list(sys.path)
@@ -96,6 +122,8 @@ class TestFunctions(unittest.TestCase):
     test([repo_name, 'classifier'], 'classifier')
 
   def testInterpolateTime(self):
+    if IGNORE_TEST:
+      return
     MAX = 10
     SER = pd.Series(range(MAX), index=range(MAX))
     self.assertEqual(ut.interpolateTime(SER, 0.4), 0.4)
@@ -103,6 +131,8 @@ class TestFunctions(unittest.TestCase):
     self.assertEqual(ut.interpolateTime(SER, MAX), MAX-1)
 
   def testMakeTimeInterpolationedMatrix(self):
+    if IGNORE_TEST:
+      return
     MAX = 5
     COLUMNS = ['a', 'b']
     FACTORS = [5, 10]
@@ -111,10 +141,23 @@ class TestFunctions(unittest.TestCase):
       df[COLUMNS[n]] = FACTORS[n]*df['time']
     df = df.set_index('time')
     #
-    matrix = ut.makeTimeInterpolatedMatrix(df, num_interpolation=4)
+    matrix = ut.makeTimeInterpolatedMatrix(df, 
+        num_interpolation=4)
     for idx in range(len(COLUMNS)):
-      trues = [a[idx+1] == FACTORS[idx]*a[0] for a in matrix]
+      trues = [a[idx+1] == FACTORS[idx]*a[0]
+          for a in matrix]
       self.assertTrue(all(trues))
+
+  def testPruneSmallValues(self):
+    if IGNORE_TEST:
+      return
+    data = np.repeat(2, 5)
+    df = pd.DataFrame({'a': data, 'b': data})
+    df_new = ut.pruneSmallValues(df)
+    self.assertTrue(df.equals(df_new))
+    #
+    df_new = ut.pruneSmallValues(df, min_value = 3)
+    self.assertEqual(len(df_new), 0)
 
 
 if __name__ == '__main__':

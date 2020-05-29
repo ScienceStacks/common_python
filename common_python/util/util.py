@@ -228,21 +228,21 @@ def makeTimeInterpolatedMatrix(df, num_interpolation=10):
     time_last = time
   return np.array(matrix)
 
-def pruneZeroes(df):
+def pruneSmallValues(df, min_value=0):
   """
-  Remove columns and rows that are all zero.
+  Remove columns and rows in which values are too small.
   :param pd.DataFrame:
   :return pd.DataFrame:
   """
   df_prune_col = pd.DataFrame()
   for col in df.columns:
-      if sum([abs(v) for v in df[col]]) > 0:
-          df_prune_col[col] = df[col]
+      if max([v  for v in df[col]]) >= min_value:
+        df_prune_col[col] = df[col]
   df_prune_col = pd.DataFrame(df_prune_col)
   idxs = []
   for idx in df_prune_col.index:
-      sum_of_values = sum([abs(v)
-          for v in df_prune_col.loc[idx, :]])
-      if np.isclose(sum_of_values,  0):
-          idxs.append(idx)
+    sum_of_values = sum([abs(v)
+      for v in df_prune_col.loc[idx, :]])
+    if np.isclose(sum_of_values,  0):
+      idxs.append(idx)
   return df_prune_col.drop(index=idxs)
