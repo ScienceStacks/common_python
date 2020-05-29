@@ -236,7 +236,7 @@ def pruneSmallValues(df, min_value=0):
   """
   df_prune_col = pd.DataFrame()
   for col in df.columns:
-      if max([v  for v in df[col]]) >= min_value:
+      if max([v  for v in df[col]]) > min_value:
         df_prune_col[col] = df[col]
   df_prune_col = pd.DataFrame(df_prune_col)
   idxs = []

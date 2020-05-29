@@ -13,7 +13,7 @@ from sklearn import svm
 import time
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_SCALE = False  # Do scale tests
 IS_REPORT = False
 IS_PLOT = False
@@ -69,6 +69,10 @@ class TestFeatureAnalyzer(unittest.TestCase):
         self.clf, self.df_X, self.ser_y,
         is_report=IS_REPORT,
         num_cross_iter=NUM_CROSS_ITER_ACCURATE)
+    self.analyzer_dct =  \
+        feature_analyzer.makeFeatureAnalyzers(
+        CLF, DF_X, SER_Y_ALL,
+        data_path_pat=TEST_DATA_PATH_PAT)
 
   def _remove(self):
     paths = list(TEST_DATA_PATH1_DCT.values())
@@ -215,12 +219,10 @@ class TestFeatureAnalyzer(unittest.TestCase):
     feature_analyzer.plotSFA(ANALYZERS, is_plot=IS_PLOT)
 
   def testMakeFeatureAnalyzers(self):
-    # TESTING
-    analyzer_dct = feature_analyzer.makeFeatureAnalyzers(
-        CLF, DF_X, SER_Y_ALL,
-        data_path_pat=TEST_DATA_PATH_PAT)
+    if IGNORE_TEST:
+      return
     classes = SER_Y_ALL.values
-    for cl, analyzer in analyzer_dct.items():
+    for cl, analyzer in self.analyzer_dct.items():
       self.assertTrue(cl in classes)
       self.assertTrue(isinstance(analyzer,
           feature_analyzer.FeatureAnalyzer))
@@ -228,6 +230,16 @@ class TestFeatureAnalyzer(unittest.TestCase):
       ser = analyzer._readSFA(
           path=analyzer._data_path_dct[
           feature_analyzer.SFA])
+
+  def testPlotCPC(self):
+    if IGNORE_TEST:
+      return
+    self.analyzer_dct[CLASS].plotCPC(is_plot=IS_PLOT)
+
+  def testPlotIPA(self):
+    if IGNORE_TEST:
+      return
+    self.analyzer_dct[CLASS].plotIPA(is_plot=IS_PLOT)
       
 
 if __name__ == '__main__':

@@ -20,12 +20,14 @@ IPA(F1, F2) = A(F1, F2) - max(A(F1), A(F2))
 
 import common_python.constants as cn
 from common_python.classifier import util_classifier
+from common_python.util import util
 
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+import seaborn
 from sklearn import svm
 
 
@@ -316,3 +318,26 @@ class FeatureAnalyzer(object):
       path = self._data_path_dct[IPA]
     df = pd.read_csv(self._data_path_dct[IPA])
     return df.set_index(FEATURE1)
+
+  def _plotHeatmap(self, metric, is_plot=True):
+    """
+    Heatmap plot.
+    """
+    df = util.pruneSmallValues(self.getMetric(metric))
+    if len(df) > 1:
+      cg = seaborn.clustermap(df, col_cluster=True,
+          row_cluster=True,
+          vmin=-1, vmax=1,
+          cbar_kws={"ticks":[-1, 0, 1]}, cmap="seismic")
+      plt.title(metric)
+      if is_plot:
+        plt.show()
+      return df
+    else:
+      return None
+
+  def plotCPC(self, **kwargs):
+    self._plotHeatmap(CPC, **kwargs)
+
+  def plotIPA(self, **kwargs):
+    self._plotHeatmap(IPA, **kwargs)
