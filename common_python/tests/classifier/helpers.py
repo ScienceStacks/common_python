@@ -5,8 +5,7 @@ from common.trinary_data import TrinaryData
 #from common.trinary_data import TrinaryData
 
 import os
-import pandas as pd
-import numpy as np
+
 
 
 DIR_PATH = os.path.abspath(os.path.dirname(__file__))
@@ -27,7 +26,7 @@ else:
   except:
     DATA = None
     DATA_LONG = None
-  
+
 def getData():
   """
   Provides classification data
@@ -36,7 +35,7 @@ def getData():
   df_X.columns = DATA.features
   ser_y = DATA.ser_y
   return df_X, ser_y
-  
+
 def getDataLong():
   """
   Provides classification data

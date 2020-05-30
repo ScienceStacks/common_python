@@ -24,11 +24,8 @@ from common_python.util import util
 
 import copy
 import matplotlib.pyplot as plt
-import numpy as np
-import os
 import pandas as pd
 import seaborn
-from sklearn import svm
 
 
 NUM_CROSS_ITER = 50  # Number of cross validations
@@ -40,7 +37,7 @@ IPA = "ipa"
 METRICS = [SFA, CPC, IPA]
 
 
-################## FUNCTIONS ##################### 
+################## FUNCTIONS #####################
 def makeFeatureAnalyzers(clf, df_X, ser_y,
       data_path_pat=None, **kwargs):
     """
@@ -101,7 +98,7 @@ def plotSFA(analyzers, num_feature=10, is_plot=True):
     plt.show()
 
 
-################## CLASSES ##################### 
+################## CLASSES #####################
 class FeatureAnalyzer(object):
 
   def __init__(self, clf, df_X, ser_y,
@@ -306,30 +303,36 @@ class FeatureAnalyzer(object):
     ser.name = None
     ser.index.name = None
     return ser.sort_values(ascending=False)
-    
+
   def _readCPC(self, path=None):
     if path is None:
       path = self._data_path_dct[CPC]
     df = pd.read_csv(self._data_path_dct[CPC])
     return df.set_index(FEATURE1)
-      
+
   def _readIPA(self, path=None):
     if path is None:
       path = self._data_path_dct[IPA]
     df = pd.read_csv(self._data_path_dct[IPA])
     return df.set_index(FEATURE1)
 
-  def _plotHeatmap(self, metric, is_plot=True):
+  def _plotHeatmap(self, metric, is_plot=True,
+                   title=None):
     """
     Heatmap plot.
+    :param str metric: metric to plot
+    :param bool is_plot: show plot
+    :param str title:
     """
+    if title is None:
+      title = metric
     df = util.pruneSmallValues(self.getMetric(metric))
     if len(df) > 1:
-      cg = seaborn.clustermap(df, col_cluster=True,
+      _ = seaborn.clustermap(df, col_cluster=True,
           row_cluster=True,
           vmin=-1, vmax=1,
           cbar_kws={"ticks":[-1, 0, 1]}, cmap="seismic")
-      plt.title(metric)
+      plt.title(title)
       if is_plot:
         plt.show()
       return df

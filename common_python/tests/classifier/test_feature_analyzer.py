@@ -2,7 +2,6 @@ import common_python.constants as cn
 from common_python.testing import helpers
 from common_python.classifier import feature_analyzer
 from common_python.tests.classifier import helpers as test_helpers
-from common_python.testing import helpers
 import common.constants as xcn
 
 import copy
@@ -35,20 +34,20 @@ NUM_FEATURE_SCALE = 100
 DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(xcn.DATA_DIR, "feature_analyzer")
 TEST_DATA_PATH_PAT = os.path.join(DATA_DIR,
-    "main_feature_analyzer_%s_%d.csv")
+                                  "main_feature_analyzer_%s_%d.csv")
 TEST_DATA_PATH_ALL_BASE = os.path.join(DATA_DIR,
-    "main_feature_analyzer_%s_%d.csv")
+                                       "main_feature_analyzer_%s_%d.csv")
 TEST_DATA_PATH_BASE = os.path.join(DIR,
-    "test_feature_analyzer_%s.csv")
+                                   "test_feature_analyzer_%s.csv")
 TEST_DATA_PATH_BASE1 = os.path.join(DIR,
-    "test_feature_analyzer1_%s.csv")
+                                    "test_feature_analyzer1_%s.csv")
 TEST_DATA_PATH_DCT = {m: TEST_DATA_PATH_BASE % m
-    for m in feature_analyzer.METRICS}
+                      for m in feature_analyzer.METRICS}
 TEST_DATA_PATH1_DCT = {m: TEST_DATA_PATH_BASE1 % m
-    for m in feature_analyzer.METRICS}
+                       for m in feature_analyzer.METRICS}
 ANALYZERS = []
 for state in STATES:
-  dct = {m: TEST_DATA_PATH_ALL_BASE  % (m, state) 
+  dct = {m: TEST_DATA_PATH_ALL_BASE  % (m, state)
       for m in feature_analyzer.METRICS}
   ser_y = pd.Series([
       cn.PCLASS if v == CLASS else cn.NCLASS
@@ -57,7 +56,7 @@ for state in STATES:
       CLF, DF_X, ser_y,
       data_path_dct=dct)
   ANALYZERS.append(analyzer)
-
+pass
 
 class TestFeatureAnalyzer(unittest.TestCase):
 
@@ -69,8 +68,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
         self.clf, self.df_X, self.ser_y,
         is_report=IS_REPORT,
         num_cross_iter=NUM_CROSS_ITER_ACCURATE)
-    self.analyzer_dct =  \
-        feature_analyzer.makeFeatureAnalyzers(
+    self.analyzer_dct = feature_analyzer.makeFeatureAnalyzers(
         CLF, DF_X, SER_Y_ALL,
         data_path_pat=TEST_DATA_PATH_PAT)
 
@@ -80,7 +78,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     for path in paths:
       if os.path.isfile(path):
         os.remove(path)
-  
+
   def setUp(self):
     if IGNORE_TEST:
       return
@@ -117,7 +115,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     analyzer = feature_analyzer.FeatureAnalyzer(
         self.clf, df_X, self.ser_y,
         num_cross_iter=NUM_CROSS_ITER)
-    ser = analyzer.ser_sfa
+    _ = analyzer.ser_sfa
     self._report("test_ser_sfa_scale", start)
 
   def _makeDFX(self, num_cols):
@@ -146,7 +144,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
         self.clf, df_X, self.ser_y,
         num_cross_iter=NUM_CROSS_ITER)
     start = time.time()
-    df = analyzer.df_cpc
+    _ = analyzer.df_cpc
     self._report("test_df_cpc_scale", start)
 
   def test_df_ipa(self):
@@ -155,7 +153,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     df = self.analyzer.df_ipa
     self.assertTrue(helpers.isValidDataFrame(df,
       [FEATURE1, FEATURE2]))
-    trues = [isinstance(v, float) for v in 
+    trues = [isinstance(v, float) for v in
         np.reshape(df.values, len(df)*len(df.columns))]
     self.assertTrue(all(trues))
 
@@ -170,7 +168,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
         self.clf, df_X, self.ser_y,
         num_cross_iter=NUM_CROSS_ITER)
     start = time.time()
-    df = analyzer.df_ipa
+    _ = analyzer.df_ipa
     self._report("test_df_ipa_scale", start)
 
   def testReportProgress(self):
@@ -227,7 +225,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
       self.assertTrue(isinstance(analyzer,
           feature_analyzer.FeatureAnalyzer))
       # Get an exception if invalid path
-      ser = analyzer._readSFA(
+      _ = analyzer._readSFA(
           path=analyzer._data_path_dct[
           feature_analyzer.SFA])
 
@@ -240,7 +238,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     if IGNORE_TEST:
       return
     self.analyzer_dct[CLASS].plotIPA(is_plot=IS_PLOT)
-      
+
 
 if __name__ == '__main__':
   unittest.main()

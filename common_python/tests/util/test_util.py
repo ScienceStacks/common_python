@@ -62,7 +62,7 @@ class TestFunctions(unittest.TestCase):
     extensions = ['x', 'xy', 'xyz']
     partial_filename = 'dummy'
     for ext in extensions:
-      this_ext = ut.getFileExtension("%s.%s" % 
+      this_ext = ut.getFileExtension("%s.%s" %
           (partial_filename, ext))
       self.assertEqual(this_ext, ext)
     # Try with no extension
@@ -75,7 +75,7 @@ class TestFunctions(unittest.TestCase):
     extensions = ['x', 'xy', 'xyz']
     partial_filename = '/u/dummy/xx'
     for ext in extensions:
-      this_partial = ut.stripFileExtension("%s.%s" % 
+      this_partial = ut.stripFileExtension("%s.%s" %
           (partial_filename, ext))
       self.assertEqual(this_partial, partial_filename)
 
@@ -141,7 +141,7 @@ class TestFunctions(unittest.TestCase):
       df[COLUMNS[n]] = FACTORS[n]*df['time']
     df = df.set_index('time')
     #
-    matrix = ut.makeTimeInterpolatedMatrix(df, 
+    matrix = ut.makeTimeInterpolatedMatrix(df,
         num_interpolation=4)
     for idx in range(len(COLUMNS)):
       trues = [a[idx+1] == FACTORS[idx]*a[0]
@@ -151,14 +151,20 @@ class TestFunctions(unittest.TestCase):
   def testPruneSmallValues(self):
     if IGNORE_TEST:
       return
-    data = np.repeat(2, 5)
-    df = pd.DataFrame({'a': data, 'b': data})
-    df_new = ut.pruneSmallValues(df)
-    self.assertTrue(df.equals(df_new))
-    #
-    df_new = ut.pruneSmallValues(df, min_value = 3)
-    self.assertEqual(len(df_new), 0)
-
+    if False:
+      data = np.repeat(2, 5)
+      df = pd.DataFrame({'a': data, 'b': data})
+      df_new = ut.pruneSmallValues(df)
+      self.assertTrue(df.equals(df_new))
+      #
+      df_new = ut.pruneSmallValues(df, min_value = 3)
+      self.assertEqual(len(df_new), 0)
+    # Test symmetric
+    data = {'a': [1, -2, -3], 'b': [-2, -2, -3], 'c': [1, -3, -3]}
+    df = pd.DataFrame(data, index=['a', 'b', 'c'])
+    df_not_symmetric = ut.pruneSmallValues(df)
+    df_symmetric = ut.pruneSmallValues(df, is_symmetric=True)
+    self.assertGreater(len(df_symmetric), len(df_not_symmetric))
 
 if __name__ == '__main__':
   unittest.main()

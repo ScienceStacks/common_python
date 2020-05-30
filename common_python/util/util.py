@@ -2,7 +2,6 @@
 
 import os
 import random
-import string
 import sys
 import pandas as pd
 import numpy as np
@@ -62,6 +61,7 @@ def stringToClass(cls_str):
   import_path = '.'.join(import_parse[:-1])
   import_statement = "from %s import %s" % (import_path, cls)
   exec(import_statement)
+  this_class = None
   assign_statement = "this_class = %s" % cls
   exec(assign_statement)
   return this_class
@@ -228,21 +228,30 @@ def makeTimeInterpolatedMatrix(df, num_interpolation=10):
     time_last = time
   return np.array(matrix)
 
-def pruneSmallValues(df, min_value=0):
+def pruneSmallValues(df, min_value=0, is_symmetric=False):
   """
   Remove columns and rows in which values are too small.
-  :param pd.DataFrame:
+  :param pd.DataFrame df:
+  :param bool is symmetric: only prune if row and column are
+      marked as deleted
   :return pd.DataFrame:
   """
-  df_prune_col = pd.DataFrame()
+  delete_columns = []
   for col in df.columns:
-      if max([v  for v in df[col]]) > min_value:
-        df_prune_col[col] = df[col]
-  df_prune_col = pd.DataFrame(df_prune_col)
-  idxs = []
-  for idx in df_prune_col.index:
-    sum_of_values = sum([abs(v)
-      for v in df_prune_col.loc[idx, :]])
-    if np.isclose(sum_of_values,  0):
-      idxs.append(idx)
-  return df_prune_col.drop(index=idxs)
+      if max(df[col]) <= min_value:
+        delete_columns.append(col)
+  delete_idxs = []
+  for idx in df.index:
+    if max(df.loc[idx, :]) <= min_value:
+      delete_idxs.append(idx)
+  if is_symmetric:
+    deletes = list(set(
+      delete_columns).intersection(delete_idxs))
+    delete_columns = deletes
+    delete_idxs = deletes
+  df_prune = df.copy()
+  df_prune = df_prune.drop(delete_columns, axis=1)
+  df_prune = df_prune.drop(delete_idxs, axis=0)
+  if len(df_prune.columns) == 0:
+    df_prune = pd.DataFrame()
+  return df_prune
