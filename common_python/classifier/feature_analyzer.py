@@ -317,19 +317,22 @@ class FeatureAnalyzer(object):
     return df.set_index(FEATURE1)
 
   def _plotHeatmap(self, metric, is_plot=True,
-                   title=None):
+                   title=None, **kwargs):
     """
     Heatmap plot.
     :param str metric: metric to plot
     :param bool is_plot: show plot
     :param str title:
+    :param dict kwargs: passed to pruneSmallValues
     """
     if title is None:
       title = metric
-    df = util.pruneSmallValues(self.getMetric(metric))
+    df = util.pruneSmallValues(self.getMetric(metric),
+                               **kwargs)
     if len(df) > 1:
       _ = seaborn.clustermap(df, col_cluster=True,
           row_cluster=True,
+          xticklabels=True, yticklabels=True,
           vmin=-1, vmax=1,
           cbar_kws={"ticks":[-1, 0, 1]}, cmap="seismic")
       plt.title(title)

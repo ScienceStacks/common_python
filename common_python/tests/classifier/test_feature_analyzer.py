@@ -233,6 +233,9 @@ class TestFeatureAnalyzer(unittest.TestCase):
     if IGNORE_TEST:
       return
     self.analyzer_dct[CLASS].plotCPC(is_plot=IS_PLOT)
+    prune_func = lambda v: v < 0.5
+    self.analyzer_dct[CLASS].plotCPC(is_plot=IS_PLOT,
+                                     prune_func=prune_func)
 
   def testPlotIPA(self):
     if IGNORE_TEST:

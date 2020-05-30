@@ -228,7 +228,8 @@ def makeTimeInterpolatedMatrix(df, num_interpolation=10):
     time_last = time
   return np.array(matrix)
 
-def pruneSmallValues(df, min_value=0, is_symmetric=False):
+def pruneSmallValues(df, min_value=0, is_symmetric=False,
+                     prune_func=None):
   """
   Remove columns and rows in which values are too small.
   :param pd.DataFrame df:
@@ -236,13 +237,17 @@ def pruneSmallValues(df, min_value=0, is_symmetric=False):
       marked as deleted
   :return pd.DataFrame:
   """
+  if prune_func is None:
+      prune_func = lambda v: v <= min_value
   delete_columns = []
   for col in df.columns:
-      if max(df[col]) <= min_value:
-        delete_columns.append(col)
+    is_prune = all([prune_func(v) for v in df[col]])
+    if is_prune:
+      delete_columns.append(col)
   delete_idxs = []
   for idx in df.index:
-    if max(df.loc[idx, :]) <= min_value:
+    is_prune = all([prune_func(v) for v in df.loc[idx, :]])
+    if is_prune:
       delete_idxs.append(idx)
   if is_symmetric:
     deletes = list(set(
