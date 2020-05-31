@@ -12,7 +12,7 @@ from sklearn import svm
 import time
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 IS_SCALE = False  # Do scale tests
 IS_REPORT = False
 IS_PLOT = False
@@ -71,6 +71,12 @@ class TestFeatureAnalyzer(unittest.TestCase):
     self.analyzer_dct = feature_analyzer.makeFeatureAnalyzers(
         CLF, DF_X, SER_Y_ALL,
         data_path_pat=TEST_DATA_PATH_PAT)
+    # Adjust for features used in TEST_DATA_PATH
+    for analyzer in self.analyzer_dct.values():
+      features = analyzer.df_cpc.columns.tolist()
+      features = list(set(features).intersection(analyzer._df_X.columns))
+      analyzer._df_X = analyzer._df_X[features]
+      analyzer._features = features
 
   def _remove(self):
     paths = list(TEST_DATA_PATH1_DCT.values())
@@ -117,6 +123,17 @@ class TestFeatureAnalyzer(unittest.TestCase):
         num_cross_iter=NUM_CROSS_ITER)
     _ = analyzer.ser_sfa
     self._report("test_ser_sfa_scale", start)
+
+  # FIXME:  (2) wrong count of results
+  def test_ser_fea_acc(self):
+    self._init()
+    analyzer = self.analyzer_dct[1]
+    ser = analyzer.ser_fea_acc
+    num_feature = len(analyzer._features)
+    expected = num_feature*(num_feature-1)/2 + num_feature
+    self.assertEqual(expected, len(ser))
+    trues = [(v <= 1) and (v >= 0) for v in ser]
+    self.assertTrue(all(trues))
 
   def _makeDFX(self, num_cols):
     features = list(DF_X.columns.tolist())
@@ -233,9 +250,9 @@ class TestFeatureAnalyzer(unittest.TestCase):
     if IGNORE_TEST:
       return
     self.analyzer_dct[CLASS].plotCPC(is_plot=IS_PLOT)
-    prune_func = lambda v: v < 0.5
+    criteria = lambda v: v < 0.5
     self.analyzer_dct[CLASS].plotCPC(is_plot=IS_PLOT,
-                                     prune_func=prune_func)
+                                     criteria=criteria)
 
   def testPlotIPA(self):
     if IGNORE_TEST:

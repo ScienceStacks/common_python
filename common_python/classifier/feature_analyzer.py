@@ -140,6 +140,8 @@ class FeatureAnalyzer(object):
     self._df_cpc = None
     # incremental prediction accuracy
     self._df_ipa = None
+    # Feature sets accuracies
+    self._ser_fea_acc = None
 
   def _reportProgress(self, metric, count, total):
     """
@@ -258,6 +260,36 @@ class FeatureAnalyzer(object):
             columns=FEATURE2, values=cn.SCORE)
     return self._df_ipa
 
+  @property
+  def ser_fea_acc(self):
+    """
+    Calculates the classification accuracy of feature sets
+    of size 1 and 2.
+    :return pd.Series: Sorted by descending accuracy
+        Index: feature set (feature separated by "+")
+        Value: Accuracy
+    """
+    if self._ser_fea_acc is None:
+      # Feature sets of size 1
+      ser1 = self.ser_sfa.copy()
+      # Feature sets of size two
+      feature_sets = []
+      accuracies = []
+      for idx, feature1 in enumerate(self._features):
+        for feature2 in self._features[(idx+1):]:
+          feature_sets.append(
+              self._makeFeatureSet(feature1, feature2))
+          accuracy = self.df_ipa.loc[feature1, feature2] +  \
+              max(self._ser_sfa.loc[feature1],
+                  self._ser_sfa.loc[feature2])
+          accuracies.append(accuracy)
+      ser2 = pd.Series(accuracies, index=feature_sets)
+      # Construct result
+      self._ser_fea_acc = pd.concat([ser1, ser2])
+      self._ser_fea_acc = self._ser_fea_acc.sort_values(
+          ascending=False)
+    return self._ser_fea_acc
+
   def getMetric(self, metric):
     if metric == SFA:
       return self.ser_sfa
@@ -327,14 +359,16 @@ class FeatureAnalyzer(object):
     """
     if title is None:
       title = metric
-    df = util.pruneValues(self.getMetric(metric),
+    df = util.trimDF(self.getMetric(metric),
                                **kwargs)
+    df.index.name = None
     if len(df) > 1:
       _ = seaborn.clustermap(df, col_cluster=True,
           row_cluster=True,
           xticklabels=True, yticklabels=True,
           vmin=-1, vmax=1,
-          cbar_kws={"ticks":[-1, 0, 1]}, cmap="seismic")
+          cbar_kws={"ticks":[-1, -0.5, 0, 0.5, 1]},
+          cmap="seismic")
       plt.title(title)
       if is_plot:
         plt.show()
@@ -342,8 +376,13 @@ class FeatureAnalyzer(object):
     else:
       return None
 
+  def _makeFeatureSet(self, feature1, feature2):
+    return "%s+%s" % (feature1, feature2)
+
   def plotCPC(self, **kwargs):
     self._plotHeatmap(CPC, **kwargs)
 
   def plotIPA(self, **kwargs):
     self._plotHeatmap(IPA, **kwargs)
+
+
