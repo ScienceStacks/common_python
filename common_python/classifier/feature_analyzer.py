@@ -323,11 +323,11 @@ class FeatureAnalyzer(object):
     :param str metric: metric to plot
     :param bool is_plot: show plot
     :param str title:
-    :param dict kwargs: passed to pruneSmallValues
+    :param dict kwargs: passed to pruneValues
     """
     if title is None:
       title = metric
-    df = util.pruneSmallValues(self.getMetric(metric),
+    df = util.pruneValues(self.getMetric(metric),
                                **kwargs)
     if len(df) > 1:
       _ = seaborn.clustermap(df, col_cluster=True,

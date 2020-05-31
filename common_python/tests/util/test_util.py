@@ -148,22 +148,25 @@ class TestFunctions(unittest.TestCase):
           for a in matrix]
       self.assertTrue(all(trues))
 
-  def testPruneSmallValues(self):
+  def testPruneValues(self):
     if IGNORE_TEST:
       return
-    if False:
-      data = np.repeat(2, 5)
-      df = pd.DataFrame({'a': data, 'b': data})
-      df_new = ut.pruneSmallValues(df)
-      self.assertTrue(df.equals(df_new))
-      #
-      df_new = ut.pruneSmallValues(df, min_value = 3)
-      self.assertEqual(len(df_new), 0)
+    data = np.repeat(2, 5)
+    df = pd.DataFrame({'a': data, 'b': data})
+    df_new = ut.pruneValues(df)
+    self.assertTrue(df.equals(df_new))
+    #
+    df_new = ut.pruneValues(df, min_value=3)
+    self.assertEqual(len(df_new), 0)
+    # Test prune_func
+    prune_func = lambda v: v < 3
+    df_newer = ut.pruneValues(df, prune_func=prune_func)
+    self.assertTrue(df_newer.equals(df_new))
     # Test symmetric
     data = {'a': [1, -2, -3], 'b': [-2, -2, -3], 'c': [1, -3, -3]}
     df = pd.DataFrame(data, index=['a', 'b', 'c'])
-    df_not_symmetric = ut.pruneSmallValues(df)
-    df_symmetric = ut.pruneSmallValues(df, is_symmetric=True)
+    df_not_symmetric = ut.pruneValues(df)
+    df_symmetric = ut.pruneValues(df, is_symmetric=True)
     self.assertGreater(len(df_symmetric), len(df_not_symmetric))
 
 if __name__ == '__main__':

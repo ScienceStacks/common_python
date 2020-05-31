@@ -228,13 +228,14 @@ def makeTimeInterpolatedMatrix(df, num_interpolation=10):
     time_last = time
   return np.array(matrix)
 
-def pruneSmallValues(df, min_value=0, is_symmetric=False,
+def pruneValues(df, min_value=0, is_symmetric=False,
                      prune_func=None):
   """
-  Remove columns and rows in which values are too small.
+  Remove columns and rows in which values satisfy a predicate.
+  The default predicate is that values are less than min_value.
   :param pd.DataFrame df:
-  :param bool is symmetric: only prune if row and column are
-      marked as deleted
+  :param bool is symmetric: only prune if same named row and
+      column satisfy the predicate
   :return pd.DataFrame:
   """
   if prune_func is None:
