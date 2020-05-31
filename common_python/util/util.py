@@ -228,26 +228,27 @@ def makeTimeInterpolatedMatrix(df, num_interpolation=10):
     time_last = time
   return np.array(matrix)
 
-def pruneValues(df, min_value=0, is_symmetric=False,
-                     prune_func=None):
+def trimDF(df, min_value=0, is_symmetric=False,
+                     criteria=None):
   """
   Remove columns and rows in which values satisfy a predicate.
   The default predicate is that values are less than min_value.
   :param pd.DataFrame df:
   :param bool is symmetric: only prune if same named row and
       column satisfy the predicate
+  :param Function criteria: trimming criteria for a value
   :return pd.DataFrame:
   """
-  if prune_func is None:
-      prune_func = lambda v: v <= min_value
+  if criteria is None:
+      criteria = lambda v: v <= min_value
   delete_columns = []
   for col in df.columns:
-    is_prune = all([prune_func(v) for v in df[col]])
+    is_prune = all([criteria(v) for v in df[col]])
     if is_prune:
       delete_columns.append(col)
   delete_idxs = []
   for idx in df.index:
-    is_prune = all([prune_func(v) for v in df.loc[idx, :]])
+    is_prune = all([criteria(v) for v in df.loc[idx, :]])
     if is_prune:
       delete_idxs.append(idx)
   if is_symmetric:
