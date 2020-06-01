@@ -1,6 +1,7 @@
 import common_python.constants as cn
 from common_python.testing import helpers
 from common_python.classifier import feature_analyzer
+from common_python.classifier.feature_analyzer import FeatureAnalyzer
 from common_python.tests.classifier import helpers as test_helpers
 import common.constants as xcn
 
@@ -9,6 +10,7 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn import svm
+import shutil
 import time
 import unittest
 
@@ -31,32 +33,14 @@ FEATURE2 = "Rv1460"
 FEATURES = [FEATURE1, FEATURE2]
 # Number of features used for scaling runs
 NUM_FEATURE_SCALE = 100
-DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(xcn.DATA_DIR, "feature_analyzer")
-TEST_DATA_PATH_PAT = os.path.join(DATA_DIR,
-                                  "main_feature_analyzer_%s_%d.csv")
-TEST_DATA_PATH_ALL_BASE = os.path.join(DATA_DIR,
-                                       "main_feature_analyzer_%s_%d.csv")
-TEST_DATA_PATH_BASE = os.path.join(DIR,
-                                   "test_feature_analyzer_%s.csv")
-TEST_DATA_PATH_BASE1 = os.path.join(DIR,
-                                    "test_feature_analyzer1_%s.csv")
-TEST_DATA_PATH_DCT = {m: TEST_DATA_PATH_BASE % m
-                      for m in feature_analyzer.METRICS}
-TEST_DATA_PATH1_DCT = {m: TEST_DATA_PATH_BASE1 % m
-                       for m in feature_analyzer.METRICS}
-ANALYZERS = []
-for state in STATES:
-  dct = {m: TEST_DATA_PATH_ALL_BASE  % (m, state)
-      for m in feature_analyzer.METRICS}
-  ser_y = pd.Series([
-      cn.PCLASS if v == CLASS else cn.NCLASS
-      for v in SER_Y_ALL], index=SER_Y_ALL.index)
-  analyzer = feature_analyzer.FeatureAnalyzer(
-      CLF, DF_X, ser_y,
-      data_path_dct=dct)
-  ANALYZERS.append(analyzer)
-pass
+# File paths for tests
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+TEST_DIR_PAT = os.path.join(TEST_DIR, "feature_analyzer_%d")
+TEST_SER_PATH = os.path.join(TEST_DIR, "ser.csv")
+# Pattern for the serialization directories
+SERIAL_PAT = os.path.join(xcn.DATA_DIR, "feature_analyzer")
+SERIAL_PAT = os.path.join(SERIAL_PAT, "%d")
+
 
 class TestFeatureAnalyzer(unittest.TestCase):
 
@@ -68,20 +52,19 @@ class TestFeatureAnalyzer(unittest.TestCase):
         self.clf, self.df_X, self.ser_y,
         is_report=IS_REPORT,
         num_cross_iter=NUM_CROSS_ITER_ACCURATE)
-    self.analyzer_dct = feature_analyzer.makeFeatureAnalyzers(
-        CLF, DF_X, SER_Y_ALL,
-        data_path_pat=TEST_DATA_PATH_PAT)
-    # Adjust for features used in TEST_DATA_PATH
-    for analyzer in self.analyzer_dct.values():
-      features = analyzer.df_cpc.columns.tolist()
-      features = list(set(features).intersection(analyzer._df_X.columns))
-      analyzer._df_X = analyzer._df_X[features]
-      analyzer._features = features
+    if False:
+      self.analyzer_dct = {s:
+          feature_analyzer.FeatureAnalyzer.deserialize(SERIAL_PAT % s)
+          for s in STATES}
 
   def _remove(self):
-    paths = list(TEST_DATA_PATH1_DCT.values())
-    paths.extend(list(TEST_DATA_PATH_DCT.values()))
+    paths = [TEST_SER_PATH]
+    for state in STATES:
+      path = TEST_DIR_PAT % state
+      paths.append(path)
     for path in paths:
+      if os.path.isdir(path):
+        shutil.rmtree(path)
       if os.path.isfile(path):
         os.remove(path)
 
@@ -125,10 +108,12 @@ class TestFeatureAnalyzer(unittest.TestCase):
     self._report("test_ser_sfa_scale", start)
 
   # FIXME:  (2) wrong count of results
-  def test_ser_fea_acc(self):
+  def test_fset_fea_acc(self):
+    if IGNORE_TEST:
+      return
     self._init()
     analyzer = self.analyzer_dct[1]
-    ser = analyzer.ser_fea_acc
+    ser = analyzer.fset_fea_acc
     num_feature = len(analyzer._features)
     expected = num_feature*(num_feature-1)/2 + num_feature
     self.assertEqual(expected, len(ser))
@@ -207,44 +192,11 @@ class TestFeatureAnalyzer(unittest.TestCase):
     analyzer._reportProgress(
        feature_analyzer.SFA, INTERVAL + 1, 10)
 
-  def testReadWriteMetrics(self):
-    if IGNORE_TEST:
-      return
-    self.analyzer.writeMetrics(TEST_DATA_PATH1_DCT)
-    self.analyzer._data_path_dct = TEST_DATA_PATH1_DCT
-    for metric in feature_analyzer.METRICS:
-      df = self.analyzer.getMetric(metric)
-      dff = self.analyzer.readMetric(metric)
-      dff.index.name = None
-      dff.name = None
-      dff = self.analyzer.readMetric(metric)
-      if isinstance(df, pd.Series):
-        trues = [dff.loc[i] == df.loc[i]
-            for i in dff.index]
-        self.assertTrue(all(trues))
-      else:
-        for idx, row in df.iterrows():
-          for col in df.columns:
-            self.assertTrue(np.isclose(df.loc[idx, col],
-                dff.loc[idx, col]))
-
   def testPlotSFA(self):
     if IGNORE_TEST:
       return
-    feature_analyzer.plotSFA(ANALYZERS, is_plot=IS_PLOT)
-
-  def testMakeFeatureAnalyzers(self):
-    if IGNORE_TEST:
-      return
-    classes = SER_Y_ALL.values
-    for cl, analyzer in self.analyzer_dct.items():
-      self.assertTrue(cl in classes)
-      self.assertTrue(isinstance(analyzer,
-          feature_analyzer.FeatureAnalyzer))
-      # Get an exception if invalid path
-      _ = analyzer._readSFA(
-          path=analyzer._data_path_dct[
-          feature_analyzer.SFA])
+    feature_analyzer.plotSFA(self.analyzer_dct.values(),
+                             is_plot=IS_PLOT)
 
   def testPlotCPC(self):
     if IGNORE_TEST:
@@ -258,6 +210,29 @@ class TestFeatureAnalyzer(unittest.TestCase):
     if IGNORE_TEST:
       return
     self.analyzer_dct[CLASS].plotIPA(is_plot=IS_PLOT)
+
+  def testGetPath(self):
+    path = FeatureAnalyzer._getPath(TEST_DIR_PAT % CLASS,
+                                    feature_analyzer.CPC)
+    os.mkdir(path)
+    self.assertTrue(os.path.isdir(path))
+    os.rmdir(path)
+
+  def testMakeSer(self):
+    if IGNORE_TEST:
+      return
+    index = ['a', 'b', 'c']
+    ser = pd.Series(range(len(index)), index=index)
+    ser.to_csv(TEST_SER_PATH)
+    df = pd.read_csv(TEST_SER_PATH)
+    ser_new = FeatureAnalyzer._makeSer(df, is_sort=False)
+    self.assertTrue(ser.equals(ser_new))
+
+  def testSerialize(self):
+    self._init()
+    self.analyzer.serialize(TEST_DIR_PAT % CLASS)
+    # TODO: add tests
+
 
 
 if __name__ == '__main__':

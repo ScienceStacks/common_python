@@ -21,9 +21,11 @@ IPA(F1, F2) = A(F1, F2) - max(A(F1), A(F2))
 import common_python.constants as cn
 from common_python.classifier import util_classifier
 from common_python.util import util
+from common_python.util.persister import Persister
 
 import copy
 import matplotlib.pyplot as plt
+import os
 import pandas as pd
 import seaborn
 
@@ -34,39 +36,16 @@ FEATURE2 = "feature2"
 SFA = "sfa"
 CPC = "cpc"
 IPA = "ipa"
-METRICS = [SFA, CPC, IPA]
+FSET = "fset"
+DF_X = "df_x"
+SER_Y = "ser_y"
+METRICS = [SFA, CPC, IPA, FSET]
+VARIABLES = list(METRICS)
+VARIABLES.extend([DF_X, SER_Y])
+MISC = "misc"
 
 
 ################## FUNCTIONS #####################
-def makeFeatureAnalyzers(clf, df_X, ser_y,
-      data_path_pat=None, **kwargs):
-    """
-    Creates a FeaturAnalyzer for each class.
-    :param Classifier clf: binary classifier
-    :param pd.DataFrame df_X:
-        columns: features
-        rows: instances
-    :param pd.Series ser_y:
-        values: plurality of class values
-        rows: instancea
-    :param Pattern data_path_pat: string pattern
-        arguments are metric, class
-    :parm dict kwargs: Optional arguments for constructor
-    :return dict:
-         key: class
-         value: FeatureAnalyzer
-    """
-    classes = list(ser_y.unique())
-    analyzer_dct = {}
-    for cl in classes:
-      dct = {m: data_path_pat % (m, cl)
-          for m in METRICS}
-      ser_binary = ser_y.apply(lambda v:
-          cn.PCLASS if v==cl else cn.NCLASS)
-      analyzer_dct[cl] = FeatureAnalyzer(clf, df_X,
-          ser_binary, data_path_dct=dct, **kwargs)
-    return analyzer_dct
-
 def plotSFA(analyzers, num_feature=10, is_plot=True):
   """
   Plots SFA for all classes.
@@ -103,8 +82,7 @@ class FeatureAnalyzer(object):
 
   def __init__(self, clf, df_X, ser_y,
       num_cross_iter=NUM_CROSS_ITER, is_report=True,
-      report_interval=None,
-      data_path_dct=None):
+      report_interval=None):
     """
     :param Classifier clf: binary classifier
     :param pd.DataFrame df_X:
@@ -125,13 +103,11 @@ class FeatureAnalyzer(object):
     self._ser_y = ser_y
     self._is_report = is_report
     self._features = df_X.columns.tolist()
+    self._num_cross_iter = num_cross_iter
     self._partitions = [
         util_classifier.partitionByState(self._ser_y)
-        for _ in range(num_cross_iter)]
+        for _ in range(self._num_cross_iter)]
     self._report_interval = report_interval
-    if data_path_dct is None:
-       data_path_dct = {}
-    self._data_path_dct = data_path_dct
     # Number procesed since last report
     self._num_processed = 0
     # Single feature accuracy
@@ -141,7 +117,7 @@ class FeatureAnalyzer(object):
     # incremental prediction accuracy
     self._df_ipa = None
     # Feature sets accuracies
-    self._ser_fea_acc = None
+    self._ser_fset = None
 
   def _reportProgress(self, metric, count, total):
     """
@@ -162,6 +138,7 @@ class FeatureAnalyzer(object):
       else:
         pass
 
+  ### METRICS ###
   @property
   def ser_sfa(self):
     """
@@ -170,21 +147,18 @@ class FeatureAnalyzer(object):
       value: accuracy in [0, 1]
     """
     if self._ser_sfa is None:
-      if SFA in self._data_path_dct:
-        self._ser_sfa = self._readSFA()
-      else:
-        total = len(self._features)
-        self._num_processed = 0
-        scores = []
-        for feature in self._features:
-          df_X = pd.DataFrame(self._df_X[feature])
-          score = util_classifier.binaryCrossValidate(
-              self._clf, df_X, self._ser_y,
-              partitions=self._partitions)
-          scores.append(score)
-          self._reportProgress(SFA, len(scores), total)
-        self._ser_sfa = pd.Series(
-            scores, index=self._features)
+      total = len(self._features)
+      self._num_processed = 0
+      scores = []
+      for feature in self._features:
+        df_X = pd.DataFrame(self._df_X[feature])
+        score = util_classifier.binaryCrossValidate(
+            self._clf, df_X, self._ser_y,
+            partitions=self._partitions)
+        scores.append(score)
+        self._reportProgress(SFA, len(scores), total)
+      self._ser_sfa = pd.Series(
+          scores, index=self._features)
     return self._ser_sfa
 
   @property
@@ -196,30 +170,27 @@ class FeatureAnalyzer(object):
         scores: correlation
     """
     if self._df_cpc is None:
-      if CPC in self._data_path_dct.keys():
-        self._df_cpc = self._readCPC()
-      else:
-        total = (len(self._features))**2
-        dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
-        for feature1 in self._features:
-          for feature2 in self._features:
-            clf_desc1 =  \
-                util_classifier.ClassifierDescription(
-                clf=self._clf, features=[feature1])
-            clf_desc2 =  \
-                util_classifier.ClassifierDescription(
-                clf=self._clf, features=[feature2])
-            score = util_classifier.correlatePredictions(
-                clf_desc1, clf_desc2, self._df_X,
-                self._ser_y, self._partitions)
-            dct[FEATURE1].append(feature1)
-            dct[FEATURE2].append(feature2)
-            dct[cn.SCORE].append(score)
-            self._reportProgress(CPC,
-                len(dct[FEATURE1]), total)
-        df = pd.DataFrame(dct)
-        self._df_cpc = df.pivot(index=FEATURE1,
-            columns=FEATURE2, values=cn.SCORE)
+      total = (len(self._features))**2
+      dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
+      for feature1 in self._features:
+        for feature2 in self._features:
+          clf_desc1 =  \
+              util_classifier.ClassifierDescription(
+              clf=self._clf, features=[feature1])
+          clf_desc2 =  \
+              util_classifier.ClassifierDescription(
+              clf=self._clf, features=[feature2])
+          score = util_classifier.correlatePredictions(
+              clf_desc1, clf_desc2, self._df_X,
+              self._ser_y, self._partitions)
+          dct[FEATURE1].append(feature1)
+          dct[FEATURE2].append(feature2)
+          dct[cn.SCORE].append(score)
+          self._reportProgress(CPC,
+              len(dct[FEATURE1]), total)
+      df = pd.DataFrame(dct)
+      self._df_cpc = df.pivot(index=FEATURE1,
+          columns=FEATURE2, values=cn.SCORE)
     return self._df_cpc
 
   @property
@@ -237,31 +208,28 @@ class FeatureAnalyzer(object):
           partitions=self._partitions)
     #
     if self._df_ipa is None:
-      if IPA in self._data_path_dct:
-        self._df_ipa = self._readIPA()
-      else:
-        total = (len(self._features))**2
-        dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
-        for feature1 in self._features:
-          for feature2 in self._features:
-            score1 = predict([feature1])
-            score2 = predict([feature2])
-            score3 = predict([feature1, feature2])
-            score = score3 - max(score1, score2)
-            dct[FEATURE1].append(feature1)
-            dct[FEATURE2].append(feature2)
-            dct[cn.SCORE].append(score)
-            self._reportProgress(CPC,
-                len(dct[FEATURE1]), total)
-            self._reportProgress(IPA,
-                len(dct[FEATURE1]), total)
-        df = pd.DataFrame(dct)
-        self._df_ipa = df.pivot(index=FEATURE1,
-            columns=FEATURE2, values=cn.SCORE)
+      total = (len(self._features))**2
+      dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
+      for feature1 in self._features:
+        for feature2 in self._features:
+          score1 = predict([feature1])
+          score2 = predict([feature2])
+          score3 = predict([feature1, feature2])
+          score = score3 - max(score1, score2)
+          dct[FEATURE1].append(feature1)
+          dct[FEATURE2].append(feature2)
+          dct[cn.SCORE].append(score)
+          self._reportProgress(CPC,
+              len(dct[FEATURE1]), total)
+          self._reportProgress(IPA,
+              len(dct[FEATURE1]), total)
+      df = pd.DataFrame(dct)
+      self._df_ipa = df.pivot(index=FEATURE1,
+          columns=FEATURE2, values=cn.SCORE)
     return self._df_ipa
 
   @property
-  def ser_fea_acc(self):
+  def ser_fset(self):
     """
     Calculates the classification accuracy of feature sets
     of size 1 and 2.
@@ -269,26 +237,30 @@ class FeatureAnalyzer(object):
         Index: feature set (feature separated by "+")
         Value: Accuracy
     """
-    if self._ser_fea_acc is None:
+    if self._ser_fset is None:
       # Feature sets of size 1
       ser1 = self.ser_sfa.copy()
       # Feature sets of size two
       feature_sets = []
       accuracies = []
+      count = len(ser1)
       for idx, feature1 in enumerate(self._features):
         for feature2 in self._features[(idx+1):]:
+          count += 1
+          if count > 4656:
+            import ipdb; ipdb.set_trace()
           feature_sets.append(
-              self._makeFeatureSet(feature1, feature2))
+              self._makeSetLabel(feature1, feature2))
           accuracy = self.df_ipa.loc[feature1, feature2] +  \
               max(self._ser_sfa.loc[feature1],
                   self._ser_sfa.loc[feature2])
           accuracies.append(accuracy)
       ser2 = pd.Series(accuracies, index=feature_sets)
       # Construct result
-      self._ser_fea_acc = pd.concat([ser1, ser2])
-      self._ser_fea_acc = self._ser_fea_acc.sort_values(
+      self._ser_fset = pd.concat([ser1, ser2])
+      self._ser_fset = self._ser_fset.sort_values(
           ascending=False)
-    return self._ser_fea_acc
+    return self._ser_fset
 
   def getMetric(self, metric):
     if metric == SFA:
@@ -297,56 +269,12 @@ class FeatureAnalyzer(object):
       return self.df_cpc
     elif metric == IPA:
       return self.df_ipa
+    elif metric == FSET:
+      return self.ser_fset
     else:
       raise ValueError("Invalid metric: %s" % metric)
 
-  def readMetric(self, metric, path=None):
-    if metric == SFA:
-      return self._readSFA(path=path)
-    elif metric == CPC:
-      return self._readCPC(path=path)
-    elif metric == IPA:
-      return self._readIPA(path=path)
-    else:
-      raise ValueError("Invalid metric: %s" % metric)
-
-  def writeMetrics(self, data_path_dct):
-    """
-    Writes SFA, CPC, IPA to the path indicated.
-    :param dict data_path_dct:
-      key: in METRICS
-      value: str (path)
-    """
-    data_value_dct = {
-        SFA: self.ser_sfa,
-        CPC: self.df_cpc,
-        IPA: self.df_ipa,
-        }
-    for key in METRICS:
-      data_value_dct[key].to_csv(data_path_dct[key])
-
-  def _readSFA(self, path=None):
-    if path is None:
-      path = self._data_path_dct[SFA]
-    df = pd.read_csv(path)
-    columns = df.columns.tolist()
-    ser = df[columns[1]]
-    ser.index = df[columns[0]]
-    ser.name = None
-    ser.index.name = None
-    return ser.sort_values(ascending=False)
-
-  def _readCPC(self, path=None):
-    if path is None:
-      path = self._data_path_dct[CPC]
-    df = pd.read_csv(self._data_path_dct[CPC])
-    return df.set_index(FEATURE1)
-
-  def _readIPA(self, path=None):
-    if path is None:
-      path = self._data_path_dct[IPA]
-    df = pd.read_csv(self._data_path_dct[IPA])
-    return df.set_index(FEATURE1)
+  ### PLOTS ###
 
   def _plotHeatmap(self, metric, is_plot=True,
                    title=None, **kwargs):
@@ -376,7 +304,7 @@ class FeatureAnalyzer(object):
     else:
       return None
 
-  def _makeFeatureSet(self, feature1, feature2):
+  def _makeSetLabel(self, feature1, feature2):
     return "%s+%s" % (feature1, feature2)
 
   def plotCPC(self, **kwargs):
@@ -384,5 +312,136 @@ class FeatureAnalyzer(object):
 
   def plotIPA(self, **kwargs):
     self._plotHeatmap(IPA, **kwargs)
+
+  #### SERIALIZE and DESERAIALIZE ###
+
+  @classmethod
+  def _getPath(cls, dir_path, name, ext="csv"):
+    """
+    Constructs a path for the variable name.
+    Creates directory path if it does not exist.
+    Parameters
+    ----------
+    cls : Type
+    dir_path: str
+      directory path
+    name : str
+      Variable name.
+    ext: str
+      File extension
+
+    Returns
+    -------
+    str. File path
+
+    """
+    if not os.path.isdir(dir_path):
+      os.mkdir(dir_path)
+    path = os.path.join(dir_path,
+                        "%s.%s" % (name, ext))
+    return path
+
+  @staticmethod
+  def _makeSer(df, is_sort=True):
+    """
+    Converts a DataFrame representation of a Series
+    into a Series.
+    :return pd.Series:
+    """
+    columns = df.columns.tolist()
+    ser = df[columns[1]]
+    ser.index = df[columns[0]]
+    ser.name = None
+    ser.index.name = None
+    if is_sort:
+      ser = ser.sort_values(ascending=False)
+    return ser
+
+  @staticmethod
+  def _makeDF(df):
+    """
+    Common post-processing of dataframe deserialization of
+    metrics.
+    :param pd.DataFrame df:
+    """
+    return df.set_index(FEATURE1)
+
+  def serialize(self, dir_path):
+    """
+    Writes all state to a directory.
+    Parameters
+    ----------
+    dir_path : str
+      DESCRIPTION. Path to where data are written.
+
+    Returns
+    -------
+    None.
+
+    """
+    if not os.path.isdir(dir_path):
+      os.mkdir(dir_path)
+    values = [self.ser_sfa, self.df_cpc, self.df_ipa,
+              self.ser_fset, self._df_X, self._ser_y]
+    for idx, name in enumerate(VARIABLES):
+      path = FeatureAnalyzer._getPath(dir_path, name)
+      values[idx].to_csv(path)
+    # Serialize the classifier
+    path = FeatureAnalyzer._getPath(dir_path, MISC, ext=cn.PCL)
+    persister = Persister(path)
+    persister.set([self._clf, self._num_cross_iter,
+                    self._is_report, self._report_interval])
+
+  @classmethod
+  def deserialize(cls, dir_path):
+    """
+    Read data from directory.
+    Note must be maintained in correspondence with serialize,
+    especially for values written the MISC.
+
+    Parameters
+    ----------
+    dir_path : str
+      DESCRIPTION. Directory path
+
+    Returns
+    -------
+    FeatureAnalyzer
+
+    """
+    # Obtain non-metric values
+    path = FeatureAnalyzer._makePath(dir_path, MISC, ext=cn.PCL)
+    persister = Persister(path)
+    [clf, num_cross_iter, is_report, report_interval] =  \
+      persister.get()
+    path = FeatureAnalyzer._makePath(dir_path, DF_X)
+    df_X = pd.read_csv(path)
+    path = FeatureAnalyzer._makePath(dir_path, DF_X)
+    df = pd.read_csv(path)
+    ser_y = FeatureAnalyzer._makeSer(df, is_sort=False)
+    # Instantiate
+    analyzer = cls(clf, df_X, ser_y,
+                   num_cross_iter=num_cross_iter,
+                   is_report=is_report,
+                   report_interval=report_interval)
+    # Set values of metrics
+    for metric in METRICS:
+      path = FeatureAnalyzer._getPath(metric)
+      df = pd.read_csv(path)
+      if metric == SFA:
+        analyzer._ser_sfa = FeatureAnalyzer._makeSer(SFA)
+      elif metric == CPC:
+        analyzer._df_cpc = FeatureAnalyzer._makeDF(df)
+      elif metric == IPA:
+        analyzer._df_ipa = FeatureAnalyzer._makeDF(df)
+      elif metric == FSET:
+        analyzer._ser_fset = FeatureAnalyzer._makeSer(df)
+    #
+    return analyzer
+
+
+
+
+
 
 
