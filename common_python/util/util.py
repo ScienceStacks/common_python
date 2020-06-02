@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 
 LETTERS = 'abcdefghijklmnopqrstuvwxyz'
+UNNAMED = "Unnamed: 0"
 
 def ConvertType(v):
   # Converts to int, float, str as required
@@ -262,3 +263,20 @@ def trimDF(df, min_value=0, is_symmetric=False,
   if len(df_prune.columns) == 0:
     df_prune = pd.DataFrame()
   return df_prune
+
+def trimUnnamed(df):
+  """
+  Removes "Unnamed" column if it exists.
+
+  Parameters
+  ----------
+  df : pd.DataFrame
+
+  Returns
+  -------
+  pd.DataFrame
+  """
+  df_new = df.copy()
+  if UNNAMED in df_new.columns:
+    del df_new[UNNAMED]
+  return df_new

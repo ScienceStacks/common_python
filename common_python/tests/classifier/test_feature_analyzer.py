@@ -14,10 +14,10 @@ import shutil
 import time
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_SCALE = False  # Do scale tests
 IS_REPORT = False
-IS_PLOT = False
+IS_PLOT = True
 CLASS = 1
 DF_X, SER_Y_ALL = test_helpers.getDataLong()
 STATES = list(SER_Y_ALL.unique())
@@ -52,10 +52,9 @@ class TestFeatureAnalyzer(unittest.TestCase):
         self.clf, self.df_X, self.ser_y,
         is_report=IS_REPORT,
         num_cross_iter=NUM_CROSS_ITER_ACCURATE)
-    if False:
-      self.analyzer_dct = {s:
-          feature_analyzer.FeatureAnalyzer.deserialize(SERIAL_PAT % s)
-          for s in STATES}
+    self.analyzer_dct = {s:
+        feature_analyzer.FeatureAnalyzer.deserialize(SERIAL_PAT % s)
+        for s in STATES}
 
   def _remove(self):
     paths = [TEST_SER_PATH]
@@ -108,12 +107,12 @@ class TestFeatureAnalyzer(unittest.TestCase):
     self._report("test_ser_sfa_scale", start)
 
   # FIXME:  (2) wrong count of results
-  def test_fset_fea_acc(self):
+  def test_ser_fset(self):
     if IGNORE_TEST:
       return
     self._init()
     analyzer = self.analyzer_dct[1]
-    ser = analyzer.fset_fea_acc
+    ser = analyzer.ser_fset
     num_feature = len(analyzer._features)
     expected = num_feature*(num_feature-1)/2 + num_feature
     self.assertEqual(expected, len(ser))
@@ -195,7 +194,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
   def testPlotSFA(self):
     if IGNORE_TEST:
       return
-    feature_analyzer.plotSFA(self.analyzer_dct.values(),
+    feature_analyzer.plotSFA(list(self.analyzer_dct.values()),
                              is_plot=IS_PLOT)
 
   def testPlotCPC(self):
@@ -228,10 +227,23 @@ class TestFeatureAnalyzer(unittest.TestCase):
     ser_new = FeatureAnalyzer._makeSer(df, is_sort=False)
     self.assertTrue(ser.equals(ser_new))
 
-  def testSerialize(self):
+  def testSerializeAndDeserialize(self):
+    if IGNORE_TEST:
+      return
     self._init()
-    self.analyzer.serialize(TEST_DIR_PAT % CLASS)
-    # TODO: add tests
+    dir_path = TEST_DIR_PAT % CLASS
+    self.analyzer.serialize(dir_path)
+    for name in feature_analyzer.VARIABLES:
+      path = FeatureAnalyzer._getPath(dir_path, name)
+      self.assertTrue(os.path.isfile(path))
+    #
+    analyzer = feature_analyzer.FeatureAnalyzer.deserialize(
+      dir_path)
+    for metric in feature_analyzer.METRICS:
+      m_old = self.analyzer.getMetric(metric)
+      m_new = analyzer.getMetric(metric)
+      self.assertTrue(all(m_old.eq(m_new)))
+
 
 
 

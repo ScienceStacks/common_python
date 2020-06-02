@@ -25,6 +25,7 @@ from common_python.util.persister import Persister
 
 import copy
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 import pandas as pd
 import seaborn
@@ -40,8 +41,6 @@ FSET = "fset"
 DF_X = "df_x"
 SER_Y = "ser_y"
 METRICS = [SFA, CPC, IPA, FSET]
-VARIABLES = list(METRICS)
-VARIABLES.extend([DF_X, SER_Y])
 MISC = "misc"
 
 
@@ -243,17 +242,15 @@ class FeatureAnalyzer(object):
       # Feature sets of size two
       feature_sets = []
       accuracies = []
-      count = len(ser1)
       for idx, feature1 in enumerate(self._features):
         for feature2 in self._features[(idx+1):]:
-          count += 1
-          if count > 4656:
-            import ipdb; ipdb.set_trace()
-          feature_sets.append(
-              self._makeSetLabel(feature1, feature2))
-          accuracy = self.df_ipa.loc[feature1, feature2] +  \
-              max(self._ser_sfa.loc[feature1],
-                  self._ser_sfa.loc[feature2])
+          feature_sets.append(self._makeSetLabel(feature1, feature2))
+          try:
+            accuracy = self.df_ipa.loc[feature1, feature2] +  \
+                max(self.ser_sfa.loc[feature1],
+                    self.ser_sfa.loc[feature2])
+          except KeyError:
+            accuracy = np.nan  # Handle missing keys
           accuracies.append(accuracy)
       ser2 = pd.Series(accuracies, index=feature_sets)
       # Construct result
@@ -358,7 +355,7 @@ class FeatureAnalyzer(object):
     return ser
 
   @staticmethod
-  def _makeDF(df):
+  def _makeMatrix(df):
     """
     Common post-processing of dataframe deserialization of
     metrics.
@@ -383,7 +380,8 @@ class FeatureAnalyzer(object):
       os.mkdir(dir_path)
     values = [self.ser_sfa, self.df_cpc, self.df_ipa,
               self.ser_fset, self._df_X, self._ser_y]
-    for idx, name in enumerate(VARIABLES):
+    variables = [SFA, CPC, IPA, FSET, DF_X, SER_Y]
+    for idx, name in enumerate(variables):
       path = FeatureAnalyzer._getPath(dir_path, name)
       values[idx].to_csv(path)
     # Serialize the classifier
@@ -409,16 +407,19 @@ class FeatureAnalyzer(object):
     FeatureAnalyzer
 
     """
+    def readDF(name):
+      path = FeatureAnalyzer._getPath(dir_path, name)
+      df = pd.read_csv(path)
+      return df
+    #
     # Obtain non-metric values
-    path = FeatureAnalyzer._makePath(dir_path, MISC, ext=cn.PCL)
+    path = FeatureAnalyzer._getPath(dir_path, MISC, ext=cn.PCL)
     persister = Persister(path)
     [clf, num_cross_iter, is_report, report_interval] =  \
-      persister.get()
-    path = FeatureAnalyzer._makePath(dir_path, DF_X)
-    df_X = pd.read_csv(path)
-    path = FeatureAnalyzer._makePath(dir_path, DF_X)
-    df = pd.read_csv(path)
-    ser_y = FeatureAnalyzer._makeSer(df, is_sort=False)
+        persister.get()
+    df_X = util.trimUnnamed(readDF(DF_X))
+    ser_y = FeatureAnalyzer._makeSer(readDF(SER_Y),
+                                     is_sort=False)
     # Instantiate
     analyzer = cls(clf, df_X, ser_y,
                    num_cross_iter=num_cross_iter,
@@ -426,14 +427,25 @@ class FeatureAnalyzer(object):
                    report_interval=report_interval)
     # Set values of metrics
     for metric in METRICS:
-      path = FeatureAnalyzer._getPath(metric)
-      df = pd.read_csv(path)
+      path = FeatureAnalyzer._getPath(dir_path, metric)
+      try:
+        df = pd.read_csv(path)
+      except FileNotFoundError:
+        if metric == FSET:
+           _ = analyzer.ser_fset  # Calculate it
+           analyzer.ser_fset.to_csv(path)
+        else:
+          raise(FileNotFoundError(path))
+        continue
       if metric == SFA:
-        analyzer._ser_sfa = FeatureAnalyzer._makeSer(SFA)
+        analyzer._ser_sfa = FeatureAnalyzer._makeSer(df)
       elif metric == CPC:
-        analyzer._df_cpc = FeatureAnalyzer._makeDF(df)
+        try:
+          analyzer._df_cpc = FeatureAnalyzer._makeMatrix(df)
+        except:
+          pass
       elif metric == IPA:
-        analyzer._df_ipa = FeatureAnalyzer._makeDF(df)
+        analyzer._df_ipa = FeatureAnalyzer._makeMatrix(df)
       elif metric == FSET:
         analyzer._ser_fset = FeatureAnalyzer._makeSer(df)
     #

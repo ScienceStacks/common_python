@@ -169,5 +169,16 @@ class TestFunctions(unittest.TestCase):
     df_symmetric = ut.trimDF(df, is_symmetric=True)
     self.assertGreater(len(df_symmetric), len(df_not_symmetric))
 
+  def testTrimUnnamed(self):
+    if IGNORE_TEST:
+      return
+    df = pd.DataFrame({'a': range(10), 'b': range(10)})
+    df_new = ut.trimUnnamed(df)
+    self.assertTrue(df.equals(df_new))
+    df[ut.UNNAMED] = df['a']
+    dff = ut.trimUnnamed(df)
+    self.assertFalse(df_new.equals(df))
+    self.assertTrue(dff.equals(df_new))
+
 if __name__ == '__main__':
   unittest.main()
