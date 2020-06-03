@@ -16,6 +16,16 @@ classification accuracy by using two features in
 combination instead of the most accurate of a
 two feature classifier.
 IPA(F1, F2) = A(F1, F2) - max(A(F1), A(F2))
+
+This module can be run as a main program to recalculate
+statistics as follows:
+  1. The argument is the absolute path of a serialization
+  directory where previous data have been stored. The directory
+  must include: df_X.csv (feature vector), ser_y.csv (binary
+  class values), and misc.pcl (other constructor objects).
+  2. Delete all serialized metric objects that need to be
+  recalculated.
+  3. Run python feature_analyzer.py <absolute directory path>
 """
 
 import common_python.constants as cn
@@ -23,6 +33,7 @@ from common_python.classifier import util_classifier
 from common_python.util import util
 from common_python.util.persister import Persister
 
+import argparse
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,7 +52,10 @@ FSET = "fset"
 DF_X = "df_x"
 SER_Y = "ser_y"
 METRICS = [SFA, CPC, IPA, FSET]
+VARIABLES = [DF_X, SER_Y]
+VARIABLES.extend(list(METRICS))
 MISC = "misc"
+FEATURE_SEPARATOR = "+"
 
 
 ################## FUNCTIONS #####################
@@ -74,6 +88,47 @@ def plotSFA(analyzers, num_feature=10, is_plot=True):
     this_ax.yaxis.set_ticks_position('both')
   if is_plot:
     plt.show()
+
+def deserialize(dir_path_dct):
+  """
+  Creates an analyzer for each class.
+  Parameters
+  ----------
+  dir_path_dct : dict
+    key: class
+    value: Path to directory for class.
+
+  Returns
+  -------
+  dict. key: class; value: FeatureAnalyzer
+  """
+  return {c: FeatureAnalyzer.deserialize(
+    dir_path_dct[c]) for c in dir_path_dct.keys()}
+
+def reserialize(dir_path_dct, out_dir_path_dct=None):
+  """
+  Deserializes the FeatureAnalyzes, re-does the calculations,
+  and then serializes.
+
+  Parameters
+  ----------
+  dir_path_dct : dict
+    key: class
+    value: Path to read the inputs for deserialization
+  out_dir_path_dct : dict
+    key: class
+    value: Path to write the outputs for deserialization
+
+  Returns
+  -------
+  None.
+
+  """
+  if out_dir_path_dct is None:
+    out_dir_path_dct = dict(dir_path_dct)
+  analyzer_dct = deserialize(dir_path_dct)
+  for idx, analyzer in analyzer_dct.items():
+    analyzer.serialize(out_dir_path_dct[idx])
 
 
 ################## CLASSES #####################
@@ -302,7 +357,7 @@ class FeatureAnalyzer(object):
       return None
 
   def _makeSetLabel(self, feature1, feature2):
-    return "%s+%s" % (feature1, feature2)
+    return "%s%s%s" % (feature1, FEATURE_SEPARATOR, feature2)
 
   def plotCPC(self, **kwargs):
     self._plotHeatmap(CPC, **kwargs)
@@ -345,6 +400,8 @@ class FeatureAnalyzer(object):
     into a Series.
     :return pd.Series:
     """
+    if df is None:
+      return df
     columns = df.columns.tolist()
     ser = df[columns[1]]
     ser.index = df[columns[0]]
@@ -361,7 +418,10 @@ class FeatureAnalyzer(object):
     metrics.
     :param pd.DataFrame df:
     """
-    return df.set_index(FEATURE1)
+    if df is None:
+      return df
+    else:
+      return df.set_index(FEATURE1)
 
   def serialize(self, dir_path):
     """
@@ -431,12 +491,8 @@ class FeatureAnalyzer(object):
       try:
         df = pd.read_csv(path)
       except FileNotFoundError:
-        if metric == FSET:
-           _ = analyzer.ser_fset  # Calculate it
-           analyzer.ser_fset.to_csv(path)
-        else:
-          raise(FileNotFoundError(path))
-        continue
+        # Indicate not present
+        df = None
       if metric == SFA:
         analyzer._ser_sfa = FeatureAnalyzer._makeSer(df)
       elif metric == CPC:
@@ -450,6 +506,16 @@ class FeatureAnalyzer(object):
         analyzer._ser_fset = FeatureAnalyzer._makeSer(df)
     #
     return analyzer
+
+
+if __name__ == '__main__':
+  msg = "Run FeatureAnalyzer for for a directory path."
+  parser = argparse.ArgumentParser(description=msg)
+  parser.add_argument("path",
+      help="Absolute path to the serialization directory",
+      type=str)
+  args = parser.parse_args()
+  reserialize({1: args.path})
 
 
 

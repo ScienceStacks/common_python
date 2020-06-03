@@ -244,7 +244,14 @@ class TestFeatureAnalyzer(unittest.TestCase):
       m_new = analyzer.getMetric(metric)
       self.assertTrue(all(m_old.eq(m_new)))
 
-
+  def testmakeAnalyzers(self):
+    if IGNORE_TEST:
+      return
+    path_dct = {s: SERIAL_PAT % s for s in STATES}
+    dct = feature_analyzer.deserialize(path_dct)
+    for state in STATES:
+      self.assertTrue(isinstance(dct[state],
+                                 feature_analyzer.FeatureAnalyzer))
 
 
 if __name__ == '__main__':
