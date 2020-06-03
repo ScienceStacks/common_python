@@ -13,46 +13,95 @@ import os
 import pandas as pd
 import seaborn
 
+MIN_FRAC_INCR = 1.01  # Must increase by at least 1%
+MIN_SCORE = 0.95
+
 
 class FeatureSetAnalyzer(object):
 
-  def __init__(self, ser_fset):
+  def __init__(self, analyzer, is_disjoint=True):
     """
     Parameters
     ----------
-    ser_fset : pd.Series
-      Index (str): feature set indicated by a "+" separator.
-      Value (float): classification accuracy.
-      Sort: descending value
+    analyzer: FeatureAnalyzer
+    is_disjoint: bool
+        Make feature sets disjoint
     """
-    self._ser_fset = ser_fset
+    self.is_disjoint = is_disjoint
+    self._analyzer = analyzer
+    self.ser_fset = self._analyzer.ser_fset
+    if is_disjoint:
+      self.ser_fset = FeatureSetAnalyzer.disjointify(
+        self.ser_fset)
 
-  def _makeNonIntersectingSets(self, min_accuracy):
+  @staticmethod
+  def disjointify(ser_fset, min_score=MIN_SCORE):
     """
-    Prunes the feature sets so that they are non-intersecting.
+    Makes disjoint the feature sets disjoint by discarding
+    feature sets that have non-null intersection with a
+    more accurate feature set.
 
     Parameters
     ----------
-    min_accuracy: float
-      Minimum accuracy for a set to be included.
+    ser_fset: pd.Series
+    max_score : float
+        minimum classification score
 
     Returns
     -------
-    list-str.
-      List of string representation of sets
+    pd.Series
     """
-    ser = self._ser_fset[self._ser_fset >= min_accuracy]
-    features = []  # Features selected
-    indices = []  # Feature strings selected
-    for idx in ser.index:
-      this_features = feature_str.split(
-          feature_analyzer.FEATURE_SEPARATOR)
-      if len(set(this_features).intersection(features)) > 0:
+    ser = ser_fset[ser_fset >= min_score].copy()
+    selecteds = []  # Features selected
+    fset_stgs = []  # Feature strings selected
+    for fset_stg in ser.index:
+      fset =  feature_analyzer.unMakeFsetStr(fset_stg)
+      if len(fset.intersection(selecteds)) > 0:
         continue
       else:
-        features.extend(features)
-        indices.append(idx)
-    return indices
+        # Include this feature set
+        selecteds.extend(list(fset))
+        fset_stgs.append(fset_stg)
+    return ser[fset_stgs].copy()
 
+  def combine(self, min_score=MIN_SCORE):
+    """
+    Extends self.ser_fset by considering binary
+    combinations of existing feature sets.
+    To be considered, the combined fset
+    must have a larger accuracy than the maximum of
+    the accuracies of the individual fsets.
 
+    Parameters
+    ----------
+    max_size : int
+        maximum size of a feature set
+    max_score : float
+        minimum classification score
 
+    Returns
+    -------
+    pd.Series
+    """
+    # Initializations for search
+    fset_stgs = []
+    scores = []
+    ser_fset = self.ser_fset[self.ser_fset >= min_score]
+    fset_stgs = ser_fset.index.tolist()
+    # Consider each in combination
+    for fset_stg1 in fset_stgs:
+      fset1 = feature_analyzer.unMakeFsetStr(fset_stg1)
+      for fset_stg2 in fset_stgs[1:]:
+        thr_accuracy = max(ser_fset.loc[fset_stg1],
+            ser_fset.loc[fset_stg2])*MIN_FRAC_INCR
+        fset2 = feature_analyzer.unMakeFsetStr(fset_stg2)
+        new_fset = list(fset1.union(fset2))
+        score = self._analyzer.score(new_fset)
+        if score >= thr_accuracy:
+          scores.append(score)
+          fset_stgs.append(
+              feature_analyzer.makeFsetStr(new_fset))
+    #
+    ser = pd.Series(scores, index=fset_stgs)
+    ser.sort_values(ascending=False)
+    return ser

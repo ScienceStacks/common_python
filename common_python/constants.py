@@ -51,3 +51,5 @@ UPPER_CASE = [x for x in map(chr, range(65, 91))]
 # Values
 PCLASS = 1  # Positive class
 NCLASS = 0  # Negative class
+FEATURE_SEPARATOR = "+" # Separator in string with multiple features
+

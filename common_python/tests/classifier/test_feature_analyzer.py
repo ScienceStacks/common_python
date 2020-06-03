@@ -108,7 +108,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     self._init()
     analyzer = self.analyzer_dct[CLASS]
     ser = analyzer.ser_fset
-    num_feature = len(analyzer._features)
+    num_feature = len(analyzer.features)
     expected = num_feature*(num_feature-1)/2 + num_feature
     self.assertEqual(expected, len(ser))
     trues = [(v <= 1) and (v >= 0) for v in ser]

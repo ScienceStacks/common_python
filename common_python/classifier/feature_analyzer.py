@@ -55,10 +55,23 @@ METRICS = [SFA, CPC, IPA, FSET]
 VARIABLES = [DF_X, SER_Y]
 VARIABLES.extend(list(METRICS))
 MISC = "misc"
-FEATURE_SEPARATOR = "+"
 
 
 ################## FUNCTIONS #####################
+def makeFsetStr(features):
+  """
+  Creates a string for a feature set
+  :param iterable-str features:
+  :return str:
+  """
+  return cn.FEATURE_SEPARATOR.join(list(features))
+
+def unMakeFsetStr(fset_stg):
+  """
+  Recovers a feature set from a string
+  """
+  return set(fset_stg.split(cn.FEATURE_SEPARATOR))
+
 def plotSFA(analyzers, num_feature=10, is_plot=True):
   """
   Plots SFA for all classes.
@@ -156,7 +169,6 @@ class FeatureAnalyzer(object):
     self._df_X = df_X
     self._ser_y = ser_y
     self._is_report = is_report
-    self._features = df_X.columns.tolist()
     self._num_cross_iter = num_cross_iter
     self._partitions = [
         util_classifier.partitionByState(self._ser_y)
@@ -172,6 +184,8 @@ class FeatureAnalyzer(object):
     self._df_ipa = None
     # Feature sets accuracies
     self._ser_fset = None
+    ######### PUBLIC ################
+    self.features = df_X.columns.tolist()
 
   def _reportProgress(self, metric, count, total):
     """
@@ -201,10 +215,10 @@ class FeatureAnalyzer(object):
       value: accuracy in [0, 1]
     """
     if self._ser_sfa is None:
-      total = len(self._features)
+      total = len(self.features)
       self._num_processed = 0
       scores = []
-      for feature in self._features:
+      for feature in self.features:
         df_X = pd.DataFrame(self._df_X[feature])
         score = util_classifier.binaryCrossValidate(
             self._clf, df_X, self._ser_y,
@@ -212,7 +226,7 @@ class FeatureAnalyzer(object):
         scores.append(score)
         self._reportProgress(SFA, len(scores), total)
       self._ser_sfa = pd.Series(
-          scores, index=self._features)
+          scores, index=self.features)
     return self._ser_sfa
 
   @property
@@ -224,10 +238,10 @@ class FeatureAnalyzer(object):
         scores: correlation
     """
     if self._df_cpc is None:
-      total = (len(self._features))**2
+      total = (len(self.features))**2
       dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
-      for feature1 in self._features:
-        for feature2 in self._features:
+      for feature1 in self.features:
+        for feature2 in self.features:
           clf_desc1 =  \
               util_classifier.ClassifierDescription(
               clf=self._clf, features=[feature1])
@@ -247,6 +261,12 @@ class FeatureAnalyzer(object):
           columns=FEATURE2, values=cn.SCORE)
     return self._df_cpc
 
+  def score(self, features):
+      df_X = pd.DataFrame(self._df_X[features])
+      return util_classifier.binaryCrossValidate(
+          self._clf, df_X, self._ser_y,
+          partitions=self._partitions)
+
   @property
   def df_ipa(self):
     """
@@ -255,20 +275,15 @@ class FeatureAnalyzer(object):
         columns: features
         scores: incremental accuracy
     """
-    def predict(features):
-      df_X = pd.DataFrame(self._df_X[features])
-      return util_classifier.binaryCrossValidate(
-          self._clf, df_X, self._ser_y,
-          partitions=self._partitions)
     #
     if self._df_ipa is None:
-      total = (len(self._features))**2
+      total = (len(self.features))**2
       dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
-      for feature1 in self._features:
-        for feature2 in self._features:
-          score1 = predict([feature1])
-          score2 = predict([feature2])
-          score3 = predict([feature1, feature2])
+      for feature1 in self.features:
+        for feature2 in self.features:
+          score1 = self.score([feature1])
+          score2 = self.score([feature2])
+          score3 = self.score([feature1, feature2])
           score = score3 - max(score1, score2)
           dct[FEATURE1].append(feature1)
           dct[FEATURE2].append(feature2)
@@ -297,9 +312,10 @@ class FeatureAnalyzer(object):
       # Feature sets of size two
       feature_sets = []
       accuracies = []
-      for idx, feature1 in enumerate(self._features):
-        for feature2 in self._features[(idx+1):]:
-          feature_sets.append(self._makeSetLabel(feature1, feature2))
+      for idx, feature1 in enumerate(self.features):
+        for feature2 in self.features[(idx+1):]:
+          feature_sets.append(makeFsetStr(
+              [feature1, feature2]))
           try:
             accuracy = self.df_ipa.loc[feature1, feature2] +  \
                 max(self.ser_sfa.loc[feature1],
@@ -325,6 +341,7 @@ class FeatureAnalyzer(object):
       return self.ser_fset
     else:
       raise ValueError("Invalid metric: %s" % metric)
+
 
   ### PLOTS ###
 
@@ -355,9 +372,6 @@ class FeatureAnalyzer(object):
       return df
     else:
       return None
-
-  def _makeSetLabel(self, feature1, feature2):
-    return "%s%s%s" % (feature1, FEATURE_SEPARATOR, feature2)
 
   def plotCPC(self, **kwargs):
     self._plotHeatmap(CPC, **kwargs)
