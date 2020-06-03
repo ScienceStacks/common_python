@@ -3,7 +3,6 @@ from common_python.testing import helpers
 from common_python.classifier import feature_analyzer
 from common_python.classifier.feature_analyzer import FeatureAnalyzer
 from common_python.tests.classifier import helpers as test_helpers
-import common.constants as xcn
 
 import copy
 import os
@@ -17,10 +16,10 @@ import unittest
 IGNORE_TEST = False
 IS_SCALE = False  # Do scale tests
 IS_REPORT = False
-IS_PLOT = True
+IS_PLOT = False
 CLASS = 1
 DF_X, SER_Y_ALL = test_helpers.getDataLong()
-STATES = list(SER_Y_ALL.unique())
+CLASSES = list(SER_Y_ALL.unique())
 # Make binary classes (for CLASS)
 SER_Y = pd.Series([
     cn.PCLASS if v == CLASS else cn.NCLASS
@@ -35,12 +34,13 @@ FEATURES = [FEATURE1, FEATURE2]
 NUM_FEATURE_SCALE = 100
 # File paths for tests
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
-TEST_DIR_PAT = os.path.join(TEST_DIR, "feature_analyzer_%d")
+TMP_DIR_DCT = {CLASS:
+     os.path.join(TEST_DIR, "tmp_feature_analyzer_%d") % CLASS}
 TEST_SER_PATH = os.path.join(TEST_DIR, "ser.csv")
-# Pattern for the serialization directories
-SERIAL_PAT = os.path.join(xcn.DATA_DIR, "feature_analyzer")
-SERIAL_PAT = os.path.join(SERIAL_PAT, "%d")
-
+# Existing data
+TEST_DIR_PATH = os.path.join(TEST_DIR,
+                           "test_feature_analyzer_%d" % CLASS)
+TEST_DIR_PATH_DCT = {CLASS: TEST_DIR_PATH}
 
 class TestFeatureAnalyzer(unittest.TestCase):
 
@@ -52,15 +52,11 @@ class TestFeatureAnalyzer(unittest.TestCase):
         self.clf, self.df_X, self.ser_y,
         is_report=IS_REPORT,
         num_cross_iter=NUM_CROSS_ITER_ACCURATE)
-    self.analyzer_dct = {s:
-        feature_analyzer.FeatureAnalyzer.deserialize(SERIAL_PAT % s)
-        for s in STATES}
+    self.analyzer_dct = feature_analyzer.deserialize(TEST_DIR_PATH_DCT)
 
   def _remove(self):
     paths = [TEST_SER_PATH]
-    for state in STATES:
-      path = TEST_DIR_PAT % state
-      paths.append(path)
+    paths.extend(list(TMP_DIR_DCT.values()))
     for path in paths:
       if os.path.isdir(path):
         shutil.rmtree(path)
@@ -106,12 +102,11 @@ class TestFeatureAnalyzer(unittest.TestCase):
     _ = analyzer.ser_sfa
     self._report("test_ser_sfa_scale", start)
 
-  # FIXME:  (2) wrong count of results
   def test_ser_fset(self):
     if IGNORE_TEST:
       return
     self._init()
-    analyzer = self.analyzer_dct[1]
+    analyzer = self.analyzer_dct[CLASS]
     ser = analyzer.ser_fset
     num_feature = len(analyzer._features)
     expected = num_feature*(num_feature-1)/2 + num_feature
@@ -194,8 +189,9 @@ class TestFeatureAnalyzer(unittest.TestCase):
   def testPlotSFA(self):
     if IGNORE_TEST:
       return
-    feature_analyzer.plotSFA(list(self.analyzer_dct.values()),
-                             is_plot=IS_PLOT)
+    self._init()
+    analyzers = list(self.analyzer_dct.values()) * 6
+    feature_analyzer.plotSFA(analyzers, is_plot=IS_PLOT)
 
   def testPlotCPC(self):
     if IGNORE_TEST:
@@ -211,11 +207,10 @@ class TestFeatureAnalyzer(unittest.TestCase):
     self.analyzer_dct[CLASS].plotIPA(is_plot=IS_PLOT)
 
   def testGetPath(self):
-    path = FeatureAnalyzer._getPath(TEST_DIR_PAT % CLASS,
+    dir_path = TMP_DIR_DCT[CLASS]
+    path = FeatureAnalyzer._getPath(dir_path,
                                     feature_analyzer.CPC)
-    os.mkdir(path)
-    self.assertTrue(os.path.isdir(path))
-    os.rmdir(path)
+    self.assertTrue("csv" in path)
 
   def testMakeSer(self):
     if IGNORE_TEST:
@@ -230,8 +225,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
   def testSerializeAndDeserialize(self):
     if IGNORE_TEST:
       return
-    self._init()
-    dir_path = TEST_DIR_PAT % CLASS
+    dir_path = TMP_DIR_DCT[CLASS]
     self.analyzer.serialize(dir_path)
     for name in feature_analyzer.VARIABLES:
       path = FeatureAnalyzer._getPath(dir_path, name)
@@ -247,10 +241,9 @@ class TestFeatureAnalyzer(unittest.TestCase):
   def testmakeAnalyzers(self):
     if IGNORE_TEST:
       return
-    path_dct = {s: SERIAL_PAT % s for s in STATES}
-    dct = feature_analyzer.deserialize(path_dct)
-    for state in STATES:
-      self.assertTrue(isinstance(dct[state],
+    dct = feature_analyzer.deserialize(TEST_DIR_PATH_DCT)
+    for cl in dct.keys():
+      self.assertTrue(isinstance(dct[cl],
                                  feature_analyzer.FeatureAnalyzer))
 
 
