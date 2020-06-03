@@ -4,7 +4,6 @@ from common_python.classifier.classifier_collection  \
     import ClassifierCollection
 from common_python.testing import helpers
 import common_python.constants as cn
-from common.trinary_data import TrinaryData
 from common_python.tests.classifier import helpers as test_helpers
 
 import pandas as pd
@@ -22,7 +21,6 @@ DF = pd.DataFrame({
     'B': np.repeat(1, 2*SIZE),
     })
 SER = pd.Series(values)
-DATA = TrinaryData()
 EMPTY_LIST = []
 
 
