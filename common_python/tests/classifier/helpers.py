@@ -1,20 +1,20 @@
 """Helpers for classifier testing."""
 
 from common_python.util.persister import Persister
-from common.trinary_data import TrinaryData
-#from common.trinary_data import TrinaryData
 
 import os
 
 
 
 DIR_PATH = os.path.abspath(os.path.dirname(__file__))
+# The PCL was constructed from TrinaryData
 TEST_DATA_PATH = os.path.join(DIR_PATH,
     "test_classifier_data.pcl")
 PERSISTER = Persister(TEST_DATA_PATH)
 
 
 if not PERSISTER.isExist():
+  from common.trinary_data import TrinaryData
   DATA = TrinaryData()  # Will get an error if pcl not present
   DATA_LONG = TrinaryData(is_averaged=False,
       is_dropT1=False)
