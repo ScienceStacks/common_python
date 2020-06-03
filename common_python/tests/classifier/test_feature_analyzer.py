@@ -41,6 +41,8 @@ TEST_SER_PATH = os.path.join(TEST_DIR, "ser.csv")
 TEST_DIR_PATH = os.path.join(TEST_DIR,
                            "test_feature_analyzer_%d" % CLASS)
 TEST_DIR_PATH_DCT = {CLASS: TEST_DIR_PATH}
+ANALYZER = test_helpers.getFeatureAnalyzer()
+ANALYZER_DCT = {test_helpers.CLASS: ANALYZER}
 
 class TestFeatureAnalyzer(unittest.TestCase):
 
@@ -52,7 +54,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
         self.clf, self.df_X, self.ser_y,
         is_report=IS_REPORT,
         num_cross_iter=NUM_CROSS_ITER_ACCURATE)
-    self.analyzer_dct = feature_analyzer.deserialize(TEST_DIR_PATH_DCT)
+    self.analyzer_dct = ANALYZER_DCT
 
   def _remove(self):
     paths = [TEST_SER_PATH]

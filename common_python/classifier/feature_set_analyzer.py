@@ -14,7 +14,7 @@ import pandas as pd
 import seaborn
 
 MIN_FRAC_INCR = 1.01  # Must increase by at least 1%
-MIN_SCORE = 0.95
+MIN_SCORE = 0.9
 
 
 class FeatureSetAnalyzer(object):
@@ -51,7 +51,8 @@ class FeatureSetAnalyzer(object):
     -------
     pd.Series
     """
-    ser = ser_fset[ser_fset >= min_score].copy()
+    ser = ser_fset[ser_fset >= min_score]
+    ser = ser.copy()
     selecteds = []  # Features selected
     fset_stgs = []  # Feature strings selected
     for fset_stg in ser.index:

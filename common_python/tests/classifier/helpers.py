@@ -1,6 +1,7 @@
 """Helpers for classifier testing."""
 
 from common_python.util.persister import Persister
+from common_python.classifier import feature_analyzer
 
 import os
 
@@ -11,6 +12,9 @@ DIR_PATH = os.path.abspath(os.path.dirname(__file__))
 TEST_DATA_PATH = os.path.join(DIR_PATH,
     "test_classifier_data.pcl")
 PERSISTER = Persister(TEST_DATA_PATH)
+CLASS = 1
+TEST_ANALYZER_PATH = os.path.join(DIR_PATH,
+    "test_feature_analyzer_%d" % CLASS)
 
 
 if not PERSISTER.isExist():
@@ -44,3 +48,7 @@ def getDataLong():
   df_X.columns = DATA_LONG.features
   ser_y = DATA_LONG.ser_y
   return df_X, ser_y
+
+def getFeatureAnalyzer():
+  return feature_analyzer.FeatureAnalyzer.deserialize(
+      TEST_ANALYZER_PATH)
