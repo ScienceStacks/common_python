@@ -34,6 +34,8 @@ FEATURES = [FEATURE1, FEATURE2]
 NUM_FEATURE_SCALE = 100
 # File paths for tests
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+TEST_PERSISTER_PATH = os.path.join(TEST_DIR,
+    "persister.pcl")
 TMP_DIR_DCT = {CLASS:
      os.path.join(TEST_DIR, "tmp_feature_analyzer_%d") % CLASS}
 TEST_SER_PATH = os.path.join(TEST_DIR, "ser.csv")
@@ -57,7 +59,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     self.analyzer_dct = ANALYZER_DCT
 
   def _remove(self):
-    paths = [TEST_SER_PATH]
+    paths = [TEST_SER_PATH, TEST_PERSISTER_PATH]
     paths.extend(list(TMP_DIR_DCT.values()))
     for path in paths:
       if os.path.isdir(path):
@@ -79,6 +81,15 @@ class TestFeatureAnalyzer(unittest.TestCase):
       return
     self.assertEqual(len(self.analyzer._partitions),
         NUM_CROSS_ITER_ACCURATE)
+
+  def testMakeFsetStr(self):
+    if IGNORE_TEST:
+      return
+    fset_stg1 = feature_analyzer.makeFsetStr(
+      [FEATURE1, FEATURE2])
+    fset_stg2 = feature_analyzer.makeFsetStr(
+      [FEATURE2, FEATURE1])
+    self.assertEqual(fset_stg1, fset_stg2)
 
   def test_ser_sfa(self):
     if IGNORE_TEST:
@@ -224,21 +235,44 @@ class TestFeatureAnalyzer(unittest.TestCase):
     ser_new = FeatureAnalyzer._makeSer(df, is_sort=False)
     self.assertTrue(ser.equals(ser_new))
 
+  def _equals(self, analyzer1, analyzer2):
+    for metric in feature_analyzer.METRICS:
+      value1 = analyzer1.getMetric(metric)
+      value2 = analyzer2.getMetric(metric)
+      self.assertTrue(all(value1.eq(value2)))
+
   def testSerializeAndDeserialize(self):
     if IGNORE_TEST:
       return
     dir_path = TMP_DIR_DCT[CLASS]
-    self.analyzer.serialize(dir_path)
+    self.analyzer.serialize(dir_path,
+        persister_path=TEST_PERSISTER_PATH)
     for name in feature_analyzer.VARIABLES:
       path = FeatureAnalyzer._getPath(dir_path, name)
       self.assertTrue(os.path.isfile(path))
     #
     analyzer = feature_analyzer.FeatureAnalyzer.deserialize(
       dir_path)
+    self._equals(self.analyzer, analyzer)
     for metric in feature_analyzer.METRICS:
       m_old = self.analyzer.getMetric(metric)
       m_new = analyzer.getMetric(metric)
       self.assertTrue(all(m_old.eq(m_new)))
+
+  def testSerializeWithPersister(self):
+    if IGNORE_TEST:
+      return
+    # Serialize the existing data
+    dir_path = TMP_DIR_DCT[CLASS]
+    self.analyzer.serialize(dir_path,
+        persister_path=TEST_PERSISTER_PATH)
+    # Create a new analyzer with no data
+    analyzer = FeatureAnalyzer(None,
+        pd.DataFrame(), pd.Series())
+    new_analyzer = analyzer.serialize(dir_path,
+        is_restart=False,
+        persister_path=TEST_PERSISTER_PATH)
+    self._equals(self.analyzer, new_analyzer)
 
   def testmakeAnalyzers(self):
     if IGNORE_TEST:
@@ -246,7 +280,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     dct = feature_analyzer.deserialize(TEST_DIR_PATH_DCT)
     for cl in dct.keys():
       self.assertTrue(isinstance(dct[cl],
-                                 feature_analyzer.FeatureAnalyzer))
+          feature_analyzer.FeatureAnalyzer))
 
 
 if __name__ == '__main__':

@@ -50,5 +50,6 @@ def getDataLong():
   return df_X, ser_y
 
 def getFeatureAnalyzer():
-  return feature_analyzer.FeatureAnalyzer.deserialize(
+  analyzer = feature_analyzer.FeatureAnalyzer.deserialize(
       TEST_ANALYZER_PATH)
+  return analyzer

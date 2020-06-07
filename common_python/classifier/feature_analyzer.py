@@ -55,6 +55,9 @@ METRICS = [SFA, CPC, IPA, FSET]
 VARIABLES = [DF_X, SER_Y]
 VARIABLES.extend(list(METRICS))
 MISC = "misc"
+SEPARATOR = "--"  # separates strings in a compound feature
+DIR = os.path.dirname(os.path.abspath("__file__"))
+PERSISTER_PATH = os.path.join(DIR, "persister.pcl")
 
 
 ################## FUNCTIONS #####################
@@ -64,9 +67,11 @@ def makeFsetStr(features):
   :param iterable-str features:
   :return str:
   """
-  return cn.FEATURE_SEPARATOR.join(list(features))
+  f_list = list(features)
+  f_list.sort()
+  return cn.FEATURE_SEPARATOR.join(f_list)
 
-def unMakeFsetStr(fset_stg):
+def unmakeFsetStr(fset_stg):
   """
   Recovers a feature set from a string
   """
@@ -142,6 +147,26 @@ def reserialize(dir_path_dct, out_dir_path_dct=None):
   analyzer_dct = deserialize(dir_path_dct)
   for idx, analyzer in analyzer_dct.items():
     analyzer.serialize(out_dir_path_dct[idx])
+
+
+def normalizeCompoundFeature(name):
+    """
+    Compound features are combinations of simple features
+    separated by a "--". This normalization ensures
+    that features are in alphabetical order.
+
+    Parameters
+    ----------
+    name : str
+      Possible compound featre.
+
+    Returns
+    -------
+    str.
+    """
+    splits = name.split(SEPARATOR)
+    splits.sort()
+    return SEPARATOR.join(splits)
 
 
 ################## CLASSES #####################
@@ -262,10 +287,13 @@ class FeatureAnalyzer(object):
     return self._df_cpc
 
   def score(self, features):
-      df_X = pd.DataFrame(self._df_X[features])
-      return util_classifier.binaryCrossValidate(
-          self._clf, df_X, self._ser_y,
-          partitions=self._partitions)
+    try:
+      df_X = pd.DataFrame(self._df_X[list(features)])
+    except:
+      import pdb; pdb.set_trace()
+    return util_classifier.binaryCrossValidate(
+        self._clf, df_X, self._ser_y,
+        partitions=self._partitions)
 
   @property
   def df_ipa(self):
@@ -312,6 +340,9 @@ class FeatureAnalyzer(object):
       # Feature sets of size two
       feature_sets = []
       accuracies = []
+      length = len(self.features)
+      total = length*(length-1)/2
+      count = 0
       for idx, feature1 in enumerate(self.features):
         for feature2 in self.features[(idx+1):]:
           feature_sets.append(makeFsetStr(
@@ -323,6 +354,8 @@ class FeatureAnalyzer(object):
           except KeyError:
             accuracy = np.nan  # Handle missing keys
           accuracies.append(accuracy)
+          self._reportProgress(FSET,
+              len(accuracies), total)
       ser2 = pd.Series(accuracies, index=feature_sets)
       # Construct result
       self._ser_fset = pd.concat([ser1, ser2])
@@ -408,7 +441,7 @@ class FeatureAnalyzer(object):
     return path
 
   @staticmethod
-  def _makeSer(df, is_sort=True):
+  def _makeSer(df, is_sort=True, is_renormalize=True):
     """
     Converts a DataFrame representation of a Series
     into a Series.
@@ -417,10 +450,16 @@ class FeatureAnalyzer(object):
     if df is None:
       return df
     columns = df.columns.tolist()
-    ser = df[columns[1]]
-    ser.index = df[columns[0]]
+    if len(columns) == 1:
+      ser = pd.Series(df[df.columns[0]])
+    else:
+      ser = df[columns[1]]
+      ser.index = df[columns[0]]
     ser.name = None
     ser.index.name = None
+    if is_renormalize:
+      ser.index = [normalizeCompoundFeature(i)
+                   for i in ser.index]
     if is_sort:
       ser = ser.sort_values(ascending=False)
     return ser
@@ -435,41 +474,63 @@ class FeatureAnalyzer(object):
     if df is None:
       return df
     else:
-      return df.set_index(FEATURE1)
+      df.columns = [normalizeCompoundFeature(c)
+               for c in df.columns]
+      df = df.set_index(FEATURE1)
+      df.index = [normalizeCompoundFeature(i)
+                  for i in df.index]
+      return df
 
-  def serialize(self, dir_path):
+  def serialize(self, dir_path, 
+      is_restart=True, persister_path=PERSISTER_PATH):
     """
     Writes all state to a directory.
     Parameters
     ----------
     dir_path : str
-      DESCRIPTION. Path to where data are written.
+      Path to where data are written.
+    is_restart: bool
+      Does not use an existing persister
+    persister_path: str
 
     Returns
     -------
-    None.
+    FeatureAnalyzer
+        What was serialized (if used persister)
 
     """
+    VALUE_STGS = ["self.ser_sfa", "self.df_cpc", "self.df_ipa",
+              "self.ser_fset", "self._df_X", "self._ser_y"]
     if not os.path.isdir(dir_path):
       os.mkdir(dir_path)
-    values = [self.ser_sfa, self.df_cpc, self.df_ipa,
-              self.ser_fset, self._df_X, self._ser_y]
+    # Recover any existing persister
+    persister = Persister(persister_path)
+    if not is_restart:
+      if persister.isExist():
+        self = persister.get()
+    values = []
+    # Calculate each variable in turn
+    for value_stg in VALUE_STGS:
+      values.append(eval(value_stg))
+      persister.set(self)
     variables = [SFA, CPC, IPA, FSET, DF_X, SER_Y]
     for idx, name in enumerate(variables):
       path = FeatureAnalyzer._getPath(dir_path, name)
       values[idx].to_csv(path)
     # Serialize the classifier
-    path = FeatureAnalyzer._getPath(dir_path, MISC, ext=cn.PCL)
+    path = FeatureAnalyzer._getPath(dir_path, MISC,
+        ext=cn.PCL)
     persister = Persister(path)
     persister.set([self._clf, self._num_cross_iter,
-                    self._is_report, self._report_interval])
+        self._is_report, self._report_interval])
+    return self
 
   @classmethod
   def deserialize(cls, dir_path):
     """
     Read data from directory.
-    Note must be maintained in correspondence with serialize,
-    especially for values written the MISC.
+    Note must be maintained in correspondence with
+    serialize, especially for values written the MISC.
 
     Parameters
     ----------
@@ -482,18 +543,39 @@ class FeatureAnalyzer(object):
 
     """
     def readDF(name):
+      UNNAMED = "Unnamed: 0"
       path = FeatureAnalyzer._getPath(dir_path, name)
       df = pd.read_csv(path)
+      if UNNAMED in df.columns:
+        df.index = df[UNNAMED]
+        del df[UNNAMED]
+        df.index.name = None
       return df
     #
+    def checkList(checks, refs):
+      result = set(checks).issubset(refs)
+      if not result:
+        import pdb; pdb.set_trace()
+    #
+    def checkFeatures(df, columns, is_index=True,
+        is_columns=True):
+      if is_index:
+        checkList(df.index, columns)
+      if is_columns:
+        checkList(df.columns, columns)
+    #
     # Obtain non-metric values
-    path = FeatureAnalyzer._getPath(dir_path, MISC, ext=cn.PCL)
+    path = FeatureAnalyzer._getPath(dir_path, MISC,
+        ext=cn.PCL)
     persister = Persister(path)
     [clf, num_cross_iter, is_report, report_interval] =  \
         persister.get()
-    df_X = util.trimUnnamed(readDF(DF_X))
-    ser_y = FeatureAnalyzer._makeSer(readDF(SER_Y),
-                                     is_sort=False)
+    df_X = readDF(DF_X)
+    columns = [normalizeCompoundFeature(c)
+               for c in df_X.columns]
+    df_X.columns = columns
+    ser_y = FeatureAnalyzer._makeSer(
+      readDF(SER_Y), is_renormalize=False, is_sort=False)
     # Instantiate
     analyzer = cls(clf, df_X, ser_y,
                    num_cross_iter=num_cross_iter,
@@ -509,15 +591,26 @@ class FeatureAnalyzer(object):
         df = None
       if metric == SFA:
         analyzer._ser_sfa = FeatureAnalyzer._makeSer(df)
+        checkFeatures(analyzer._ser_sfa, columns,
+            is_index=True, is_columns=False)
       elif metric == CPC:
         try:
           analyzer._df_cpc = FeatureAnalyzer._makeMatrix(df)
+          checkFeatures(analyzer._df_cpc, columns,
+              is_index=True, is_columns=True)
         except:
           pass
       elif metric == IPA:
         analyzer._df_ipa = FeatureAnalyzer._makeMatrix(df)
+        checkFeatures(analyzer._df_ipa, columns,
+            is_index=True, is_columns=True)
       elif metric == FSET:
         analyzer._ser_fset = FeatureAnalyzer._makeSer(df)
+        fset_features = []
+        [fset_features.extend(i.split("+"))
+            for i in analyzer._ser_fset.index]
+        fset_features = list(set(fset_features))
+        checkList(columns, fset_features)
     #
     return analyzer
 
