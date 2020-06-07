@@ -56,7 +56,7 @@ def _mk(fset):
 
 
 ############### CLASSES ####################
-class FeatureSetAnalyzer(object):
+class FeatureSet(object):
 
   def __init__(self, analyzer):
     """
@@ -126,16 +126,15 @@ class FeatureSetAnalyzer(object):
     ser = ser.sort_values(ascending=False)
     return ser
 
-  def optimize(self, min_score=MIN_SCORE):
+  def make(self, min_score=MIN_SCORE):
     """
-    Optimizes the feature sets to increase their accuracy.
-    Each of the final sets should have a score that is no
-    less than min_score.
+    Constructs feature sets by interactively combining features
+    that have a sufficiently large score.
 
     Parameters
     ----------
     max_score : float
-        minimum classification score
+        minimum classification accuracy score
 
     Returns
     -------
