@@ -7,7 +7,7 @@ import numpy as np
 import os
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 IS_PLOT = True
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -54,6 +54,16 @@ class TestFeatureSet(unittest.TestCase):
     self.assertTrue(all(ser.eq(ser1)))
     some_true = ["+" in f for f in ser.index]
     self.assertTrue(any(some_true))
+
+  def testMakeCandidateSer(self):
+    FSET = {"Rv2009", "Rv1460"}
+    min_score = 0.01
+    ser = self.fs_analyzer._makeCandidateSer(FSET,
+        min_score=min_score)
+    self.assertEqual(len(ser[ser < min_score]), 0)
+    length = len([i for i in ser.index if i in list(FSET)])
+    self.assertEqual(length, 0)
+
 
 
 

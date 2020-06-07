@@ -115,12 +115,14 @@ class FeatureSetAnalyzer(object):
     score_dct = {}
     for feature in fset:
       ser_ipa = self._analyzer.df_ipa[feature]
-      for other_feature, other_score in ser_ipa.todict().items:
+      for other_feature, other_score in ser_ipa.to_dict().items():
         if not other_feature in score_dct:
-          score_dct[other_score] = []
+          score_dct[other_feature] = []
         score_dct[other_feature].append(other_score)
     ser_dct = {k: max(v) for k, v in score_dct.items()}
     ser = pd.Series(ser_dct)
+    ser = ser[ser >= min_score]
+    ser = ser.drop(list(fset))
     ser = ser.sort_values(ascending=False)
     return ser
 
