@@ -12,25 +12,9 @@ import seaborn
 
 MIN_FRAC_INCR = 1.01  # Must increase by at least 1%
 MIN_SCORE = 0
-FSET = "fset"
+FEATURE_SEPARATOR = "+"
 
 ############ FUNCTIONS #################
-def makeFsetStr(features):
-  """
-  Creates a string for a feature set
-  :param iterable-str features:
-  :return str:
-  """
-  f_list = list(features)
-  f_list.sort()
-  return cn.FEATURE_SEPARATOR.join(f_list)
-
-def unmakeFsetStr(fset_stg):
-  """
-  Recovers a feature set from a string
-  """
-  return set(fset_stg.split(cn.FEATURE_SEPARATOR))
-
 def disjointify(ser_fset, min_score=MIN_SCORE):
   """
   Makes disjoint the feature sets disjoint by discarding
@@ -52,18 +36,64 @@ def disjointify(ser_fset, min_score=MIN_SCORE):
   selecteds = []  # Features selected
   fset_stgs = []  # Feature strings selected
   for fset_stg in ser.index:
-    fset =  feature_analyzer.unmakeFsetStr(fset_stg)
-    if len(fset.intersection(selecteds)) > 0:
+    fset =  FeatureSet(fset_stg)
+    if len(fset.set.intersection(selecteds)) > 0:
       continue
     else:
       # Include this feature set
-      selecteds.extend(list(fset))
-      fset_stgs.append(fset_stg)
+      selecteds.extend(list(fset.set))
+      fset_stgs.append(fset.str)
   ser_result = ser[fset_stgs].copy()
   return ser_result
 
 
 ############### CLASSES ####################
+class FeatureSet(object):
+  '''Represetation of a set of features'''
+
+  def __init__(self, descriptor):
+    """
+    Parameters
+    ----------
+    descriptor: list/set/string
+    """
+    if isinstance(descriptor, str):
+      self.str = descriptor
+      self.set = FeatureSet._unmakeStr(self.str)
+    elif isinstance(descriptor, set)  \
+        or isinstance(descriptor, list):
+      self.set = set(descriptor)
+      self.str = FeatureSet._makeStr(self.set)
+    else:
+      raise ValueError("Invalid argument type")
+
+  def __str__(self):
+    return self.str
+
+  @staticmethod
+  def _makeStr(features):
+    """
+    Creates a string for a feature set
+    :param iterable-str features:
+    :return str:
+    """
+    f_list = list(features)
+    f_list.sort()
+    return cn.FEATURE_SEPARATOR.join(f_list)
+  
+  @staticmethod
+  def _unmakeStr(fset_stg):
+    """
+    Recovers a feature set from a string
+    """
+    return set(fset_stg.split(cn.FEATURE_SEPARATOR))
+
+  def equals(self, other):
+    diff = self.set.symmetric_difference(other.set)
+    return len(diff) == 0
+
+
+########################################  
 class FeatureSetCollection(object):
 
   def __init__(self, analyzer):
@@ -95,8 +125,8 @@ class FeatureSetCollection(object):
       for idx, feature1 in enumerate(
           self._analyzer.features):
         for feature2 in self._analyzer.features[(idx+1):]:
-          feature_sets.append(makeFsetStr(
-              [feature1, feature2]))
+          fset = FeatureSet([feature1, feature2])
+          feature_sets.append(fset.str)
           try:
             accuracy = self._analyzer.df_ipa.loc[
                 feature1, feature2] +  \
@@ -112,6 +142,23 @@ class FeatureSetCollection(object):
           ascending=False)
     return self._ser_fset
 
+  def disjointify(self, **kwargs):
+    """
+    Creates a list of feature set strings with non-overlapping
+    features.
+
+    Parameters
+    ----------
+    kwargs: dict
+        Parameters passed to function.
+
+    Returns
+    -------
+    pd.Series
+    """
+    return disjointify(self.ser_fset, **kwargs)
+    
+
   def _makeCandidateSer(self, fset, min_score=0):
     """
     Creates a Series with the features most likely to
@@ -121,7 +168,7 @@ class FeatureSetCollection(object):
 
     Parameters
     ----------
-    fset : set
+    fset : FeatureSet
       Set of features.
 
     Returns
@@ -131,7 +178,7 @@ class FeatureSetCollection(object):
         value: max ipa
     """
     score_dct = {}
-    for feature in fset:
+    for feature in fset.set:
       ser_ipa = self._analyzer.df_ipa[feature]
       for other_feature, other_score in ser_ipa.to_dict().items():
         if not other_feature in score_dct:
@@ -140,14 +187,14 @@ class FeatureSetCollection(object):
     ser_dct = {k: max(v) for k, v in score_dct.items()}
     ser = pd.Series(ser_dct)
     ser = ser[ser >= min_score]
-    ser = ser.drop(list(fset))
+    ser = ser.drop(list(fset.set))
     ser = ser.sort_values(ascending=False)
     return ser
 
-  def make(self, min_score=MIN_SCORE):
+  def optimize(self, min_score=MIN_SCORE):
     """
-    Constructs feature sets by interactively combining features
-    that have a sufficiently large score.
+    Optimizes the collection of features sets by
+    finding increases in score accuracy.
 
     Parameters
     ----------
@@ -158,32 +205,31 @@ class FeatureSetCollection(object):
     -------
     pd.Series
     """
-    ser = self._analyzer.ser_sfa
-    ser = ser[ser >= min_score]
+    ser = self.disjointify(min_score=min_score)
     process_dct = ser.to_dict()
     result_dct = {}
     #
     def getScore(fset):
       # Gets the score for an fset
-      return process_dct[makeFsetStr(fset)]
+      return process_dct[fset.str]
     # Iteratively consider combinations of fsets
     while len(process_dct) > 0:
-      cur_fset_stg = list(process_dct.keys())[0]
-      cur_fset = unmakeFsetStr(cur_fset_stg)
-      cur_score = process_dct[cur_fset_stg]
+      cur_fset = FeatureSet(list(process_dct.keys())[0])
+      cur_score = process_dct[cur_fset.str]
       if len(process_dct) == 1:
         if cur_score >= min_score:
-          result_dct[cur_fset_stg] = getScore(cur_fset)
-        del process_dct[cur_fset_stg]
+          result_dct[cur_fset.str] = getScore(cur_fset)
+        del process_dct[cur_fset.str]
         break
       #
-      del process_dct[cur_fset_stg]
+      del process_dct[cur_fset.str]
       # Look for a high accuracy feature set
       is_changed = False
       for other_fset_stg in process_dct.keys():
-        other_fset = unmakeFsetStr(other_fset_stg)
-        new_fset = cur_fset.union(other_fset)
-        new_score = self._analyzer.score(new_fset)
+        other_fset = FeatureSet(other_fset_stg)
+        new_fset = FeatureSet(
+            cur_fset.set.union(other_fset.set))
+        new_score = self._analyzer.score(new_fset.set)
         old_score =  max(cur_score, getScore(other_fset))
         if new_score < old_score*MIN_FRAC_INCR:
           continue
@@ -191,13 +237,12 @@ class FeatureSetCollection(object):
           continue
         # The new feature set improves the classifier
         # Add the new feature; delete the old ones
-        new_fset_stg = makeFsetStr(new_fset)
-        process_dct[new_fset_stg] = new_score
-        del process_dct[other_fset_stg]
+        process_dct[new_fset.str] = new_score
+        del process_dct[other_fset.str]
         is_changed = True
         break
       if not is_changed:
-        result_dct[cur_fset_stg] = cur_score
+        result_dct[cur_fset.str] = cur_score
     ser = pd.Series(result_dct)
     ser = ser.sort_values(ascending=False)
     return ser
