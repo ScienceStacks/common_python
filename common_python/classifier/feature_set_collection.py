@@ -96,27 +96,31 @@ class FeatureSet(object):
 ########################################  
 class FeatureSetCollection(object):
 
-  def __init__(self, analyzer):
+  def __init__(self, analyzer, min_score=MIN_SCORE):
     """
     Parameters
     ----------
     analyzer: FeatureAnalyzer
+    min_score: float
+        minimum accuracy score used in calculations
     """
     self._analyzer = analyzer
-    self._ser_fset = None  # Use self.make() to construct
+    self._min_score = min_score
+    self._ser_sbfset = None  # Use self.make() to construct
     #  index: string representation of a set of features
     #  value: accuracy (score)
+    self._ser_comb = None  # Combinations of feature sets
 
   @property
-  def ser_fset(self):
+  def ser_sbfset(self):
     """
-    Calculates the classification accuracy of feature sets
-    of size 1 and 2.
+    Calculates the classification accuracy of singleton
+    and binary feature sets.
     :return pd.Series: Sorted by descending accuracy
         Index: feature set (feature separated by "+")
         Value: Accuracy
     """
-    if self._ser_fset is None:
+    if self._ser_sbfset is None:
       # Feature sets of size 1
       ser1 = self._analyzer.ser_sfa.copy()
       # Feature sets of size two
@@ -137,10 +141,69 @@ class FeatureSetCollection(object):
           accuracies.append(accuracy)
       ser2 = pd.Series(accuracies, index=feature_sets)
       # Construct result
-      self._ser_fset = pd.concat([ser1, ser2])
-      self._ser_fset = self._ser_fset.sort_values(
+      self._ser_sbfset = pd.concat([ser1, ser2])
+      self._ser_sbfset = self._ser_sbfset.sort_values(
           ascending=False)
-    return self._ser_fset
+    return self._ser_sbfset
+
+  @property
+  def ser_comb(self):
+    """
+    Optimizes the collection of features sets by
+    finding increases in score accuracy.
+
+    Parameters
+    ----------
+    max_score : float
+        minimum classification accuracy score
+
+    Returns
+    -------
+    pd.Series
+    """
+    if self._ser_comb is None:
+      ser = self.disjointify(min_score=self._min_score)
+      process_dct = ser.to_dict()
+      result_dct = {}
+      #
+      def getScore(fset):
+        # Gets the score for an fset
+        return process_dct[fset.str]
+      # Iteratively consider combinations of fsets
+      while len(process_dct) > 0:
+        cur_fset = FeatureSet(list(process_dct.keys())[0])
+        cur_score = process_dct[cur_fset.str]
+        if len(process_dct) == 1:
+          if cur_score >= self._min_score:
+            result_dct[cur_fset.str] = getScore(cur_fset)
+          del process_dct[cur_fset.str]
+          break
+        #
+        del process_dct[cur_fset.str]
+        # Look for a high accuracy feature set
+        is_changed = False
+        for other_fset_stg in process_dct.keys():
+          other_fset = FeatureSet(other_fset_stg)
+          new_fset = FeatureSet(
+              cur_fset.set.union(other_fset.set))
+          new_score = self._analyzer.score(new_fset.set)
+          old_score =  max(cur_score, getScore(other_fset))
+          if new_score < old_score*MIN_FRAC_INCR:
+            continue
+          if new_score < self._min_score:
+            continue
+          # The new feature set improves the classifier
+          # Add the new feature; delete the old ones
+          process_dct[new_fset.str] = new_score
+          del process_dct[other_fset.str]
+          is_changed = True
+          break
+        if not is_changed:
+          result_dct[cur_fset.str] = cur_score
+      self._ser_comb = pd.Series(result_dct)
+      self._ser_comb = self._ser_comb.sort_values(
+          ascending=False)
+    return self._ser_comb
 
   def disjointify(self, **kwargs):
     """
@@ -156,9 +219,8 @@ class FeatureSetCollection(object):
     -------
     pd.Series
     """
-    return disjointify(self.ser_fset, **kwargs)
+    return disjointify(self.ser_sbfset, **kwargs)
     
-
   def _makeCandidateSer(self, fset, min_score=0):
     """
     Creates a Series with the features most likely to
@@ -188,61 +250,5 @@ class FeatureSetCollection(object):
     ser = pd.Series(ser_dct)
     ser = ser[ser >= min_score]
     ser = ser.drop(list(fset.set))
-    ser = ser.sort_values(ascending=False)
-    return ser
-
-  def optimize(self, min_score=MIN_SCORE):
-    """
-    Optimizes the collection of features sets by
-    finding increases in score accuracy.
-
-    Parameters
-    ----------
-    max_score : float
-        minimum classification accuracy score
-
-    Returns
-    -------
-    pd.Series
-    """
-    ser = self.disjointify(min_score=min_score)
-    process_dct = ser.to_dict()
-    result_dct = {}
-    #
-    def getScore(fset):
-      # Gets the score for an fset
-      return process_dct[fset.str]
-    # Iteratively consider combinations of fsets
-    while len(process_dct) > 0:
-      cur_fset = FeatureSet(list(process_dct.keys())[0])
-      cur_score = process_dct[cur_fset.str]
-      if len(process_dct) == 1:
-        if cur_score >= min_score:
-          result_dct[cur_fset.str] = getScore(cur_fset)
-        del process_dct[cur_fset.str]
-        break
-      #
-      del process_dct[cur_fset.str]
-      # Look for a high accuracy feature set
-      is_changed = False
-      for other_fset_stg in process_dct.keys():
-        other_fset = FeatureSet(other_fset_stg)
-        new_fset = FeatureSet(
-            cur_fset.set.union(other_fset.set))
-        new_score = self._analyzer.score(new_fset.set)
-        old_score =  max(cur_score, getScore(other_fset))
-        if new_score < old_score*MIN_FRAC_INCR:
-          continue
-        if new_score < min_score:
-          continue
-        # The new feature set improves the classifier
-        # Add the new feature; delete the old ones
-        process_dct[new_fset.str] = new_score
-        del process_dct[other_fset.str]
-        is_changed = True
-        break
-      if not is_changed:
-        result_dct[cur_fset.str] = cur_score
-    ser = pd.Series(result_dct)
     ser = ser.sort_values(ascending=False)
     return ser

@@ -9,7 +9,7 @@ import numpy as np
 import os
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_PLOT = True
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -18,6 +18,7 @@ TEST_DIR_PATH = os.path.join(TEST_DIR,
 ANALYZER = test_helpers.getFeatureAnalyzer()
 FEATURE1 = "feature1"
 FEATURE2 = "feature2"
+MIN_SCORE = 0.9
 
 
 class TestFeatureSet(unittest.TestCase):
@@ -41,33 +42,35 @@ class TestFeatureSet(unittest.TestCase):
 class TestFeatureSetCollection(unittest.TestCase):
 
   def setUp(self):
-    self.collection = FeatureSetCollection(ANALYZER)
+    self.collection = FeatureSetCollection(ANALYZER,
+        min_score=MIN_SCORE)
 
   def testConstructor(self):
     if IGNORE_TEST:
       return
-    self.assertGreater(len(self.collection.ser_fset), 0)
-    falses = [np.isnan(v) for v in self.collection.ser_fset]
+    self.assertGreater(len(self.collection.ser_sbfset), 0)
+    falses = [np.isnan(v) for v in 
+        self.collection.ser_sbfset]
     self.assertFalse(any(falses))
 
   def testDisjointify(self):
     if IGNORE_TEST:
       return
     ser = self.collection.disjointify()
-    self.assertGreater(len(self.collection.ser_fset),
-                    len(ser))
+    self.assertGreater(len(self.collection.ser_sbfset),
+        len(ser))
     ser_fset = feature_set_collection.disjointify(
-      self.collection.ser_fset, min_score=0.9)
-    fset_stgs = self.collection.ser_fset.index.tolist()
+        self.collection.ser_sbfset, min_score=0.9)
+    fset_stgs = self.collection.ser_sbfset.index.tolist()
     # Fails because analyzer.ser_fset is bad
     result = set(fset_stgs).issuperset(
         ser_fset.index.tolist())
     self.assertTrue(result)
 
-  def testOptimize(self):
-    # TESTING
-    MIN_SCORE = 0.8
-    ser = self.collection.optimize(min_score=MIN_SCORE)
+  def test_ser_comb(self):
+    if IGNORE_TEST:
+      return
+    ser = self.collection.ser_comb
     ser1 = ser[ser >= MIN_SCORE]
     self.assertTrue(all(ser.eq(ser1)))
     some_true = [feature_set_collection.FEATURE_SEPARATOR
@@ -86,10 +89,10 @@ class TestFeatureSetCollection(unittest.TestCase):
         if i in list(FSET.set)])
     self.assertEqual(length, 0)
 
-  def test_ser_fset(self):
+  def test_ser_sbfset(self):
     if IGNORE_TEST:
       return
-    ser = self.collection.ser_fset
+    ser = self.collection.ser_sbfset
     num_feature = len(ANALYZER.features)
     expected = num_feature*(num_feature-1)/2 + num_feature
     self.assertEqual(expected, len(ser))
