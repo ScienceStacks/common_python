@@ -48,10 +48,9 @@ FEATURE2 = "feature2"
 SFA = "sfa"
 CPC = "cpc"
 IPA = "ipa"
-FSET = "fset"
 DF_X = "df_x"
 SER_Y = "ser_y"
-METRICS = [SFA, CPC, IPA, FSET]
+METRICS = [SFA, CPC, IPA]
 VARIABLES = [DF_X, SER_Y]
 VARIABLES.extend(list(METRICS))
 MISC = "misc"
@@ -61,22 +60,6 @@ PERSISTER_PATH = os.path.join(DIR, "persister.pcl")
 
 
 ################## FUNCTIONS #####################
-def makeFsetStr(features):
-  """
-  Creates a string for a feature set
-  :param iterable-str features:
-  :return str:
-  """
-  f_list = list(features)
-  f_list.sort()
-  return cn.FEATURE_SEPARATOR.join(f_list)
-
-def unmakeFsetStr(fset_stg):
-  """
-  Recovers a feature set from a string
-  """
-  return set(fset_stg.split(cn.FEATURE_SEPARATOR))
-
 def plotSFA(analyzers, num_feature=10, is_plot=True):
   """
   Plots SFA for all classes.
@@ -207,8 +190,6 @@ class FeatureAnalyzer(object):
     self._df_cpc = None
     # incremental prediction accuracy
     self._df_ipa = None
-    # Feature sets accuracies
-    self._ser_fset = None
     ######### PUBLIC ################
     self.features = df_X.columns.tolist()
 
@@ -325,44 +306,6 @@ class FeatureAnalyzer(object):
           columns=FEATURE2, values=cn.SCORE)
     return self._df_ipa
 
-  @property
-  def ser_fset(self):
-    """
-    Calculates the classification accuracy of feature sets
-    of size 1 and 2.
-    :return pd.Series: Sorted by descending accuracy
-        Index: feature set (feature separated by "+")
-        Value: Accuracy
-    """
-    if self._ser_fset is None:
-      # Feature sets of size 1
-      ser1 = self.ser_sfa.copy()
-      # Feature sets of size two
-      feature_sets = []
-      accuracies = []
-      length = len(self.features)
-      total = length*(length-1)/2
-      count = 0
-      for idx, feature1 in enumerate(self.features):
-        for feature2 in self.features[(idx+1):]:
-          feature_sets.append(makeFsetStr(
-              [feature1, feature2]))
-          try:
-            accuracy = self.df_ipa.loc[feature1, feature2] +  \
-                max(self.ser_sfa.loc[feature1],
-                    self.ser_sfa.loc[feature2])
-          except KeyError:
-            accuracy = np.nan  # Handle missing keys
-          accuracies.append(accuracy)
-          self._reportProgress(FSET,
-              len(accuracies), total)
-      ser2 = pd.Series(accuracies, index=feature_sets)
-      # Construct result
-      self._ser_fset = pd.concat([ser1, ser2])
-      self._ser_fset = self._ser_fset.sort_values(
-          ascending=False)
-    return self._ser_fset
-
   def getMetric(self, metric):
     if metric == SFA:
       return self.ser_sfa
@@ -370,8 +313,6 @@ class FeatureAnalyzer(object):
       return self.df_cpc
     elif metric == IPA:
       return self.df_ipa
-    elif metric == FSET:
-      return self.ser_fset
     else:
       raise ValueError("Invalid metric: %s" % metric)
 
@@ -499,8 +440,8 @@ class FeatureAnalyzer(object):
         What was serialized (if used persister)
 
     """
-    VALUE_STGS = ["self.ser_sfa", "self.df_cpc", "self.df_ipa",
-              "self.ser_fset", "self._df_X", "self._ser_y"]
+    VALUE_STGS = ["self.ser_sfa", "self.df_cpc",
+              "self.df_ipa", "self._df_X", "self._ser_y"]
     if not os.path.isdir(dir_path):
       os.mkdir(dir_path)
     # Recover any existing persister
@@ -513,7 +454,7 @@ class FeatureAnalyzer(object):
     for value_stg in VALUE_STGS:
       values.append(eval(value_stg))
       persister.set(self)
-    variables = [SFA, CPC, IPA, FSET, DF_X, SER_Y]
+    variables = [SFA, CPC, IPA, DF_X, SER_Y]
     for idx, name in enumerate(variables):
       path = FeatureAnalyzer._getPath(dir_path, name)
       values[idx].to_csv(path)
@@ -604,13 +545,6 @@ class FeatureAnalyzer(object):
         analyzer._df_ipa = FeatureAnalyzer._makeMatrix(df)
         checkFeatures(analyzer._df_ipa, columns,
             is_index=True, is_columns=True)
-      elif metric == FSET:
-        analyzer._ser_fset = FeatureAnalyzer._makeSer(df)
-        fset_features = []
-        [fset_features.extend(i.split("+"))
-            for i in analyzer._ser_fset.index]
-        fset_features = list(set(fset_features))
-        checkList(columns, fset_features)
     #
     return analyzer
 

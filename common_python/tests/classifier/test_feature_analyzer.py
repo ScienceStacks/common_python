@@ -82,22 +82,6 @@ class TestFeatureAnalyzer(unittest.TestCase):
     self.assertEqual(len(self.analyzer._partitions),
         NUM_CROSS_ITER_ACCURATE)
 
-  def testMakeFsetStr(self):
-    if IGNORE_TEST:
-      return
-    fset_stg1 = feature_analyzer.makeFsetStr(
-      [FEATURE1, FEATURE2])
-    fset_stg2 = feature_analyzer.makeFsetStr(
-      [FEATURE2, FEATURE1])
-    self.assertEqual(fset_stg1, fset_stg2)
-
-  def test_ser_sfa(self):
-    if IGNORE_TEST:
-      return
-    ser = self.analyzer.ser_sfa
-    trues = [isinstance(v, float) for v in ser.values]
-    self.assertTrue(all(trues))
-
   def _report(self, method, start):
     print("\n*** Ran %s in %4.2f seconds" %
         (method, time.time() - start))
@@ -115,16 +99,11 @@ class TestFeatureAnalyzer(unittest.TestCase):
     _ = analyzer.ser_sfa
     self._report("test_ser_sfa_scale", start)
 
-  def test_ser_fset(self):
+  def test_ser_sfa(self):
     if IGNORE_TEST:
       return
-    self._init()
-    analyzer = self.analyzer_dct[CLASS]
-    ser = analyzer.ser_fset
-    num_feature = len(analyzer.features)
-    expected = num_feature*(num_feature-1)/2 + num_feature
-    self.assertEqual(expected, len(ser))
-    trues = [(v <= 1) and (v >= 0) for v in ser]
+    ser = self.analyzer.ser_sfa
+    trues = [isinstance(v, float) for v in ser.values]
     self.assertTrue(all(trues))
 
   def _makeDFX(self, num_cols):
