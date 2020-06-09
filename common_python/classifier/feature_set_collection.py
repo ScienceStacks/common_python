@@ -13,6 +13,9 @@ import seaborn
 MIN_FRAC_INCR = 1.01  # Must increase by at least 1%
 MIN_SCORE = 0
 FEATURE_SEPARATOR = "+"
+SER_SBFSET = "ser_sbfset"
+SER_COMB = "ser_comb"
+COMPUTES = [SER_SBFSET, SER_COMB]
 
 ############ FUNCTIONS #################
 def disjointify(ser_fset, min_score=MIN_SCORE):
@@ -58,8 +61,9 @@ class FeatureSet(object):
     descriptor: list/set/string
     """
     if isinstance(descriptor, str):
-      self.str = descriptor
-      self.set = FeatureSet._unmakeStr(self.str)
+      # Ensure that string is correctly ordered
+      self.set = FeatureSet._unmakeStr(descriptor)
+      self.str = FeatureSet._makeStr(self.set)
     elif isinstance(descriptor, set)  \
         or isinstance(descriptor, list):
       self.set = set(descriptor)
@@ -252,3 +256,25 @@ class FeatureSetCollection(object):
     ser = ser.drop(list(fset.set))
     ser = ser.sort_values(ascending=False)
     return ser
+
+  def serialize(self, dir_path):
+    """
+    Serializes the computed objects.
+
+    Parameters
+    ----------
+    dir_path: str
+      Path to the directory where objects are serialized.
+
+    Returns
+    -------
+    None.
+    """
+    if not os.path.isdir(dir_path):
+      os.mkdir(dir_path)
+    for stg in COMPUTES:
+      result = eval("self.%s" % stg)
+      path = os.path.join(dir_path, "%s.csv" % stg)
+      result.to_csv(path)
+    
+  

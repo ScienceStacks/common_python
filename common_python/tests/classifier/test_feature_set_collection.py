@@ -7,14 +7,17 @@ from common_python.classifier  \
 
 import numpy as np
 import os
+import shutil
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 IS_PLOT = True
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR_PATH = os.path.join(TEST_DIR,
     "test_feature_set_collection_%d" % CLASS)
+TEST_SERIALIZE_DIR = os.path.join(TEST_DIR,
+    "test_feature_set_collection_serialize")
 ANALYZER = test_helpers.getFeatureAnalyzer()
 FEATURE1 = "feature1"
 FEATURE2 = "feature2"
@@ -23,8 +26,18 @@ MIN_SCORE = 0.9
 
 class TestFeatureSet(unittest.TestCase):
 
+  def _remove(self):
+    dirs = [TEST_SERIALIZE_DIR]
+    for path in dirs:
+      if os.path.isdir(path):
+        shutil.rmtree(path, ignore_errors=True)
+
   def setUp(self):
+    self._remove()
     self.fset = FeatureSet([FEATURE1, FEATURE2])
+
+  def tearDown(self):
+    self._remove()
 
   def testStr(self):
     if IGNORE_TEST:
@@ -106,6 +119,15 @@ class TestFeatureSetCollection(unittest.TestCase):
       features = features.union(fset.set)
       self.assertGreater(len(
           self.collection._analyzer._df_X[features]), 0)
+
+  def testSerialize(self):
+    # TESTING
+    self.collection.serialize(TEST_SERIALIZE_DIR)
+    for stg in feature_set_collection.COMPUTES:
+      path = os.path.join(TEST_SERIALIZE_DIR,
+          "%s.csv" % stg)
+      self.assertTrue(os.path.isfile(path))
+
 
 
 if __name__ == '__main__':
