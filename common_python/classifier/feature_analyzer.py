@@ -36,7 +36,6 @@ from common_python.util.persister import Persister
 import argparse
 import copy
 import matplotlib.pyplot as plt
-import numpy as np
 import os
 import pandas as pd
 import seaborn
@@ -422,7 +421,7 @@ class FeatureAnalyzer(object):
                   for i in df.index]
       return df
 
-  def serialize(self, dir_path, 
+  def serialize(self, dir_path,
       is_restart=True, persister_path=PERSISTER_PATH):
     """
     Writes all state to a directory.

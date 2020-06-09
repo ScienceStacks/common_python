@@ -222,7 +222,7 @@ def plotStateFstat(state, df_X, ser_y, is_plot=True):
   if state is None:
       state_equ = {s: s for s in ser_y.unique()}
   else:
-      state_equ = {s: s if s==state else -1 for s 
+      state_equ = {s: s if s==state else -1 for s
           in ser_y.unique()}
   num_state = len(state_equ.values())
   ser_fstat = makeFstatSer(df_X, ser_y,
@@ -368,7 +368,7 @@ def partitionByState(ser, holdouts=1):
   return train_idxs, test_idxs
   return test_idxs
 
-def binaryCrossValidate(clf, df_X, ser_y, 
+def binaryCrossValidate(clf, df_X, ser_y,
     partitions=None, num_holdouts=1, num_iterations=10):
   """
   Constructs a cross validated estimate of the score
@@ -388,17 +388,16 @@ def binaryCrossValidate(clf, df_X, ser_y,
       cross validations if constructing partitions
   :return float: score
   """
-  if partitions is None:
-    partitions = [partitionByState(
-          ser_y, holdouts=num_holdouts)
-          for _ in range(num_iterations)]
+  iterator = makePartitioner(ser_y=ser_y,
+    partitions=partitions, num_itertions=num_iterations,
+    num_holdout=num_holdouts)
   scores = []
   features = df_X.columns.tolist()
   copy_clf = copy.deepcopy(clf)
-  for train_idxs, test_idxs in partitions:
+  for train_set, test_set in iterator:
     scores.append(scoreFeatures(copy_clf, df_X, ser_y,
         features=features, is_copy=False,
-        train_idxs=train_idxs, test_idxs=test_idxs))
+        train_idxs=train_set, test_idxs=test_set))
   return np.mean(scores)
 
 def correlatePredictions(clf_desc1, clf_desc2,
@@ -443,3 +442,94 @@ def correlatePredictions(clf_desc1, clf_desc2,
   if np.isnan(result):
     result = 0.0
   return result
+
+def partitioner(ser, count, num_holdout=1):
+  """
+  Creates multiple training and test indexes by 
+  randomly selecting a indices for a classifier.
+  This is an alternative to partitionByState.
+
+    Parameters
+    ----------
+    ser : pd.Series
+      Values: state
+      index: instance
+    count: int
+      Number of partitions
+    num_holdout : int, optional
+      Number of holdouts per state to form tests.
+
+    Returns
+    -------
+    :return iterator.
+        The iterator returns a pair of
+        test and training indices
+    """
+  classes = ser.unique().tolist()
+  classes.sort()
+  for _ in range(count):
+    test_set = []
+    for cls in classes:
+      ser_cls = ser[ser == cls]
+      if len(ser_cls) <= num_holdout:
+        raise ValueError(
+            "Class %s has fewer than %d holdouts" %
+            (cls, num_holdout))
+      idxs = random.sample(
+          ser_cls.index.tolist(), num_holdout)
+      test_set.extend(idxs)
+    #
+    train_set = list(set(ser.index).difference(test_set))
+    yield train_set, test_set
+
+def makePartitioner(partitions=None, count=None,
+    num_holdout=1, ser_y=None):
+  """
+  Creates a partitioner type iterator from partitions.
+
+    Parameters
+    ----------
+    partitions: list-list-index
+    count: int
+        Number of partitions to create
+    num_holdout: int
+        Number of holdouts for each state
+    ser_y: pd.Series
+        Class values
+
+    Returns
+    -------
+    :return iterator.
+        The iterator returns a pair of
+        test and training indices
+    """
+  if partitions is None:
+    iterator = partitioner(ser_y, count,
+        num_holdout=num_holdout)
+  elif isinstance(partitions, collections.abc.Iterable):
+    iterator = partitions
+  else:
+    raise RuntimeError("Invalid input")
+  for train_set, test_set in iterator:
+    yield train_set, test_set
+
+
+def backEliminate(clf, df_X, ser_y, partitions,
+    max_decr_score=0.0):
+  """
+  Uses backwards elimination to remove features without
+  a significant reduction in the accuracy score.
+
+  Parameters
+  ----------
+  clf : Classifier
+  df_X : Feature matrix
+  ser_y : Calssification vector.
+  partitions : Partition
+    DESCRIPTION.
+
+  Returns
+  -------
+  None.
+
+  """

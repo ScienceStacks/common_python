@@ -6,7 +6,6 @@ from common_python.classifier import classifier_ensemble
 from common_python.testing import helpers
 
 import copy
-import math
 import pandas as pd
 import random
 import numpy as np
@@ -14,7 +13,7 @@ from sklearn import svm
 import unittest
 
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 IS_PLOT = False
 SER_Y = pd.Series({
     "0-1": 0,
@@ -57,7 +56,7 @@ class TestFunctions(unittest.TestCase):
     self.df_X_long, self.ser_y_long =  \
         test_helpers.getDataLong()
     self.clf = copy.deepcopy(CLF)
- 
+
   def testFindAdjacentStates(self):
     if IGNORE_TEST:
       return
@@ -222,10 +221,13 @@ class TestFunctions(unittest.TestCase):
     partitions = [util_classifier.partitionByState(
         SER_Y_BINARY, holdouts=1)
         for _ in range(SIZE)]
+    partitioner = util_classifier.partitioner(
+        SER_Y_BINARY, SIZE, num_holdout=1)
     score_one = util_classifier.scoreFeatures(
         CLF, DF_X_BINARY, SER_Y_BINARY)
     score_many = util_classifier.binaryCrossValidate(CLF,
-        DF_X_BINARY, SER_Y_BINARY, partitions=partitions)
+        DF_X_BINARY, SER_Y_BINARY,
+        partitions=partitioner)
     self.assertGreaterEqual(score_one, score_many)
     #
     score_many2 = util_classifier.binaryCrossValidate(CLF,
@@ -257,9 +259,56 @@ class TestFunctions(unittest.TestCase):
         clf_desc1, clf_desc2, DF_X_BINARY,
         SER_Y_BINARY, partitions)
     self.assertTrue(isinstance(score, float))
+
+  def testPartitioner(self):
+    if IGNORE_TEST:
+      return
+    SIZE = 3
+    COUNT = 4
+    SER = pd.Series({v: v % SIZE 
+        for v in range(SIZE*COUNT)})
+    iterator = util_classifier.partitioner(SER, COUNT)
+    count = 0
+    for train_set, test_set in iterator:
+      all = set(train_set).union(test_set)
+      diff = all.symmetric_difference(set(SER.index))
+      self.assertEqual(len(diff), 0)
+      count += 1
+    self.assertEqual(COUNT, count)
+
+  def testMakePartitioner(self):
+    # TESTING
+    def isEquiv(set1, set2):
+      self.assertEqual(len(set1), len(set2))
+    #
+    def test(partition1, partition2):
+      self.assertEqual(len(partition1), len(partition2))
+      for idx in range(len(partition1)):
+        for _ in range(2):
+          isEquiv(partition1[idx][0], partition2[idx][0])
+          isEquiv(partition1[idx][1], partition2[idx][1])
+    #
+    SIZE = 3
+    COUNT = 4
+    NUM_HOLDOUT = 2
+    SER = pd.Series({v: v % SIZE 
+        for v in range(SIZE*COUNT)})
+    ref_iter = util_classifier.partitioner(SER, COUNT,
+        num_holdout=NUM_HOLDOUT)
+    ref_partition = [(p, q) for p,q in ref_iter]
+    #
+    iterator = util_classifier.makePartitioner(
+        ser_y=SER, count=COUNT, num_holdout=NUM_HOLDOUT)
+    this_partition = [(p, q) for p,q in iterator]
+    test(ref_partition, this_partition)
+    #
+    iterator = util_classifier.makePartitioner(
+        partitions=this_partition)
+    this_partition = [(p, q) for p,q in iterator]
+    test(ref_partition, this_partition)
     
     
-    
+
 
 if __name__ == '__main__':
   unittest.main()

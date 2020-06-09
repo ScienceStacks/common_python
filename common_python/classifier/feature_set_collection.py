@@ -4,6 +4,7 @@ import common_python.constants as cn
 from common_python.classifier import util_classifier
 from common_python.classifier import feature_analyzer
 
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -277,4 +278,18 @@ class FeatureSetCollection(object):
       path = os.path.join(dir_path, "%s.csv" % stg)
       result.to_csv(path)
     
+
+if __name__ == '__main__':
+  msg = "Construct FeatureSetCollection metrics for FeatureAnalyzer."
+  parser = argparse.ArgumentParser(description=msg)
+  msg = "Absolute path to the FeatureAnalyzer"
+  msg += " serialization directory. Also where"
+  msg += " results are stored."
+  parser.add_argument("path", help=msg, type=str)
+  args = parser.parse_args()
+  key = "X"
+  analyzer_dct = feature_analyzer.deserialize(
+      {key: args.path})
+  collection = FeatureSetCollection(analyzer_dct[key])
+  collection.serialize(args.path)
   

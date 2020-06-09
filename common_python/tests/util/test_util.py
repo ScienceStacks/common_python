@@ -180,5 +180,6 @@ class TestFunctions(unittest.TestCase):
     self.assertFalse(df_new.equals(df))
     self.assertTrue(dff.equals(df_new))
 
+
 if __name__ == '__main__':
   unittest.main()
