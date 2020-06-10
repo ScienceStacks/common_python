@@ -173,8 +173,13 @@ class TestFunctions(unittest.TestCase):
         features=features)
     self.assertGreater(score_all, score)
     # Train on all features with a subset of samples
-    train_idxs = random.sample(
-        DF_X_BINARY.index.tolist(), SIZE)
+    for _ in range(5):
+      # Ensure that sample has 2 classes
+      train_idxs = random.sample(
+          DF_X_BINARY.index.tolist(), SIZE)
+      classes = SER_Y_BINARY.loc[train_idxs].unique()
+      if len(classes) > 1:
+        break
     score = util_classifier.scoreFeatures(
         CLF, DF_X_BINARY, SER_Y_BINARY,
         train_idxs=train_idxs)
@@ -225,14 +230,16 @@ class TestFunctions(unittest.TestCase):
         SER_Y_BINARY, SIZE, num_holdout=1)
     score_one = util_classifier.scoreFeatures(
         CLF, DF_X_BINARY, SER_Y_BINARY)
-    score_many = util_classifier.binaryCrossValidate(CLF,
+    bcv_result = util_classifier.binaryCrossValidate(CLF,
         DF_X_BINARY, SER_Y_BINARY,
         partitions=partitioner)
+    score_many = bcv_result.score
     self.assertGreaterEqual(score_one, score_many)
     #
-    score_many2 = util_classifier.binaryCrossValidate(CLF,
+    bcv_result = util_classifier.binaryCrossValidate(CLF,
         DF_X_BINARY, SER_Y_BINARY, num_holdouts=1,
         num_iteration=SIZE)
+    score_many2 = bcv_result.score
     self.assertLess(np.abs(score_many-score_many2),
         0.1)
 
@@ -320,13 +327,17 @@ class TestFunctions(unittest.TestCase):
     df_X = DF_X_BINARY[FEATURES]
     partitions = util_classifier.makePartitions(
         ser_y=SER_Y_BINARY, num_iteration=10)
-    base_score = util_classifier.binaryCrossValidate(CLF,
+    bcv_result = util_classifier.binaryCrossValidate(CLF,
         df_X, SER_Y_BINARY, partitions)
+    base_score = bcv_result.score
     #
     def test(features, score):
-        diff = set(features).symmetric_difference(
-            BASE_FEATURES)
-        self.assertEqual(len(diff), 0)
+        if len(features) > 1:
+          # Occassionally we sample indexes for which
+          # a single feature is sufficient. Ignore these.
+          diff = set(features).symmetric_difference(
+              BASE_FEATURES)
+          self.assertEqual(len(diff), 0)
         self.assertTrue(np.isclose(base_score, score))
     #
     features, score = util_classifier.backEliminate(

@@ -204,7 +204,14 @@ class FeatureSetCollection(object):
           is_changed = True
           break
         if not is_changed:
-          result_dct[cur_fset.str] = cur_score
+          back_elim = self._analyzer.backEliminate(
+              cur_fset.set)
+          new_fset = FeatureSet(back_elim.sub)
+          result_dct[new_fset.str] = back_elim.score
+          # Put back the features that are eliminated
+          for feature in back_elim.elim:
+            process_dct[feature] =  \
+                self._analyzer.ser_sfa.loc[feature]
       self._ser_comb = pd.Series(result_dct)
       self._ser_comb = self._ser_comb.sort_values(
           ascending=False)
@@ -280,7 +287,7 @@ class FeatureSetCollection(object):
     
 
 if __name__ == '__main__':
-  msg = "Construct FeatureSetCollection metrics for FeatureAnalyzer."
+  msg = "Construct FeatureSetCollection metrics."
   parser = argparse.ArgumentParser(description=msg)
   msg = "Absolute path to the FeatureAnalyzer"
   msg += " serialization directory. Also where"

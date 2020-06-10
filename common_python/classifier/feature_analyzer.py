@@ -34,6 +34,7 @@ from common_python.util import util
 from common_python.util.persister import Persister
 
 import argparse
+import collections
 import copy
 import matplotlib.pyplot as plt
 import os
@@ -56,6 +57,14 @@ MISC = "misc"
 SEPARATOR = "--"  # separates strings in a compound feature
 DIR = os.path.dirname(os.path.abspath("__file__"))
 PERSISTER_PATH = os.path.join(DIR, "persister.pcl")
+
+
+# sub: subset of features selected
+# score: score for the subset
+# elim: features eliminated
+BackEliminateResult = collections.namedtuple(
+    "BackEliminationResult",
+    "sub score elim")
 
 
 ################## FUNCTIONS #####################
@@ -226,9 +235,10 @@ class FeatureAnalyzer(object):
       scores = []
       for feature in self.features:
         df_X = pd.DataFrame(self._df_X[feature])
-        score = util_classifier.binaryCrossValidate(
+        bcv_result = util_classifier.binaryCrossValidate(
             self._clf, df_X, self._ser_y,
             partitions=self._partitions)
+        score = bcv_result.score
         scores.append(score)
         self._reportProgress(SFA, len(scores), total)
       self._ser_sfa = pd.Series(
@@ -268,13 +278,32 @@ class FeatureAnalyzer(object):
     return self._df_cpc
 
   def score(self, features):
-    try:
-      df_X = pd.DataFrame(self._df_X[list(features)])
-    except:
-      import pdb; pdb.set_trace()
-    return util_classifier.binaryCrossValidate(
+    df_X = pd.DataFrame(self._df_X[list(features)])
+    bcv_result = util_classifier.binaryCrossValidate(
         self._clf, df_X, self._ser_y,
         partitions=self._partitions)
+    return bcv_result.score
+
+  def backEliminate(self, features, max_decr_score=0.001):
+    """
+    Determines if a subset of the features is
+    sufficient to maintain the classification accuracy.
+    
+    Parameters
+    ----------
+    features: list-str
+    max_decr_score: float
+
+    Returns
+    -------
+    pd.Series
+    """
+    sub, score = util_classifier.backEliminate(
+        self._df_X[list(features)], self._ser_y,
+        self._partitions, max_decr_score=max_decr_score)
+    elim = list(set(features).difference(sub))
+    return BackEliminateResult(sub=sub, score=score,
+        elim=elim)
 
   @property
   def df_ipa(self):

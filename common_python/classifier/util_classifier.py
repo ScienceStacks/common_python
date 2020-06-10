@@ -31,6 +31,10 @@ AdjacentStates = collections.namedtuple(
 #
 ClassifierDescription = collections.namedtuple(
     "ClassifierDescription", "clf features")
+#
+BinaryCrossValidateResult = collections.namedtuple(
+    "BinaryCrossValidateResult",
+    "score clf")
 
 
 def findAdjacentStates(ser_y, index):
@@ -385,7 +389,7 @@ def binaryCrossValidate(clf, df_X, ser_y,
       constructing partitions
   :param int num_iteration: number of iterations in
       cross validations if constructing partitions
-  :return float: score
+  :return BinaryCrossValidate:
   """
   iterator = makePartitioner(ser_y=ser_y,
     partitions=partitions, num_iteration=num_iteration,
@@ -397,7 +401,9 @@ def binaryCrossValidate(clf, df_X, ser_y,
     scores.append(scoreFeatures(copy_clf, df_X, ser_y,
         features=features, is_copy=False,
         train_idxs=train_set, test_idxs=test_set))
-  return np.mean(scores)
+  result = BinaryCrossValidateResult(
+      score=np.mean(scores), clf=copy_clf)
+  return result
 
 def correlatePredictions(clf_desc1, clf_desc2,
     df_X, ser_y, partitions):
@@ -548,21 +554,24 @@ def backEliminate(clf, df_X, ser_y, partitions,
   """
   features = df_X.columns.to_list()
   max_iteration = len(features)
-  last_score = binaryCrossValidate(clf, df_X, ser_y,
-    partitions=partitions)
+  bcv_result = binaryCrossValidate(clf, df_X, ser_y,
+      partitions=partitions)
+  last_score = bcv_result.score
   for _ in range(max_iteration):
     is_changed = False
-    for feature in features:
-      new_features = list(features)
-      new_features.remove(feature)
-      new_score = binaryCrossValidate(clf, 
-          df_X[new_features],
-          ser_y, partitions=partitions)
-      if last_score - new_score <= max_decr_score:
-        features.remove(feature)
-        is_changed = True
-        last_score = new_score
-        break
+    if len(features) > 1:
+      for feature in features:
+        new_features = list(features)
+        new_features.remove(feature)
+        bcv_result = binaryCrossValidate(clf, 
+            df_X[new_features],
+            ser_y, partitions=partitions)
+        new_score = bcv_result.score
+        if last_score - new_score <= max_decr_score:
+          features.remove(feature)
+          is_changed = True
+          last_score = new_score
+          break
     if not is_changed:
       break
   return features, last_score
