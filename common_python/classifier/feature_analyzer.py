@@ -278,6 +278,18 @@ class FeatureAnalyzer(object):
     return self._df_cpc
 
   def score(self, features):
+    """
+    Scores a classifier with the specified features.
+    
+    Parameters
+    ----------
+    features: list-str
+    max_decr_score: float
+
+    Returns
+    -------
+    float. Score
+    """
     df_X = pd.DataFrame(self._df_X[list(features)])
     bcv_result = util_classifier.binaryCrossValidate(
         self._clf, df_X, self._ser_y,
@@ -298,7 +310,7 @@ class FeatureAnalyzer(object):
     -------
     pd.Series
     """
-    sub, score = util_classifier.backEliminate(
+    sub, score = util_classifier.backEliminate(self._clf,
         self._df_X[list(features)], self._ser_y,
         self._partitions, max_decr_score=max_decr_score)
     elim = list(set(features).difference(sub))

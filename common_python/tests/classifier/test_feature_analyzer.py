@@ -261,6 +261,16 @@ class TestFeatureAnalyzer(unittest.TestCase):
       self.assertTrue(isinstance(dct[cl],
           feature_analyzer.FeatureAnalyzer))
 
+  def testBackEliminate(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    features = [FEATURE1, FEATURE2]
+    score = self.analyzer.score(features)
+    be_result = self.analyzer.backEliminate(features)
+    self.assertTrue(np.isclose(score, be_result.score))
+    
+
 
 if __name__ == '__main__':
   unittest.main()
