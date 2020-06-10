@@ -368,7 +368,7 @@ def partitionByState(ser, holdouts=1):
   return train_idxs, test_idxs
 
 def binaryCrossValidate(clf, df_X, ser_y,
-    partitions=None, num_holdouts=1, num_iterations=10):
+    partitions=None, num_holdouts=1, num_iteration=10):
   """
   Constructs a cross validated estimate of the score
   for a classifier trained on the features in df_X.
@@ -383,12 +383,12 @@ def binaryCrossValidate(clf, df_X, ser_y,
       list of pairs of indices. Pairs are train, test.
   :param int num_holdouts: holdouts used if
       constructing partitions
-  :param int num_iterations: number of iterations in
+  :param int num_iteration: number of iterations in
       cross validations if constructing partitions
   :return float: score
   """
   iterator = makePartitioner(ser_y=ser_y,
-    partitions=partitions, count=num_iterations,
+    partitions=partitions, num_iteration=num_iteration,
     num_holdout=num_holdouts)
   scores = []
   features = df_X.columns.tolist()
@@ -481,15 +481,29 @@ def partitioner(ser, count, num_holdout=1):
     train_set = list(set(ser.index).difference(test_set))
     yield train_set, test_set
 
-def makePartitioner(partitions=None, count=None,
+def makePartitions(**kwargs):
+  """
+  Creates partitions.
+
+    Parameters
+    ----------
+    kwargs: dict
+
+    Returns
+    -------
+    :return list-list-index
+    """
+  return [p for p in makePartitioner(**kwargs)]
+
+def makePartitioner(partitions=None, num_iteration=None,
     num_holdout=1, ser_y=None):
   """
-  Creates a partitioner type iterator from partitions.
+  Creates a partitioner type iterator for partitions.
 
     Parameters
     ----------
     partitions: list-list-index
-    count: int
+    num_itereation: int
         Number of partitions to create
     num_holdout: int
         Number of holdouts for each state
@@ -503,7 +517,7 @@ def makePartitioner(partitions=None, count=None,
         test and training indices
     """
   if partitions is None:
-    iterator = partitioner(ser_y, count,
+    iterator = partitioner(ser_y, num_iteration,
         num_holdout=num_holdout)
   elif isinstance(partitions, collections.abc.Iterable):
     iterator = partitions
@@ -512,23 +526,43 @@ def makePartitioner(partitions=None, count=None,
   for train_set, test_set in iterator:
     yield train_set, test_set
 
-
 def backEliminate(clf, df_X, ser_y, partitions,
-    max_decr_score=0.0):
+    max_decr_score=0.001):
   """
   Uses backwards elimination to remove features without
   a significant reduction in the accuracy score.
 
   Parameters
   ----------
-  clf : Classifier
-  df_X : Feature matrix
-  ser_y : Calssification vector.
-  partitions : Partition
-    DESCRIPTION.
-
+  clf: Classifier
+  df_X: Feature matrix
+  ser_y: Calssification vector.
+  partitions: list-list-index_pairs
+  max_decr_score: float
+      Maximum amount by which score can decrease
+      when deleting a feature.
   Returns
   -------
-  None.
-
+  list-object, float.
+      Features selected, score for these features
   """
+  features = df_X.columns.to_list()
+  max_iteration = len(features)
+  last_score = binaryCrossValidate(clf, df_X, ser_y,
+    partitions=partitions)
+  for _ in range(max_iteration):
+    is_changed = False
+    for feature in features:
+      new_features = list(features)
+      new_features.remove(feature)
+      new_score = binaryCrossValidate(clf, 
+          df_X[new_features],
+          ser_y, partitions=partitions)
+      if last_score - new_score <= max_decr_score:
+        features.remove(feature)
+        is_changed = True
+        last_score = new_score
+        break
+    if not is_changed:
+      break
+  return features, last_score

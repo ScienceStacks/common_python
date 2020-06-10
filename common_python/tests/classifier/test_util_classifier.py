@@ -232,7 +232,7 @@ class TestFunctions(unittest.TestCase):
     #
     score_many2 = util_classifier.binaryCrossValidate(CLF,
         DF_X_BINARY, SER_Y_BINARY, num_holdouts=1,
-        num_iterations=SIZE)
+        num_iteration=SIZE)
     self.assertLess(np.abs(score_many-score_many2),
         0.1)
 
@@ -299,7 +299,8 @@ class TestFunctions(unittest.TestCase):
     ref_partition = [(p, q) for p,q in ref_iter]
     #
     iterator = util_classifier.makePartitioner(
-        ser_y=SER, count=COUNT, num_holdout=NUM_HOLDOUT)
+        ser_y=SER, 
+        num_iteration=COUNT, num_holdout=NUM_HOLDOUT)
     this_partition = [(p, q) for p,q in iterator]
     test(ref_partition, this_partition)
     #
@@ -307,8 +308,35 @@ class TestFunctions(unittest.TestCase):
         partitions=this_partition)
     this_partition = [(p, q) for p,q in iterator]
     test(ref_partition, this_partition)
-    
-    
+
+  def testBackEliminate(self):
+    if IGNORE_TEST:
+      return
+    BASE_FEATURES = ["Rv3095", "Rv3246c"]
+    BOGUS_FEATURES = ["Rv0054"]
+    FEATURES = list(set(BASE_FEATURES).union(
+        BOGUS_FEATURES))
+    #
+    df_X = DF_X_BINARY[FEATURES]
+    partitions = util_classifier.makePartitions(
+        ser_y=SER_Y_BINARY, num_iteration=10)
+    base_score = util_classifier.binaryCrossValidate(CLF,
+        df_X, SER_Y_BINARY, partitions)
+    #
+    def test(features, score):
+        diff = set(features).symmetric_difference(
+            BASE_FEATURES)
+        self.assertEqual(len(diff), 0)
+        self.assertTrue(np.isclose(base_score, score))
+    #
+    features, score = util_classifier.backEliminate(
+        CLF, df_X, SER_Y_BINARY, partitions)
+    test(features, score)
+    #
+    df_X = DF_X_BINARY[BASE_FEATURES]
+    features, score = util_classifier.backEliminate(
+        CLF, df_X, SER_Y_BINARY, partitions)
+    test(features, score)
 
 
 if __name__ == '__main__':
