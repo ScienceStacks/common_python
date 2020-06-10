@@ -177,9 +177,10 @@ class FeatureAnalyzer(object):
     self._ser_y = ser_y
     self._is_report = is_report
     self._num_cross_iter = num_cross_iter
-    self._partitions = [
-        util_classifier.partitionByState(self._ser_y)
-        for _ in range(self._num_cross_iter)]
+    iterator = util_classifier.partitioner(
+        self._ser_y, self._num_cross_iter,
+        num_holdout=1)
+    self._partitions = [p for p in iterator]
     self._report_interval = report_interval
     # Number procesed since last report
     self._num_processed = 0

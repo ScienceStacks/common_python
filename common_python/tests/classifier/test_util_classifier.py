@@ -13,7 +13,7 @@ from sklearn import svm
 import unittest
 
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_PLOT = False
 SER_Y = pd.Series({
     "0-1": 0,
@@ -277,7 +277,8 @@ class TestFunctions(unittest.TestCase):
     self.assertEqual(COUNT, count)
 
   def testMakePartitioner(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     def isEquiv(set1, set2):
       self.assertEqual(len(set1), len(set2))
     #

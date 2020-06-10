@@ -366,7 +366,6 @@ def partitionByState(ser, holdouts=1):
   #
   train_idxs = list(set(ser.index).difference(test_idxs))
   return train_idxs, test_idxs
-  return test_idxs
 
 def binaryCrossValidate(clf, df_X, ser_y,
     partitions=None, num_holdouts=1, num_iterations=10):
@@ -389,7 +388,7 @@ def binaryCrossValidate(clf, df_X, ser_y,
   :return float: score
   """
   iterator = makePartitioner(ser_y=ser_y,
-    partitions=partitions, num_itertions=num_iterations,
+    partitions=partitions, count=num_iterations,
     num_holdout=num_holdouts)
   scores = []
   features = df_X.columns.tolist()
