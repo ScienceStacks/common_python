@@ -159,13 +159,26 @@ class FeatureSetCollection(object):
 
     Parameters
     ----------
-    max_score : float
-        minimum classification accuracy score
 
     Returns
     -------
     pd.Series
     """
+    def update(fset):
+      """
+      Refines the feature set and updates data.
+      """
+      be_result = self._analyzer.backEliminate(
+          list(fset.set))
+      new_fset = FeatureSet(be_result.sub)
+      result_dct[new_fset.str] = be_result.score
+      # Put back the features that are eliminated
+      for feature in be_result.elim:
+        score = self._analyzer.ser_sfa.loc[feature]
+        if score >= self._min_score:
+          process_dct[feature] = score
+      return
+    #
     if self._ser_comb is None:
       ser = self.disjointify(min_score=self._min_score)
       process_dct = ser.to_dict()
@@ -180,9 +193,10 @@ class FeatureSetCollection(object):
         cur_score = process_dct[cur_fset.str]
         if len(process_dct) == 1:
           if cur_score >= self._min_score:
-            result_dct[cur_fset.str] = getScore(cur_fset)
-          del process_dct[cur_fset.str]
-          break
+            update(cur_fset)
+          if len(process_dct) <= 2:
+            del process_dct[cur_fset.str]
+            break
         #
         del process_dct[cur_fset.str]
         # Look for a high accuracy feature set
@@ -204,14 +218,7 @@ class FeatureSetCollection(object):
           is_changed = True
           break
         if not is_changed:
-          back_elim = self._analyzer.backEliminate(
-              cur_fset.set)
-          new_fset = FeatureSet(back_elim.sub)
-          result_dct[new_fset.str] = back_elim.score
-          # Put back the features that are eliminated
-          for feature in back_elim.elim:
-            process_dct[feature] =  \
-                self._analyzer.ser_sfa.loc[feature]
+          update(cur_fset)
       self._ser_comb = pd.Series(result_dct)
       self._ser_comb = self._ser_comb.sort_values(
           ascending=False)

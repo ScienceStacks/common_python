@@ -81,8 +81,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.assertTrue(result)
 
   def test_ser_comb(self):
-    if IGNORE_TEST:
-      return
+    # TESTING
     ser = self.collection.ser_comb
     ser1 = ser[ser >= MIN_SCORE]
     self.assertTrue(all(ser.eq(ser1)))
@@ -121,7 +120,8 @@ class TestFeatureSetCollection(unittest.TestCase):
           self.collection._analyzer._df_X[features]), 0)
 
   def testSerialize(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     self.collection.serialize(TEST_SERIALIZE_DIR)
     for stg in feature_set_collection.COMPUTES:
       path = os.path.join(TEST_SERIALIZE_DIR,
