@@ -280,3 +280,7 @@ def trimUnnamed(df):
   if UNNAMED in df_new.columns:
     del df_new[UNNAMED]
   return df_new
+
+def isSetEqual(set1, set2):
+  diff = set(set(set1)).symmetric_difference(set2)
+  return len(diff) == 0

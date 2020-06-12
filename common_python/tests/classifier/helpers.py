@@ -2,8 +2,12 @@
 
 from common_python.util.persister import Persister
 from common_python.classifier import feature_analyzer
+from common_python.classifier  \
+    import feature_set_collection
 
 import os
+import numpy as np
+import pandas as pd
 
 
 
@@ -15,6 +19,8 @@ PERSISTER = Persister(TEST_DATA_PATH)
 CLASS = 1
 TEST_ANALYZER_PATH = os.path.join(DIR_PATH,
     "test_feature_analyzer_%d" % CLASS)
+TEST_SER_COMB_PATH = os.path.join(DIR_PATH,
+    "test_ser_comb_%d.csv" % CLASS)
 
 
 if not PERSISTER.isExist():
@@ -53,3 +59,11 @@ def getFeatureAnalyzer():
   analyzer = feature_analyzer.FeatureAnalyzer.deserialize(
       TEST_ANALYZER_PATH)
   return analyzer
+
+def getCombSer():
+  df = pd.read_csv(TEST_SER_COMB_PATH)
+  index_col = df.columns.tolist()[0]
+  value_col = df.columns.tolist()[1]
+  ser = df[value_col].copy()
+  ser.index = df[index_col]
+  return ser

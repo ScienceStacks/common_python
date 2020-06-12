@@ -180,6 +180,12 @@ class TestFunctions(unittest.TestCase):
     self.assertFalse(df_new.equals(df))
     self.assertTrue(dff.equals(df_new))
 
+  def testIsSetEqual(self):
+    SET1 = [1, 2, 3]
+    SET2 = [1, 2]
+    self.assertTrue(ut.isSetEqual(SET1, SET1))
+    self.assertFalse(ut.isSetEqual(SET1, SET2))
+
 
 if __name__ == '__main__':
   unittest.main()
