@@ -45,7 +45,7 @@ import threading
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 PERSISTER_PATH = os.path.join(DIR,
-    "feature_eqivalence_calculator.pcl")
+    "feature_equivalence_calculator.pcl")
 NUM_CROSS_ITER = 50
 NO_FEATURE_SCORE = 0.5
 

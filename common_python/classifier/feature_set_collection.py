@@ -3,6 +3,7 @@
 import common_python.constants as cn
 from common_python.classifier import util_classifier
 from common_python.classifier import feature_analyzer
+from common_python.util.persister import Persister
 
 import argparse
 import matplotlib.pyplot as plt
@@ -17,6 +18,7 @@ FEATURE_SEPARATOR = "+"
 SER_SBFSET = "ser_sbfset"
 SER_COMB = "ser_comb"
 COMPUTES = [SER_SBFSET, SER_COMB]
+MISC_PCL = "feature_set_collection_misc.pcl"
 
 ############ FUNCTIONS #################
 def disjointify(ser_fset, min_score=MIN_SCORE):
@@ -85,7 +87,7 @@ class FeatureSet(object):
     f_list = list(features)
     f_list.sort()
     return cn.FEATURE_SEPARATOR.join(f_list)
-  
+
   @staticmethod
   def _unmakeStr(fset_stg):
     """
@@ -98,7 +100,7 @@ class FeatureSet(object):
     return len(diff) == 0
 
 
-########################################  
+########################################
 class FeatureSetCollection(object):
 
   def __init__(self, analyzer, min_score=MIN_SCORE):
@@ -239,7 +241,7 @@ class FeatureSetCollection(object):
     pd.Series
     """
     return disjointify(self.ser_sbfset, **kwargs)
-    
+
   def _makeCandidateSer(self, fset, min_score=0):
     """
     Creates a Series with the features most likely to
@@ -287,11 +289,81 @@ class FeatureSetCollection(object):
     """
     if not os.path.isdir(dir_path):
       os.mkdir(dir_path)
+    # Save the computed values
     for stg in COMPUTES:
       result = eval("self.%s" % stg)
       path = os.path.join(dir_path, "%s.csv" % stg)
       result.to_csv(path)
-    
+    # Serialize constructor parameter values
+    path = os.path.join(dir_path, MISC_PCL)
+    persister = Persister(path)
+    persister.set(self._min_score)
+
+  @classmethod
+  def deserialize(cls, dir_path):
+    """
+    Deserializes a FeatureSetCollection saved in its
+    FeatureAnalyzer directory.
+
+    Parameters
+    ----------
+    dir_path: str
+
+    Returns
+    ----------
+    FeatureSetCollection
+    """
+    def readDF(name):
+     # Reads the file for the variable name if it exists
+     # Returns a DataFrame or a Series
+      UNNAMED = "Unnamed: 0"
+      path = os.path.join(dir_path, "%s.csv" % name)
+      if os.path.isfile(path):
+        df = pd.read_csv(path)
+        if UNNAMED in df.columns:
+          df.index = df[UNNAMED]
+          del df[UNNAMED]
+          df.index.name = None
+        if len(df.columns) == 1:
+          result = pd.Series(df[df.columns.tolist()[0]])
+      else:
+        result = None
+      return result
+    # Get constructor parameter values
+    path = os.path.join(dir_path, MISC_PCL)
+    if os.path.isfile(path):
+      persister = Persister(path)
+      min_score = persister.get()
+    else:
+      min_score = MIN_SCORE
+    # Get the analyzer
+    key = "X"
+    analyzer_dct = feature_analyzer.deserialize(
+        {key: dir_path})
+    # Construct the FeatureSetCollection
+    collection = cls(analyzer_dct[key], min_score=min_score)
+    collection._ser_sbfset = readDF(SER_SBFSET)
+    collection._ser_comb = readDF(SER_COMB)
+    return collection
+
+  def plotFeatureSetForInstances(self, df_cls):
+    """
+    Constructs a bar of feature contibutions to classification.
+
+    Parameters
+    ----------
+    df_cls : pd.DatafRAME
+      Columns: features
+      Index: instances
+      Values: positive or negative contributions
+
+    Returns
+    -------
+    None.
+
+    """
+    raise ValueError("Not implemented.")
+
 
 if __name__ == '__main__':
   msg = "Construct FeatureSetCollection metrics."
@@ -302,8 +374,10 @@ if __name__ == '__main__':
   parser.add_argument("path", help=msg, type=str)
   args = parser.parse_args()
   key = "X"
-  analyzer_dct = feature_analyzer.deserialize(
-      {key: args.path})
-  collection = FeatureSetCollection(analyzer_dct[key])
+  if False:
+    analyzer_dct = feature_analyzer.deserialize(
+        {key: args.path})
+    collection = FeatureSetCollection(analyzer_dct[key])
+  collection = FeatureSetCollection.deserialize(args.path)
   collection.serialize(args.path)
-  
+

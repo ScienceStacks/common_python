@@ -28,7 +28,7 @@ def addTest(instance):
       instance.collection.add()
     length = len(instance.collection.chosens)
     if length != num_iteration:
-      self.assertEqual(length, num_iteration)
+      instance.assertEqual(length, num_iteration)
   #
   test(1)
   test(5)
@@ -36,12 +36,12 @@ def addTest(instance):
 
 ##################################################
 class TestFeatureCollection(unittest.TestCase):
-  
+
   def setUp(self):
     if IGNORE_TEST:
       return
     self._init()
-  
+
   def _init(self):
     self.df_X, self.ser_y = (copy.deepcopy(DF_X),
         copy.deepcopy(SER_Y))
@@ -108,12 +108,12 @@ class TestFeatureCollection(unittest.TestCase):
 
 ##################################################
 class TestFeatureCollectionCorr(unittest.TestCase):
-  
+
   def setUp(self):
     if IGNORE_TEST:
       return
     self._init()
-  
+
   def _init(self):
     self.df_X, self.ser_y = (copy.deepcopy(DF_X),
         copy.deepcopy(SER_Y))
@@ -128,12 +128,12 @@ class TestFeatureCollectionCorr(unittest.TestCase):
 
 ##################################################
 class TestFeatureCollectionResidual(unittest.TestCase):
-  
+
   def setUp(self):
     if IGNORE_TEST:
       return
     self._init()
-  
+
   def _init(self):
     self.df_X, self.ser_y = (copy.deepcopy(DF_X),
         copy.deepcopy(SER_Y))
@@ -146,7 +146,7 @@ class TestFeatureCollectionResidual(unittest.TestCase):
       return
     self._init()
     addTest(self)
-    
+
 
 if __name__ == '__main__':
   unittest.main()

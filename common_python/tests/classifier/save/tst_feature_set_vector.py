@@ -62,17 +62,18 @@ class TestFeatureSet(unittest.TestCase):
         lambda v: np.abs(v))
     self.assertEqual(ser.sum().value, 0)
     # XOR with a 0 vector should yield the original
-    ser_X = DF_X.
+    ser_X = DF_X.loc[INDEX, :]
     ser_X = ser_X.apply(lambda v: 0)
     new_vector = FeatureSetVector(self.analyzer,
         SER_COMB.index, ser_X)
-    new_vector = self.vector.xor(other_vector)
-    ser = new_vector.df_value[cn.VALUE].apply(
+    new_vector = self.vector.xor(ser_X)
+    ser_new = new_vector.df_value[cn.VALUE].apply(
         lambda v: np.abs(v))
+    ser_X = self.vector._ser_X.loc[self.vector.features]
+    trues = [np.abs(v1) == np.abs(v2) for v1, v2 in
+        zip(new_vector._ser_X, ser_X)]
     import pdb; pdb.set_trace()
-    
-    
- 
+    self.assertTrue(all(trues))
 
 
 

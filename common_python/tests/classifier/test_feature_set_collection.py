@@ -10,7 +10,7 @@ import os
 import shutil
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_PLOT = True
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,10 +27,16 @@ MIN_SCORE = 0.9
 class TestFeatureSet(unittest.TestCase):
 
   def _remove(self):
-    dirs = [TEST_SERIALIZE_DIR]
-    for path in dirs:
-      if os.path.isdir(path):
-        shutil.rmtree(path, ignore_errors=True)
+    paths = [os.path.join(TEST_SERIALIZE_DIR,
+        feature_set_collection.MISC_PCL)]
+    csv_file_names = [feature_set_collection.SER_COMB,
+        feature_set_collection.SER_SBFSET]
+    [paths.append(
+        os.path.join(TEST_SERIALIZE_DIR, "%s.csv" % f))
+        for f in csv_file_names]
+    for path in paths:
+      if os.path.isfile(path):
+        os.remove(path)
 
   def setUp(self):
     self._remove()
@@ -62,7 +68,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     if IGNORE_TEST:
       return
     self.assertGreater(len(self.collection.ser_sbfset), 0)
-    falses = [np.isnan(v) for v in 
+    falses = [np.isnan(v) for v in
         self.collection.ser_sbfset]
     self.assertFalse(any(falses))
 
@@ -81,7 +87,8 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.assertTrue(result)
 
   def test_ser_comb(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     ser = self.collection.ser_comb
     ser1 = ser[ser >= MIN_SCORE]
     self.assertTrue(all(ser.eq(ser1)))
@@ -97,7 +104,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     ser = self.collection._makeCandidateSer(FSET,
         min_score=min_score)
     self.assertEqual(len(ser[ser < min_score]), 0)
-    length = len([i for i in ser.index 
+    length = len([i for i in ser.index
         if i in list(FSET.set)])
     self.assertEqual(length, 0)
 
@@ -127,6 +134,22 @@ class TestFeatureSetCollection(unittest.TestCase):
       path = os.path.join(TEST_SERIALIZE_DIR,
           "%s.csv" % stg)
       self.assertTrue(os.path.isfile(path))
+    path = os.path.join(TEST_SERIALIZE_DIR,
+        feature_set_collection.MISC_PCL)
+    self.assertTrue(os.path.isfile(path))
+
+  def testDeserialize(self):
+    if IGNORE_TEST:
+      return
+    self.collection.serialize(TEST_SERIALIZE_DIR)
+    collection = FeatureSetCollection.deserialize(
+        TEST_SERIALIZE_DIR)
+    self.assertEqual(collection._min_score,
+       self.collection._min_score)
+    self.assertEqual(len(self.collection.ser_comb),
+        len(collection.ser_comb))
+    self.assertEqual(len(self.collection.ser_sbfset),
+        len(collection.ser_sbfset))
 
 
 
