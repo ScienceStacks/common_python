@@ -6,6 +6,7 @@ from common_python.classifier import feature_analyzer
 from common_python.util.persister import Persister
 
 import argparse
+import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -61,7 +62,7 @@ class FeatureSet(object):
     """
     Parameters
     ----------
-    descriptor: list/set/string
+    descriptor: list/set/string/FeatureSet
     """
     if isinstance(descriptor, str):
       # Ensure that string is correctly ordered
@@ -71,8 +72,12 @@ class FeatureSet(object):
         or isinstance(descriptor, list):
       self.set = set(descriptor)
       self.str = FeatureSet._makeStr(self.set)
+    elif isinstance(descriptor, FeatureSet):
+      self.set = descriptor.set
+      self.str = descriptor.str
     else:
       raise ValueError("Invalid argument type")
+    self.list = list(self.set)
 
   def __str__(self):
     return self.str
@@ -363,6 +368,63 @@ class FeatureSetCollection(object):
 
     """
     raise ValueError("Not implemented.")
+
+  def profileFset(self, fset):
+    """
+    Creates a DataFrame that the feature sets provided
+    by calculating the contribution to the classification.
+    The profile assumes the use of SVM so that the effect
+    of features is additive. Summing the value of 
+    features in a
+    feature set results in a float. 
+    If this is < 0, it is the
+    0 class, and if > 0, it is the 1 class.
+
+    Values for an instance are calculated by using 
+    that instance as a test set.
+
+    Parameters
+    ----------
+    fset: FeatureSet/str
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: 
+          features - column for each feature in fset
+          cn.SUM - sum of the values of the features
+          cn.PREDICTED - predicted class
+          cn.CLASS - true class value
+        Values: contribution to class
+        Index: instance
+    """
+    fset = FeatureSet(fset)
+    features = list(fset.set)
+    dct = {f: [] for f in fset.set}
+    dct[cn.PREDICTED] = []
+    clf = copy.deepcopy(self._analyzer._clf)
+    df_X = pd.DataFrame(self._analyzer._df_X[features])
+    df_X.index = self._analyzer._df_X.index
+    ser_y = self._analyzer._ser_y
+    #
+    instances = df_X.index.tolist()
+    for instance in instances:
+      test_idxs = [instance]
+      train_idxs = list(set(instances).difference(
+          instance))
+      clf.fit(df_X.loc[train_idxs, :],
+          ser_y.loc[train_idxs])
+      predicted = clf.predict(df_X.loc[test_idxs, :])[0]
+      for idx, feature in enumerate(list(fset.set)):
+        dct[feature].append(clf.coef_[0][idx]  \
+            * df_X.loc[instance, feature])
+      dct[cn.PREDICTED].append(predicted)
+    dct[cn.CLASS] = ser_y.values
+    df = pd.DataFrame(dct)
+    # Compute the sums
+    sers = [df[f] for f in features]
+    df[cn.SUM] = sum(sers)
+    return df
 
 
 if __name__ == '__main__':

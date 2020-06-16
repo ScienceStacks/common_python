@@ -4,13 +4,15 @@ from common_python.classifier.feature_set_collection  \
     import FeatureSetCollection, FeatureSet
 from common_python.classifier  \
     import feature_set_collection
+from common_python.testing import helpers
+from common_python import constants as cn
 
 import numpy as np
 import os
 import shutil
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 IS_PLOT = True
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -87,8 +89,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.assertTrue(result)
 
   def test_ser_comb(self):
-    if IGNORE_TEST:
-      return
+    # TESTING
     ser = self.collection.ser_comb
     ser1 = ser[ser >= MIN_SCORE]
     self.assertTrue(all(ser.eq(ser1)))
@@ -151,6 +152,15 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.assertEqual(len(self.collection.ser_sbfset),
         len(collection.ser_sbfset))
 
+  def testProfileCollection(self):
+    if IGNORE_TEST:
+      return
+    fset = FeatureSet("Rv2009+Rv3830c")
+    df = self.collection.profileFset(fset)
+    columns = [cn.SUM, cn.PREDICTED, cn.CLASS]
+    columns.extend(fset.list)
+    self.assertTrue(helpers.isValidDataFrame(df,
+        expected_columns=columns))
 
 
 if __name__ == '__main__':

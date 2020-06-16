@@ -8,6 +8,7 @@ PCL = "pcl"
 ENSEMBLE_PATH = os.path.join(CODE_DIR, "ensemble_file.%s" % PCL)
 
 # Column names
+ACTUAL = "actual"  # True value
 CLASS = "class"
 COUNT = "count"  # A count
 CLS_FEATURE = "cls_feature"
@@ -22,9 +23,11 @@ KEGG_GENE = "kegg_gene"
 KEGG_EC = "kegg_ec"  # EC number
 KEGG_KO = "kgg_ko"  # KEGG orthology
 MEAN = "mean"
+PREDICTED = "predicted"
 SCORE = "score"
 STERR = "sterr"  # Standard error (std of mean)
 STD = "std"  # Standard deviation of population
+SUM = "sum"  # Sum of values
 VALUE = "value"  # General value
 
 # KEGG Access
