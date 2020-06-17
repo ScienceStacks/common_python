@@ -12,7 +12,7 @@ import os
 import shutil
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_PLOT = True
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +24,7 @@ ANALYZER = test_helpers.getFeatureAnalyzer()
 FEATURE1 = "feature1"
 FEATURE2 = "feature2"
 MIN_SCORE = 0.9
+FSET = FeatureSet("Rv2009+Rv3830c")
 
 
 class TestFeatureSet(unittest.TestCase):
@@ -89,25 +90,14 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.assertTrue(result)
 
   def test_ser_comb(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     ser = self.collection.ser_comb
     ser1 = ser[ser >= MIN_SCORE]
     self.assertTrue(all(ser.eq(ser1)))
     some_true = [feature_set_collection.FEATURE_SEPARATOR
         in f for f in ser.index]
     self.assertTrue(any(some_true))
-
-  def testMakeCandidateSer(self):
-    if IGNORE_TEST:
-      return
-    FSET = FeatureSet({"Rv2009", "Rv1460"})
-    min_score = 0.01
-    ser = self.collection._makeCandidateSer(FSET,
-        min_score=min_score)
-    self.assertEqual(len(ser[ser < min_score]), 0)
-    length = len([i for i in ser.index
-        if i in list(FSET.set)])
-    self.assertEqual(length, 0)
 
   def test_ser_sbfset(self):
     if IGNORE_TEST:
@@ -125,7 +115,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     for fset in fsets:
       features = features.union(fset.set)
       self.assertGreater(len(
-          self.collection._analyzer._df_X[features]), 0)
+          self.collection._analyzer.df_X[features]), 0)
 
   def testSerialize(self):
     if IGNORE_TEST:
@@ -155,12 +145,20 @@ class TestFeatureSetCollection(unittest.TestCase):
   def testProfileCollection(self):
     if IGNORE_TEST:
       return
-    fset = FeatureSet("Rv2009+Rv3830c")
-    df = self.collection.profileFset(fset)
-    columns = [cn.SUM, cn.PREDICTED, cn.CLASS]
-    columns.extend(fset.list)
+    df = self.collection.profileFset(FSET)
+    columns = [cn.SUM, cn.PREDICTED, cn.CLASS,
+        cn.INTERCEPT]
+    columns.extend(FSET.list)
     self.assertTrue(helpers.isValidDataFrame(df,
         expected_columns=columns))
+
+  def testplotProfileFset(self):
+    if IGNORE_TEST:
+      return
+    # Smoke test
+    self.collection.plotProfileFset(FSET,
+        is_plot=IS_PLOT)
+ 
 
 
 if __name__ == '__main__':

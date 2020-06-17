@@ -11,6 +11,8 @@ The state F-statistic for a gene quantifies
 how well it distinguishes between states.
 """
 
+from common_python import constants as cn
+
 import collections
 import copy
 import matplotlib.pyplot as plt
@@ -32,9 +34,11 @@ AdjacentStates = collections.namedtuple(
 ClassifierDescription = collections.namedtuple(
     "ClassifierDescription", "clf features")
 #
+# score - score for cross validations
+# scores - list of scores
 BinaryCrossValidateResult = collections.namedtuple(
     "BinaryCrossValidateResult",
-    "score clf")
+    "score scores")
 
 
 def findAdjacentStates(ser_y, index):
@@ -371,6 +375,49 @@ def partitionByState(ser, holdouts=1):
   train_idxs = list(set(ser.index).difference(test_idxs))
   return train_idxs, test_idxs
 
+def getBinarySVMParameters(clf):
+  return clf.intercept_[0], clf.coef_[0]
+
+def predictBinarySVM(clf, values):
+  """
+  Does binary SVM prediction from the SVM coeficients.
+  :param SVC clf:
+  :param list/array values:
+  :return int in [0, 1]:
+  """
+  intercept, arr1 = getBinarySVMParameters(clf)
+  arr2 = np.array(values)
+  svm_value = arr1.dot(arr2) + intercept
+  if svm_value < 0:
+    binary_class = cn.NCLASS
+  else:
+    binary_class = cn.PCLASS
+  return binary_class
+
+def binaryMultiFit(clf, df_X, ser_y,
+    list_train_idxs=None):
+  """
+  Constructs multiple fits for indices.
+  :param Classifier clf:
+  :param pd.DataFrame df_X:
+      columns: features
+      index: instances
+  :param pd.Series ser_y:
+      index: instances
+      values: binary class values (0, 1)
+  :param list-indexes
+  :return array - mean values of coeficients:
+  """
+  if list_train_idxs is None:
+    list_train_idxs = [df_X.index.to_list()]
+  coefs = np.repeat(0.0, len(df_X.columns))
+  for train_idxs in list_train_idxs:
+    arr_X, arr_y = makeArrays(df_X, ser_y,
+        indices=train_idxs)
+    clf.fit(arr_X, arr_y)
+    coefs += clf.coef_[0]
+  return coefs/len(list_train_idxs)
+
 def binaryCrossValidate(clf, df_X, ser_y,
     partitions=None, num_holdouts=1, num_iteration=10):
   """
@@ -402,7 +449,7 @@ def binaryCrossValidate(clf, df_X, ser_y,
         features=features, is_copy=False,
         train_idxs=train_set, test_idxs=test_set))
   result = BinaryCrossValidateResult(
-      score=np.mean(scores), clf=copy_clf)
+      score=np.mean(scores), scores=scores)
   return result
 
 def correlatePredictions(clf_desc1, clf_desc2,

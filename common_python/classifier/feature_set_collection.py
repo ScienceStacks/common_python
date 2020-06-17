@@ -247,38 +247,6 @@ class FeatureSetCollection(object):
     """
     return disjointify(self.ser_sbfset, **kwargs)
 
-  def _makeCandidateSer(self, fset, min_score=0):
-    """
-    Creates a Series with the features most likely to
-    increase the accuracy of the feature set. The features
-    are chosen based on their incremental predication accuracy
-    (IPA).
-
-    Parameters
-    ----------
-    fset : FeatureSet
-      Set of features.
-
-    Returns
-    -------
-    pd.Series
-        index: feature, sorted by descending value
-        value: max ipa
-    """
-    score_dct = {}
-    for feature in fset.set:
-      ser_ipa = self._analyzer.df_ipa[feature]
-      for other_feature, other_score in ser_ipa.to_dict().items():
-        if not other_feature in score_dct:
-          score_dct[other_feature] = []
-        score_dct[other_feature].append(other_score)
-    ser_dct = {k: max(v) for k, v in score_dct.items()}
-    ser = pd.Series(ser_dct)
-    ser = ser[ser >= min_score]
-    ser = ser.drop(list(fset.set))
-    ser = ser.sort_values(ascending=False)
-    return ser
-
   def serialize(self, dir_path):
     """
     Serializes the computed objects.
@@ -351,25 +319,62 @@ class FeatureSetCollection(object):
     collection._ser_comb = readDF(SER_COMB)
     return collection
 
-  def plotFeatureSetForInstances(self, df_cls):
+  def plotProfileFset(self, fset, is_plot=True,
+      ylim=[-4, 4]):
     """
-    Constructs a bar of feature contibutions to classification.
+    Constructs a bar of feature contibutions to
+    classification.
 
     Parameters
     ----------
-    df_cls : pd.DatafRAME
-      Columns: features
-      Index: instances
-      Values: positive or negative contributions
+    fset: FeatureSet
+    is_plot: bool
 
     Returns
     -------
     None.
-
     """
-    raise ValueError("Not implemented.")
+    df_profile = self.profileFset(fset)
+    instances = df_profile.index.to_list()
+    columns = [cn.INTERCEPT]
+    columns.extend(fset.list)
+    df_plot = pd.DataFrame(df_profile[columns])
+    #
+    def shade(mult):
+      """
+      Shades the region for class 1.
+      :param float mult: direction of shading
+      """
+      class_instances = self._analyzer.ser_y[
+          self._analyzer.ser_y == 1].index.tolist()
+      values = np.repeat(mult, len(class_instances))
+      ax.bar(class_instances, values, alpha=0.3,
+          width=1.0, color="grey")
+    #
+    # Construct the plot
+    ax = df_plot.plot.bar(stacked=True)
+    ax.scatter(instances, df_profile[cn.SUM],
+        color="red")
+    ax.plot([instances[0], instances[-1]], [0, 0],
+        color="black")
+    shade(ylim[0])
+    shade(ylim[1])
+    column_values = [df_plot[c].tolist()
+        for c in columns]
+    labels = [l if i % 3 == 0 else "" for i, l
+        in enumerate(instances)]
+    #ax.bar(df_plot.index, *column_values)
+    ax.set_xticklabels(labels)
+    ax.set_ylabel('distance')
+    ax.set_ylabel('instance')
+    ax.set_ylim(ylim)
+    #ax.set_title('Scores by group and gender')
+    ax.legend()
+ 
+    if is_plot:
+      plt.show()
 
-  def profileFset(self, fset):
+  def profileFset(self, fset, num_fit=10, is_sorted=True):
     """
     Creates a DataFrame that the feature sets provided
     by calculating the contribution to the classification.
@@ -386,46 +391,66 @@ class FeatureSetCollection(object):
     Parameters
     ----------
     fset: FeatureSet/str
+    num_fit: int
+        Number of fits done to estimate parameters
+    is_sorted: bool
+        Sort the returned value using index values
+        after the first character
 
     Returns
     -------
     pd.DataFrame
         Columns: 
           features - column for each feature in fset
+          cn.INTERCEPT
           cn.SUM - sum of the values of the features
+                   and the intercept
           cn.PREDICTED - predicted class
           cn.CLASS - true class value
         Values: contribution to class
-        Index: instance
+        Index: instance, sorted by time and then
     """
+    # Initializations
     fset = FeatureSet(fset)
     features = list(fset.set)
     dct = {f: [] for f in fset.set}
     dct[cn.PREDICTED] = []
-    clf = copy.deepcopy(self._analyzer._clf)
-    df_X = pd.DataFrame(self._analyzer._df_X[features])
-    df_X.index = self._analyzer._df_X.index
-    ser_y = self._analyzer._ser_y
-    #
+    dct[cn.INTERCEPT] = []
+    clf = copy.deepcopy(self._analyzer.clf)
+    df_X = self._analyzer.df_X[features].copy(deep=True)
+    ser_y = self._analyzer.ser_y.copy(deep=True)
+    # Construct contributions of instances
     instances = df_X.index.tolist()
+    predicts = []
     for instance in instances:
-      test_idxs = [instance]
-      train_idxs = list(set(instances).difference(
-          instance))
-      clf.fit(df_X.loc[train_idxs, :],
-          ser_y.loc[train_idxs])
-      predicted = clf.predict(df_X.loc[test_idxs, :])[0]
+      # Create indices for multi-fit
+      indices  = ser_y.index[ser_y.index != instance]
+      ser_sub = ser_y.loc[indices]
+      df_sub = df_X.loc[indices]
+      clf.fit(df_sub, ser_sub)
+      score = clf.score([df_X.loc[instance, :]],
+          [ser_y.loc[instance]])
+      #coefs = util_classifier.binaryMultiFit(clf,
+      #    df_sub, ser_sub)
+      predicted = util_classifier.predictBinarySVM(
+          clf, df_X.loc[instance, :])
+      intercept, coefs = util_classifier.  \
+          getBinarySVMParameters(clf)
       for idx, feature in enumerate(list(fset.set)):
-        dct[feature].append(clf.coef_[0][idx]  \
+        dct[feature].append(coefs[idx]  \
             * df_X.loc[instance, feature])
       dct[cn.PREDICTED].append(predicted)
-    dct[cn.CLASS] = ser_y.values
+      dct[cn.INTERCEPT].append(intercept)
     df = pd.DataFrame(dct)
+    df.index = instances
+    df[cn.CLASS] = ser_y
     # Compute the sums
     sers = [df[f] for f in features]
-    df[cn.SUM] = sum(sers)
+    df[cn.SUM] = sum(sers) + df[cn.INTERCEPT]
+    sorted_index = sorted(instances,
+        key=lambda v: float(v[1:]))
+    df = df.reindex(sorted_index)
     return df
-
 
 if __name__ == '__main__':
   msg = "Construct FeatureSetCollection metrics."

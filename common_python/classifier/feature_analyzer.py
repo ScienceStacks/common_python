@@ -223,6 +223,18 @@ class FeatureAnalyzer(object):
 
   ### METRICS ###
   @property
+  def df_X(self):
+    return self._df_X
+
+  @property
+  def ser_y(self):
+    return self._ser_y
+
+  @property
+  def clf(self):
+    return self._clf
+
+  @property
   def ser_sfa(self):
     """
     Construct series for single feature accuracy
