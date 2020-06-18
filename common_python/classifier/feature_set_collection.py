@@ -380,13 +380,20 @@ class FeatureSetCollection(object):
     if is_plot:
       plt.show()
 
-  def plotProfileFsets(self, fsets, is_plot, **kwargs):
+  def plotProfileFsets(self, fsets, is_plot=True,
+      **kwargs):
+    """
+    Profile plots for feature sets.
+    :param list-FeatureSet/list-str
+    :param bool is_plot:
+    :param dict options for plot:
+    """
     count = len(fsets)
-    fig, axes = plt.subplots(1, count)
+    fig, axes = plt.subplots(1, count, **kwargs)
     x_spacing = 3*count
     for idx, fset in enumerate(fsets):
       self.plotProfileFset(fset, ax=axes[idx],
-          is_plot=False, x_spacing=x_spacing, **kwargs)
+          is_plot=False, x_spacing=x_spacing)
     if is_plot:
       plt.show()
 

@@ -93,6 +93,8 @@ class TestFeatureSetCollection(unittest.TestCase):
       return
     ser = self.collection.ser_comb
     ser1 = ser[ser >= MIN_SCORE]
+    if not all(ser.eq(ser1)):
+      import pdb; pdb.set_trace() # Catch intermitent bug
     self.assertTrue(all(ser.eq(ser1)))
     some_true = [feature_set_collection.FEATURE_SEPARATOR
         in f for f in ser.index]
