@@ -13,7 +13,7 @@ import shutil
 import unittest
 
 IGNORE_TEST = False
-IS_PLOT = True
+IS_PLOT = False
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR_PATH = os.path.join(TEST_DIR,
@@ -24,7 +24,6 @@ ANALYZER = test_helpers.getFeatureAnalyzer()
 FEATURE1 = "feature1"
 FEATURE2 = "feature2"
 MIN_SCORE = 0.9
-FSET = FeatureSet("Rv2009+Rv3830c")
 
 
 class TestFeatureSet(unittest.TestCase):
@@ -145,10 +144,12 @@ class TestFeatureSetCollection(unittest.TestCase):
   def testProfileCollection(self):
     if IGNORE_TEST:
       return
-    df = self.collection.profileFset(FSET)
+    fset_stg = self.collection.ser_comb.index.tolist()[0]
+    fset = FeatureSet(fset_stg)
+    df = self.collection.profileFset(fset)
     columns = [cn.SUM, cn.PREDICTED, cn.CLASS,
         cn.INTERCEPT]
-    columns.extend(FSET.list)
+    columns.extend(fset.list)
     self.assertTrue(helpers.isValidDataFrame(df,
         expected_columns=columns))
 
@@ -156,7 +157,17 @@ class TestFeatureSetCollection(unittest.TestCase):
     if IGNORE_TEST:
       return
     # Smoke test
-    self.collection.plotProfileFset(FSET,
+    fset_stg = self.collection.ser_comb.index.tolist()[0]
+    fset = FeatureSet(fset_stg)
+    self.collection.plotProfileFset(fset,
+        is_plot=IS_PLOT, title="Class 1")
+
+  def testplotProfileFsets(self):
+    if IGNORE_TEST:
+      return
+    # Smoke test
+    fset_stgs = self.collection.ser_comb.index.tolist()
+    self.collection.plotProfileFsets(fset_stgs,
         is_plot=IS_PLOT)
  
 

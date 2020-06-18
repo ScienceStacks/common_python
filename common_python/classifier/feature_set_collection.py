@@ -319,21 +319,26 @@ class FeatureSetCollection(object):
     collection._ser_comb = readDF(SER_COMB)
     return collection
 
-  def plotProfileFset(self, fset, is_plot=True,
-      ylim=[-4, 4]):
+  def plotProfileFset(self, descriptor, is_plot=True,
+      ylim=[-4, 4], title="", ax=None, x_spacing=3):
     """
     Constructs a bar of feature contibutions to
     classification.
 
     Parameters
     ----------
-    fset: FeatureSet
+    descriptor: FeatureSet/str
     is_plot: bool
+    ylim: list-float
+    title: str
+    x_spacing: int
+        spacing between xaxis labels
 
     Returns
     -------
     None.
     """
+    fset = FeatureSet(descriptor)
     df_profile = self.profileFset(fset)
     instances = df_profile.index.to_list()
     columns = [cn.INTERCEPT]
@@ -352,7 +357,10 @@ class FeatureSetCollection(object):
           width=1.0, color="grey")
     #
     # Construct the plot
-    ax = df_plot.plot.bar(stacked=True)
+    if ax is None:
+      ax = df_plot.plot.bar(stacked=True)
+    else:
+      df_plot.plot.bar(stacked=True, ax=ax)
     ax.scatter(instances, df_profile[cn.SUM],
         color="red")
     ax.plot([instances[0], instances[-1]], [0, 0],
@@ -361,16 +369,24 @@ class FeatureSetCollection(object):
     shade(ylim[1])
     column_values = [df_plot[c].tolist()
         for c in columns]
-    labels = [l if i % 3 == 0 else "" for i, l
+    labels = [l if i % x_spacing == 0 else "" for i, l
         in enumerate(instances)]
-    #ax.bar(df_plot.index, *column_values)
     ax.set_xticklabels(labels)
-    ax.set_ylabel('distance')
-    ax.set_ylabel('instance')
+    #ax.set_ylabel('distance')
+    #ax.set_xlabel('instance')
     ax.set_ylim(ylim)
-    #ax.set_title('Scores by group and gender')
+    ax.set_title(title)
     ax.legend()
- 
+    if is_plot:
+      plt.show()
+
+  def plotProfileFsets(self, fsets, is_plot, **kwargs):
+    count = len(fsets)
+    fig, axes = plt.subplots(1, count)
+    x_spacing = 3*count
+    for idx, fset in enumerate(fsets):
+      self.plotProfileFset(fset, ax=axes[idx],
+          is_plot=False, x_spacing=x_spacing, **kwargs)
     if is_plot:
       plt.show()
 
