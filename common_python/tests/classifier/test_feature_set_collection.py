@@ -1,7 +1,8 @@
-
 from common_python.tests.classifier import helpers as test_helpers
 from common_python.classifier.feature_set_collection  \
-    import FeatureSetCollection, FeatureSet
+    import FeatureSetCollection
+from common_python.classifier.feature_set  \
+    import FeatureSet
 from common_python.classifier  \
     import feature_set_collection
 from common_python.testing import helpers
@@ -21,42 +22,7 @@ TEST_DIR_PATH = os.path.join(TEST_DIR,
 TEST_SERIALIZE_DIR = os.path.join(TEST_DIR,
     "test_feature_set_collection_serialize")
 ANALYZER = test_helpers.getFeatureAnalyzer()
-FEATURE1 = "feature1"
-FEATURE2 = "feature2"
 MIN_SCORE = 0.9
-
-
-class TestFeatureSet(unittest.TestCase):
-
-  def _remove(self):
-    paths = [os.path.join(TEST_SERIALIZE_DIR,
-        feature_set_collection.MISC_PCL)]
-    csv_file_names = [feature_set_collection.SER_COMB,
-        feature_set_collection.SER_SBFSET]
-    [paths.append(
-        os.path.join(TEST_SERIALIZE_DIR, "%s.csv" % f))
-        for f in csv_file_names]
-    for path in paths:
-      if os.path.isfile(path):
-        os.remove(path)
-
-  def setUp(self):
-    self._remove()
-    self.fset = FeatureSet([FEATURE1, FEATURE2])
-
-  def tearDown(self):
-    self._remove()
-
-  def testStr(self):
-    if IGNORE_TEST:
-      return
-    self.assertEqual(self.fset.str, str(self.fset))
-
-  def testEquals(self):
-    if IGNORE_TEST:
-      return
-    fset = FeatureSet([FEATURE2, FEATURE1])
-    self.assertTrue(self.fset.equals(fset))
 
 
 ##########################################
@@ -143,33 +109,12 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.assertEqual(len(self.collection.ser_sbfset),
         len(collection.ser_sbfset))
 
-  def testProfileCollection(self):
-    if IGNORE_TEST:
-      return
-    fset_stg = self.collection.ser_comb.index.tolist()[0]
-    fset = FeatureSet(fset_stg)
-    df = self.collection.profileFset(fset)
-    columns = [cn.SUM, cn.PREDICTED, cn.CLASS,
-        cn.INTERCEPT]
-    columns.extend(fset.list)
-    self.assertTrue(helpers.isValidDataFrame(df,
-        expected_columns=columns))
-
-  def testplotProfileFset(self):
-    if IGNORE_TEST:
-      return
-    # Smoke test
-    fset_stg = self.collection.ser_comb.index.tolist()[0]
-    fset = FeatureSet(fset_stg)
-    self.collection.plotProfileFset(fset,
-        is_plot=IS_PLOT)
-
-  def testplotProfileFsets(self):
+  def testplotProfile(self):
     if IGNORE_TEST:
       return
     # Smoke test
     fset_stgs = self.collection.ser_comb.index.tolist()
-    self.collection.plotProfileFsets(fset_stgs,
+    self.collection.plotProfile(fset_stgs,
         is_plot=IS_PLOT)
  
 

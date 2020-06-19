@@ -269,7 +269,7 @@ class FeatureSetCollection(object):
     collection._ser_comb = readDF(SER_COMB)
     return collection
 
-  def plotProfileFsets(self, fsets, is_plot=True,
+  def plotProfile(self, fsets, is_plot=True,
       **kwargs):
     """
     Profile plots for feature sets.
@@ -281,7 +281,8 @@ class FeatureSetCollection(object):
     fig, axes = plt.subplots(1, count, **kwargs)
     x_spacing = 3*count
     for idx, fset in enumerate(fsets):
-      self.plotProfileFset(fset, ax=axes[idx],
+      fset = FeatureSet(fset, analyzer=self._analyzer)
+      fset.plotProfile(ax=axes[idx],
           is_plot=False, x_spacing=x_spacing)
     if is_plot:
       plt.show()
