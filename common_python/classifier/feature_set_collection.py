@@ -1,6 +1,8 @@
-'''Constructs and evaluates alternative selections of classifier features.'''
+'''Constructs and evaluates alternative classifier features.'''
 
 import common_python.constants as cn
+from common_python.classifier.feature_set  \
+    import FeatureSet
 from common_python.classifier import util_classifier
 from common_python.classifier import feature_analyzer
 from common_python.util.persister import Persister
@@ -15,7 +17,6 @@ import seaborn
 
 MIN_FRAC_INCR = 1.01  # Must increase by at least 1%
 MIN_SCORE = 0
-FEATURE_SEPARATOR = "+"
 SER_SBFSET = "ser_sbfset"
 SER_COMB = "ser_comb"
 COMPUTES = [SER_SBFSET, SER_COMB]
@@ -55,57 +56,6 @@ def disjointify(ser_fset, min_score=MIN_SCORE):
 
 
 ############### CLASSES ####################
-class FeatureSet(object):
-  '''Represetation of a set of features'''
-
-  def __init__(self, descriptor):
-    """
-    Parameters
-    ----------
-    descriptor: list/set/string/FeatureSet
-    """
-    if isinstance(descriptor, str):
-      # Ensure that string is correctly ordered
-      self.set = FeatureSet._unmakeStr(descriptor)
-      self.str = FeatureSet._makeStr(self.set)
-    elif isinstance(descriptor, set)  \
-        or isinstance(descriptor, list):
-      self.set = set(descriptor)
-      self.str = FeatureSet._makeStr(self.set)
-    elif isinstance(descriptor, FeatureSet):
-      self.set = descriptor.set
-      self.str = descriptor.str
-    else:
-      raise ValueError("Invalid argument type")
-    self.list = list(self.set)
-
-  def __str__(self):
-    return self.str
-
-  @staticmethod
-  def _makeStr(features):
-    """
-    Creates a string for a feature set
-    :param iterable-str features:
-    :return str:
-    """
-    f_list = list(features)
-    f_list.sort()
-    return cn.FEATURE_SEPARATOR.join(f_list)
-
-  @staticmethod
-  def _unmakeStr(fset_stg):
-    """
-    Recovers a feature set from a string
-    """
-    return set(fset_stg.split(cn.FEATURE_SEPARATOR))
-
-  def equals(self, other):
-    diff = self.set.symmetric_difference(other.set)
-    return len(diff) == 0
-
-
-########################################
 class FeatureSetCollection(object):
 
   def __init__(self, analyzer, min_score=MIN_SCORE):
@@ -319,67 +269,6 @@ class FeatureSetCollection(object):
     collection._ser_comb = readDF(SER_COMB)
     return collection
 
-  def plotProfileFset(self, descriptor, is_plot=True,
-      ylim=[-4, 4], title="", ax=None, x_spacing=3):
-    """
-    Constructs a bar of feature contibutions to
-    classification.
-
-    Parameters
-    ----------
-    descriptor: FeatureSet/str
-    is_plot: bool
-    ylim: list-float
-    title: str
-    x_spacing: int
-        spacing between xaxis labels
-
-    Returns
-    -------
-    None.
-    """
-    fset = FeatureSet(descriptor)
-    df_profile = self.profileFset(fset)
-    instances = df_profile.index.to_list()
-    columns = [cn.INTERCEPT]
-    columns.extend(fset.list)
-    df_plot = pd.DataFrame(df_profile[columns])
-    #
-    def shade(mult):
-      """
-      Shades the region for class 1.
-      :param float mult: direction of shading
-      """
-      class_instances = self._analyzer.ser_y[
-          self._analyzer.ser_y == 1].index.tolist()
-      values = np.repeat(mult, len(class_instances))
-      ax.bar(class_instances, values, alpha=0.3,
-          width=1.0, color="grey")
-    #
-    # Construct the plot
-    if ax is None:
-      ax = df_plot.plot.bar(stacked=True)
-    else:
-      df_plot.plot.bar(stacked=True, ax=ax)
-    ax.scatter(instances, df_profile[cn.SUM],
-        color="red")
-    ax.plot([instances[0], instances[-1]], [0, 0],
-        color="black")
-    shade(ylim[0])
-    shade(ylim[1])
-    column_values = [df_plot[c].tolist()
-        for c in columns]
-    labels = [l if i % x_spacing == 0 else "" for i, l
-        in enumerate(instances)]
-    ax.set_xticklabels(labels)
-    #ax.set_ylabel('distance')
-    #ax.set_xlabel('instance')
-    ax.set_ylim(ylim)
-    ax.set_title(title)
-    ax.legend()
-    if is_plot:
-      plt.show()
-
   def plotProfileFsets(self, fsets, is_plot=True,
       **kwargs):
     """
@@ -397,84 +286,6 @@ class FeatureSetCollection(object):
     if is_plot:
       plt.show()
 
-  def profileFset(self, fset, num_fit=10, is_sorted=True):
-    """
-    Creates a DataFrame that the feature sets provided
-    by calculating the contribution to the classification.
-    The profile assumes the use of SVM so that the effect
-    of features is additive. Summing the value of 
-    features in a
-    feature set results in a float. 
-    If this is < 0, it is the
-    0 class, and if > 0, it is the 1 class.
-
-    Values for an instance are calculated by using 
-    that instance as a test set.
-
-    Parameters
-    ----------
-    fset: FeatureSet/str
-    num_fit: int
-        Number of fits done to estimate parameters
-    is_sorted: bool
-        Sort the returned value using index values
-        after the first character
-
-    Returns
-    -------
-    pd.DataFrame
-        Columns: 
-          features - column for each feature in fset
-          cn.INTERCEPT
-          cn.SUM - sum of the values of the features
-                   and the intercept
-          cn.PREDICTED - predicted class
-          cn.CLASS - true class value
-        Values: contribution to class
-        Index: instance, sorted by time and then
-    """
-    # Initializations
-    fset = FeatureSet(fset)
-    features = list(fset.set)
-    dct = {f: [] for f in fset.set}
-    dct[cn.PREDICTED] = []
-    dct[cn.INTERCEPT] = []
-    clf = copy.deepcopy(self._analyzer.clf)
-    df_X = self._analyzer.df_X[features].copy(deep=True)
-    ser_y = self._analyzer.ser_y.copy(deep=True)
-    # Construct contributions of instances
-    instances = df_X.index.tolist()
-    predicts = []
-    for instance in instances:
-      # Create indices for multi-fit
-      indices  = ser_y.index[ser_y.index != instance]
-      ser_sub = ser_y.loc[indices]
-      df_sub = df_X.loc[indices]
-      clf.fit(df_sub, ser_sub)
-      score = clf.score([df_X.loc[instance, :]],
-          [ser_y.loc[instance]])
-      #coefs = util_classifier.binaryMultiFit(clf,
-      #    df_sub, ser_sub)
-      predicted = util_classifier.predictBinarySVM(
-          clf, df_X.loc[instance, :])
-      intercept, coefs = util_classifier.  \
-          getBinarySVMParameters(clf)
-      for idx, feature in enumerate(list(fset.set)):
-        dct[feature].append(coefs[idx]  \
-            * df_X.loc[instance, feature])
-      dct[cn.PREDICTED].append(predicted)
-      dct[cn.INTERCEPT].append(intercept)
-    df = pd.DataFrame(dct)
-    df.index = instances
-    df[cn.CLASS] = ser_y
-    # Compute the sums
-    sers = [df[f] for f in features]
-    df[cn.SUM] = sum(sers) + df[cn.INTERCEPT]
-    sorted_index = sorted(instances,
-        key=lambda v: float(v[1:]))
-    df = df.reindex(sorted_index)
-    return df
-
 if __name__ == '__main__':
   msg = "Construct FeatureSetCollection metrics."
   parser = argparse.ArgumentParser(description=msg)
@@ -490,4 +301,3 @@ if __name__ == '__main__':
     collection = FeatureSetCollection(analyzer_dct[key])
   collection = FeatureSetCollection.deserialize(args.path)
   collection.serialize(args.path)
-

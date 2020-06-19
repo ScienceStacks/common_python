@@ -162,7 +162,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     fset_stg = self.collection.ser_comb.index.tolist()[0]
     fset = FeatureSet(fset_stg)
     self.collection.plotProfileFset(fset,
-        is_plot=IS_PLOT, title="Class 1")
+        is_plot=IS_PLOT)
 
   def testplotProfileFsets(self):
     if IGNORE_TEST:
