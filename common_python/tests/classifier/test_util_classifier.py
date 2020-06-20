@@ -1,5 +1,6 @@
 from common_python import constants as cn
 from common_python.classifier import util_classifier
+from common_python.util import util
 from common_python.tests.classifier  \
     import helpers as test_helpers
 from common_python.classifier import classifier_ensemble
@@ -47,16 +48,6 @@ SER_Y_BINARY = pd.Series([
     for v in SER_Y_ALL],
     index=SER_Y_ALL.index)
 CLF = svm.LinearSVC()
-
-################ HELPERS #################
-def _makeTrinary(v):
-  if v < 0:
-    return -1
-  elif v > 0:
-    return 1
-  else:
-    return 0
-
 
 ################ TESTS #################
 class TestFunctions(unittest.TestCase):
@@ -286,8 +277,8 @@ class TestFunctions(unittest.TestCase):
         trinary_values)
     for f1, f2 in iterator:
       vec = np.array([1, f1, f2])
-      sum1 = _makeTrinary(sum(vec*values1))
-      sum2 = _makeTrinary(sum(vec*values2))
+      sum1 = util.makeTrinary(sum(vec*values1))
+      sum2 = util.makeTrinary(sum(vec*values2))
       self.assertEqual(sum1, sum2)
 
   def testCorrelatePrediction(self):

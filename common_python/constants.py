@@ -27,6 +27,7 @@ MEAN = "mean"
 PREDICTED = "predicted"  # Predicted valuejjj
 SCORE = "score"
 STERR = "sterr"  # Standard error (std of mean)
+SIGLVL = "siglvl"
 STD = "std"  # Standard deviation of population
 SUM = "sum"  # Sum of values
 VALUE = "value"  # General value
@@ -57,4 +58,5 @@ UPPER_CASE = [x for x in map(chr, range(65, 91))]
 PCLASS = 1  # Positive class
 NCLASS = 0  # Negative class
 FEATURE_SEPARATOR = "+" # Separator in string with multiple features
+TRINARY_VALUES = [-1, 0, 1]
 

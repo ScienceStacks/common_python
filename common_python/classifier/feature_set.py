@@ -4,9 +4,11 @@ import common_python.constants as cn
 from common_python.classifier import util_classifier
 from common_python.classifier import feature_analyzer
 from common_python.util.persister import Persister
+from common_python.util.util import util
 
 import argparse
 import copy
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -55,11 +57,11 @@ class FeatureSet(object):
     if self._analyzer is not None:
       fit_partitions = [t for t, _ in 
           self._analyzer.partitions]
-      self.intercept, self.coefs = util_classifier
-          .binaryMultiFit(self._analyzer._clf,
+      self.intercept, self.coefs  \
+          = util_classifier.binaryMultiFit(
+          self._analyzer._clf,
           self._analyzer.df_X, self._analyzer.ser_y,
-          partitions=fit_partitions)
-    import pdb; pdb.set_trace()
+          list_train_idxs=fit_partitions)
 
   def __str__(self):
     return self.str
@@ -82,19 +84,43 @@ class FeatureSet(object):
     """
     return set(fset_stg.split(cn.FEATURE_SEPARATOR))
 
-  def _calcParameters(self):
+  def _evaluateByTrinaryValue(self):
     """
-    Calculates the average value of parameters
-    across instances for an SVM.
-    :return float, list-float
-         intercept, coefs
-    """
-    intercept, coefs = util_classifier.binaryMultiFit(
-        df_sub, ser_sub)
+    Constructs a dataframe used to evaluate membership in the
+    positive class based on the trinary values of features
+    in the feature set.
 
-  def equals(self, other):
-    diff = self.set.symmetric_difference(other.set)
-    return len(diff) == 0
+    Parameters
+    ----------
+    sort_function: Function
+        single value; returns float
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: 
+          cn.PREDICTED - predicted class
+          cn.CLASS - true class value
+          cn.COUNT - count of occurrences in feature vector
+          cn.SIGLVL - significance level at least 
+              that count
+              in the feature vector for a positive class
+        Values: contribution to class
+        Index: trinary values of features
+        Index.name: string representation of FeatureSet.
+    """
+    dct = {cn.PREDICTED: [], cn.COUNT: [], cn.VALUE}
+    iterator = itertools.product(cn.TRINARY_VALUES,
+        len(self.list))
+    for feature_values in iterator:
+      value = np.array(feature_values)*self.coefs +  \
+          self.intercept
+      dct[cn.VALUE].append(feature_values)
+      dct[cn.PREDICTED].append(
+          util.makeBinaryClass(value))
+    # TODO: (1) counts of rows satisfying trinary values
+      
+
 
   def profile(self, sort_function=SORT_FUNCTION):
     """
@@ -108,7 +134,8 @@ class FeatureSet(object):
     0 class, and if > 0, it is the 1 class.
 
     Values for an instance are calculated by using 
-    that instance as a test set.
+    that instance as a test set. So, the parameters
+    obtained may differ from self.intercept, self.coefs.
 
     Parameters
     ----------

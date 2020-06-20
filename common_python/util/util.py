@@ -1,4 +1,6 @@
-'''Utility routines.'''
+'''Utility routines.''' 
+
+import common_python.constants as cn
 
 import os
 import random
@@ -290,4 +292,20 @@ def decimalToBinary(dec):
   length = len(binary_stg)
   return np.array([int(binary_stg[i])
       for i in range(length)])
-  
+
+def makeTrinary(v):
+  if v < 0:
+    return -1
+  elif v > 0:
+    return 1
+  else:
+    return 0
+
+def makeBinaryClass(v):
+  if v < 0:
+    return cn.NCLASS
+  elif v > 0:
+    return cn.PCLASS
+  else:
+    return np.nan
+
