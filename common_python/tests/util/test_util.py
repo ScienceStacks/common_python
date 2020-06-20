@@ -181,10 +181,21 @@ class TestFunctions(unittest.TestCase):
     self.assertTrue(dff.equals(df_new))
 
   def testIsSetEqual(self):
+    if IGNORE_TEST:
+      return
     SET1 = [1, 2, 3]
     SET2 = [1, 2]
     self.assertTrue(ut.isSetEqual(SET1, SET1))
     self.assertFalse(ut.isSetEqual(SET1, SET2))
+
+  def testDecimalToBinary(self):
+    if IGNORE_TEST:
+      return
+    NUM = 6 
+    arr_bin = ut.decimalToBinary(NUM)
+    arr_power = np.array([4, 2, 1])
+    self.assertEqual(NUM,
+        sum(arr_power*arr_bin))
 
 
 if __name__ == '__main__':

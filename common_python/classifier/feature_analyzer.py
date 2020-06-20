@@ -221,7 +221,11 @@ class FeatureAnalyzer(object):
       else:
         pass
 
-  ### METRICS ###
+  ### PROPERTIES ###
+  @property
+  def partitions(self):
+    return self._partitions
+
   @property
   def df_X(self):
     return self._df_X

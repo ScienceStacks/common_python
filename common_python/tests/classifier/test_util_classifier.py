@@ -6,6 +6,7 @@ from common_python.classifier import classifier_ensemble
 from common_python.testing import helpers
 
 import copy
+import itertools
 import pandas as pd
 import random
 import numpy as np
@@ -47,7 +48,17 @@ SER_Y_BINARY = pd.Series([
     index=SER_Y_ALL.index)
 CLF = svm.LinearSVC()
 
+################ HELPERS #################
+def _makeTrinary(v):
+  if v < 0:
+    return -1
+  elif v > 0:
+    return 1
+  else:
+    return 0
 
+
+################ TESTS #################
 class TestFunctions(unittest.TestCase):
 
   def setUp(self):
@@ -240,8 +251,44 @@ class TestFunctions(unittest.TestCase):
         DF_X_BINARY, SER_Y_BINARY, num_holdouts=1,
         num_iteration=SIZE)
     score_many2 = bcv_result.score
+    self.assertEqual(len(bcv_result.clfs), SIZE)
     self.assertLess(np.abs(score_many-score_many2),
         0.1)
+
+  def testBinaryMultiFit(self):
+    if IGNORE_TEST:
+      return
+    SIZE = 20
+    FEATURES = ["Rv2009", "Rv3830c"]
+    partitions = [util_classifier.partitionByState(
+        SER_Y_BINARY, holdouts=1)
+        for _ in range(SIZE)]
+    fit_partitions = [t for t,_ in partitions]
+    bcv_result = util_classifier.binaryCrossValidate(CLF,
+        DF_X_BINARY[FEATURES], SER_Y_BINARY,
+        partitions=partitions)
+    intercept, coefs = util_classifier.binaryMultiFit(CLF,
+        DF_X_BINARY[FEATURES], SER_Y_BINARY,
+        list_train_idxs=fit_partitions)
+    values1 = [intercept]
+    values1.extend(coefs.tolist())
+    values2 = [np.mean([c.intercept_[0] 
+         for c in bcv_result.clfs])]
+    mean_coefs = []
+    [mean_coefs.extend(c.coef_) for c in bcv_result.clfs]
+    mean_coefs = sum(mean_coefs)/SIZE
+    values2.extend(mean_coefs.tolist())
+    # Check that the two results are equivalent in that
+    # for every assignment of trainary value, we have
+    # the same trinary value
+    trinary_values = [-1, 0, 1]
+    iterator = itertools.product(trinary_values,
+        trinary_values)
+    for f1, f2 in iterator:
+      vec = np.array([1, f1, f2])
+      sum1 = _makeTrinary(sum(vec*values1))
+      sum2 = _makeTrinary(sum(vec*values2))
+      self.assertEqual(sum1, sum2)
 
   def testCorrelatePrediction(self):
     if IGNORE_TEST:

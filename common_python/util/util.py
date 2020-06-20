@@ -284,3 +284,10 @@ def trimUnnamed(df):
 def isSetEqual(set1, set2):
   diff = set(set(set1)).symmetric_difference(set2)
   return len(diff) == 0
+
+def decimalToBinary(dec):
+  binary_stg = bin(dec)[2:]
+  length = len(binary_stg)
+  return np.array([int(binary_stg[i])
+      for i in range(length)])
+  

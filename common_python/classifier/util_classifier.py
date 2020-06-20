@@ -36,9 +36,10 @@ ClassifierDescription = collections.namedtuple(
 #
 # score - score for cross validations
 # scores - list of scores
+# clfs - list of classifiers
 BinaryCrossValidateResult = collections.namedtuple(
     "BinaryCrossValidateResult",
-    "score scores")
+    "score scores clfs")
 
 
 def findAdjacentStates(ser_y, index):
@@ -397,7 +398,8 @@ def predictBinarySVM(clf, values):
 def binaryMultiFit(clf, df_X, ser_y,
     list_train_idxs=None):
   """
-  Constructs multiple fits for indices.
+  Constructs multiple fits for indices for a classifier
+  that has an intercept and coefs_.
   :param Classifier clf:
   :param pd.DataFrame df_X:
       columns: features
@@ -406,17 +408,22 @@ def binaryMultiFit(clf, df_X, ser_y,
       index: instances
       values: binary class values (0, 1)
   :param list-indexes
-  :return array - mean values of coeficients:
+  :return float, array
+      intercept
+      mean values of coeficients:
   """
   if list_train_idxs is None:
     list_train_idxs = [df_X.index.to_list()]
   coefs = np.repeat(0.0, len(df_X.columns))
+  intercept = 0
+  length = len(list_train_idxs)
   for train_idxs in list_train_idxs:
     arr_X, arr_y = makeArrays(df_X, ser_y,
         indices=train_idxs)
     clf.fit(arr_X, arr_y)
     coefs += clf.coef_[0]
-  return coefs/len(list_train_idxs)
+    intercept += clf.intercept_[0]
+  return intercept/length, coefs/length
 
 def binaryCrossValidate(clf, df_X, ser_y,
     partitions=None, num_holdouts=1, num_iteration=10):
@@ -438,18 +445,21 @@ def binaryCrossValidate(clf, df_X, ser_y,
       cross validations if constructing partitions
   :return BinaryCrossValidate:
   """
-  iterator = makePartitioner(ser_y=ser_y,
-    partitions=partitions, num_iteration=num_iteration,
-    num_holdout=num_holdouts)
+  if partitions is None:
+    partitions = [p for p in 
+        partitioner(ser_y, num_iteration,
+        num_holdout=num_holdouts)]
   scores = []
   features = df_X.columns.tolist()
-  copy_clf = copy.deepcopy(clf)
-  for train_set, test_set in iterator:
+  clfs = []
+  for train_set, test_set in partitions:
+    copy_clf = copy.deepcopy(clf)
     scores.append(scoreFeatures(copy_clf, df_X, ser_y,
         features=features, is_copy=False,
         train_idxs=train_set, test_idxs=test_set))
+    clfs.append(copy_clf)
   result = BinaryCrossValidateResult(
-      score=np.mean(scores), scores=scores)
+      score=np.mean(scores), scores=scores, clfs=clfs)
   return result
 
 def correlatePredictions(clf_desc1, clf_desc2,

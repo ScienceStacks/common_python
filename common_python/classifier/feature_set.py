@@ -19,7 +19,11 @@ SORT_FUNCTION = lambda v: float(v[1:])
 
 ############### CLASSES ####################
 class FeatureSet(object):
-  '''Represetation of a set of features'''
+  """
+  Represetation of a set of features. Assumes
+  an SVM classifier so that the classifier parameters
+  are an intercept and feature multipliers.
+  """
 
   def __init__(self, descriptor, analyzer=None):
     """
@@ -28,6 +32,9 @@ class FeatureSet(object):
     descriptor: list/set/string/FeatureSet
     analyzer: FeatureAnalyzer
     """
+    # The following are values averaged across instances
+    self.intercept = None  # y-axis offset
+    self.coefs = None  # Feature multipliers
     if isinstance(descriptor, str):
       # Ensure that string is correctly ordered
       self.set = FeatureSet._unmakeStr(descriptor)
@@ -45,6 +52,14 @@ class FeatureSet(object):
     else:
       raise ValueError("Invalid argument type")
     self.list = list(self.set)
+    if self._analyzer is not None:
+      fit_partitions = [t for t, _ in 
+          self._analyzer.partitions]
+      self.intercept, self.coefs = util_classifier
+          .binaryMultiFit(self._analyzer._clf,
+          self._analyzer.df_X, self._analyzer.ser_y,
+          partitions=fit_partitions)
+    import pdb; pdb.set_trace()
 
   def __str__(self):
     return self.str
@@ -66,6 +81,16 @@ class FeatureSet(object):
     Recovers a feature set from a string
     """
     return set(fset_stg.split(cn.FEATURE_SEPARATOR))
+
+  def _calcParameters(self):
+    """
+    Calculates the average value of parameters
+    across instances for an SVM.
+    :return float, list-float
+         intercept, coefs
+    """
+    intercept, coefs = util_classifier.binaryMultiFit(
+        df_sub, ser_sub)
 
   def equals(self, other):
     diff = self.set.symmetric_difference(other.set)
@@ -123,8 +148,6 @@ class FeatureSet(object):
       clf.fit(df_sub, ser_sub)
       score = clf.score([df_X.loc[instance, :]],
           [ser_y.loc[instance]])
-      #coefs = util_classifier.binaryMultiFit(clf,
-      #    df_sub, ser_sub)
       predicted = util_classifier.predictBinarySVM(
           clf, df_X.loc[instance, :])
       intercept, coefs = util_classifier.  \

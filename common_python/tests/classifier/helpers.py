@@ -2,8 +2,6 @@
 
 from common_python.util.persister import Persister
 from common_python.classifier import feature_analyzer
-from common_python.classifier  \
-    import feature_set_collection
 
 import os
 import numpy as np
