@@ -8,7 +8,7 @@ import numpy as np
 import os
 import unittest
 
-IGNORE_TEST = True
+IGNORE_TEST = False
 IS_PLOT = False
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -56,14 +56,14 @@ class TestFeatureSet(unittest.TestCase):
     fset.plotProfileInstance(is_plot=IS_PLOT)
 
   def testplotProfileTrinary(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     fset = FeatureSet(FEATURE_SET_STG, analyzer=ANALYZER)
     df = fset.profileTrinary()
-    columns = [cn.PREDICED, cn.FRACPOS,
-        cn.FRACNEG, cn.SIGLVL, cn.COUNT]
+    columns = [cn.PREDICTED, cn.FRAC, cn.SIGLVL_POS,
+        cn.SIGLVL_NEG, cn.COUNT, cn.FEATURE_SET]
     self.assertTrue(helpers.isValidDataFrame(df,
         expected_columns=columns))
-    import pdb; pdb.set_trace()
 
 
 if __name__ == '__main__':

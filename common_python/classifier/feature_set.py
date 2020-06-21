@@ -13,10 +13,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+import scipy.stats as stats
 import seaborn
 
 FEATURE_SEPARATOR = "+"
-SORT_FUNCTION = lambda v: float(v[1:])
+SORT_FUNC = lambda v: float(v[1:])
+PROB_EQUAL = 0.5
 
 
 ############### CLASSES ####################
@@ -67,6 +69,10 @@ class FeatureSet(object):
   def __str__(self):
     return self.str
 
+  def equals(self, other):
+    diff = self.set.symmetric_difference(other.set)
+    return len(diff) == 0
+
   @staticmethod
   def _makeStr(features):
     """
@@ -107,6 +113,7 @@ class FeatureSet(object):
               that count
               in the feature vector for a positive class
           cn.COUNT - number of feature vectors with value
+          cn.FEATURE_SET
         Values: contribution to class
         Index: trinary values of features
         Index.name: string representation of FeatureSet.
@@ -146,10 +153,35 @@ class FeatureSet(object):
     # Nan counts are zeros
     df[cn.COUNT] = df[cn.COUNT].apply(lambda v:
         0 if np.isnan(v) else v)
+    # Calculate significance levels
+    pos_list = []
+    neg_list = []
+    for _, row in df.iterrows():
+      if row[cn.COUNT] == 0:
+        siglvl_pos = 1.0
+        siglvl_neg = 1.0
+      else:
+        count_pos = int(row[cn.COUNT]*row[cn.FRAC])
+        if count_pos == 0:
+          siglvl_pos = 1.0
+          siglvl_neg = 0
+        elif count_pos == row[cn.COUNT]:
+          siglvl_pos = 0
+          siglvl_neg = 1.0
+        else:
+          siglvl_pos = 1 - stats.binom.cdf(
+              count_pos - 1, row[cn.COUNT], PROB_EQUAL)
+          siglvl_neg = stats.binom.cdf(
+              count_pos, row[cn.COUNT], PROB_EQUAL)
+      pos_list.append(siglvl_pos)
+      neg_list.append(siglvl_neg)
+    df[cn.SIGLVL_POS] = pos_list
+    df[cn.SIGLVL_NEG] = neg_list
+    df[cn.FEATURE_SET] = self.str
     return df
 
 
-  def profileInstance(self, sort_function=SORT_FUNCTION):
+  def profileInstance(self, sort_function=SORT_FUNC):
     """
     Profiles the FeatureSet over instances
     by calculating the contribution to the classification.
