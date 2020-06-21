@@ -8,7 +8,7 @@ import numpy as np
 import os
 import unittest
 
-IGNORE_TEST = False
+IGNORE_TEST = True
 IS_PLOT = False
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -36,24 +36,34 @@ class TestFeatureSet(unittest.TestCase):
     fset = FeatureSet([FEATURE2, FEATURE1])
     self.assertTrue(self.fset.equals(fset))
 
-  def testProfile(self):
+  def testProfileInstance(self):
     if IGNORE_TEST:
       return
     fset = FeatureSet(FEATURE_SET_STG,
         analyzer=ANALYZER)
-    df = fset.profile()
+    df = fset.profileInstance()
     columns = [cn.SUM, cn.PREDICTED, cn.CLASS,
         cn.INTERCEPT]
     columns.extend(fset.list)
     self.assertTrue(helpers.isValidDataFrame(df,
         expected_columns=columns))
 
-  def testplotProfile(self):
+  def testplotProfileInstance(self):
     if IGNORE_TEST:
       return
     # Smoke test
     fset = FeatureSet(FEATURE_SET_STG, analyzer=ANALYZER)
-    fset.plotProfile(is_plot=IS_PLOT)
+    fset.plotProfileInstance(is_plot=IS_PLOT)
+
+  def testplotProfileTrinary(self):
+    # TESTING
+    fset = FeatureSet(FEATURE_SET_STG, analyzer=ANALYZER)
+    df = fset.profileTrinary()
+    columns = [cn.PREDICED, cn.FRACPOS,
+        cn.FRACNEG, cn.SIGLVL, cn.COUNT]
+    self.assertTrue(helpers.isValidDataFrame(df,
+        expected_columns=columns))
+    import pdb; pdb.set_trace()
 
 
 if __name__ == '__main__':

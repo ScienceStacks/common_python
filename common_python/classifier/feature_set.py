@@ -4,7 +4,7 @@ import common_python.constants as cn
 from common_python.classifier import util_classifier
 from common_python.classifier import feature_analyzer
 from common_python.util.persister import Persister
-from common_python.util.util import util
+from common_python.util import util
 
 import argparse
 import copy
@@ -60,7 +60,8 @@ class FeatureSet(object):
       self.intercept, self.coefs  \
           = util_classifier.binaryMultiFit(
           self._analyzer._clf,
-          self._analyzer.df_X, self._analyzer.ser_y,
+          self._analyzer.df_X[self.list],
+          self._analyzer.ser_y,
           list_train_idxs=fit_partitions)
 
   def __str__(self):
@@ -84,11 +85,9 @@ class FeatureSet(object):
     """
     return set(fset_stg.split(cn.FEATURE_SEPARATOR))
 
-  def _evaluateByTrinaryValue(self):
+  def profileTrinary(self):
     """
-    Constructs a dataframe used to evaluate membership in the
-    positive class based on the trinary values of features
-    in the feature set.
+    Profiles the FeatureSet by trinary value of features.
 
     Parameters
     ----------
@@ -100,31 +99,59 @@ class FeatureSet(object):
     pd.DataFrame
         Columns: 
           cn.PREDICTED - predicted class
-          cn.CLASS - true class value
-          cn.COUNT - count of occurrences in feature vector
-          cn.SIGLVL - significance level at least 
+          cn.FRAC- Fraction of +1 class for feature values
+          cn.SIGLVL_POS - significance level at least 
               that count
               in the feature vector for a positive class
+          cn.SIGLVL_NEG - significance level at least 
+              that count
+              in the feature vector for a positive class
+          cn.COUNT - number of feature vectors with value
         Values: contribution to class
         Index: trinary values of features
         Index.name: string representation of FeatureSet.
     """
-    dct = {cn.PREDICTED: [], cn.COUNT: [], cn.VALUE}
-    iterator = itertools.product(cn.TRINARY_VALUES,
-        len(self.list))
+    # TODO: SIGLVL
+    def calc(df, is_mean=True):
+      dfg = df.groupby(self.list)
+      if is_mean:
+        ser_count = dfg.mean()
+      else:
+        ser_count = dfg.count()
+      ser_count.index = ser_count.index.tolist()
+      return ser_count[ser_count.columns.tolist()[0]]
+    #
+    df_X = self._analyzer.df_X
+    dct = {cn.PREDICTED: [], cn.VALUE: []}
+    args = [cn.TRINARY_VALUES for _ in
+        range(len(self.list))]
+    iterator = itertools.product(*args)
     for feature_values in iterator:
-      value = np.array(feature_values)*self.coefs +  \
-          self.intercept
+      value = np.array(feature_values).dot(
+          self.coefs) + self.intercept
       dct[cn.VALUE].append(feature_values)
       dct[cn.PREDICTED].append(
           util.makeBinaryClass(value))
-    # TODO: (1) counts of rows satisfying trinary values
-      
+    df = pd.DataFrame(dct)
+    df = df.set_index(cn.VALUE)
+    # Counts
+    ser_count = calc(df_X, is_mean=False)
+    df[cn.COUNT] = ser_count
+    # Mean class values
+    df_y = pd.DataFrame(self._analyzer.ser_y)
+    df_y = df_X[self.list].copy()
+    df_y[cn.CLASS] = self._analyzer.ser_y
+    ser_fracpos = calc(df_y)
+    df[cn.FRAC] = ser_fracpos
+    # Nan counts are zeros
+    df[cn.COUNT] = df[cn.COUNT].apply(lambda v:
+        0 if np.isnan(v) else v)
+    return df
 
 
-  def profile(self, sort_function=SORT_FUNCTION):
+  def profileInstance(self, sort_function=SORT_FUNCTION):
     """
-    Creates a DataFrame that the feature sets provided
+    Profiles the FeatureSet over instances
     by calculating the contribution to the classification.
     The profile assumes the use of SVM so that the effect
     of features is additive. Summing the value of 
@@ -195,7 +222,7 @@ class FeatureSet(object):
       df = df.reindex(sorted_index)
     return df
 
-  def plotProfile(self, is_plot=True,
+  def plotProfileInstance(self, is_plot=True,
       ylim=[-4, 4], title=None, ax=None, x_spacing=3):
     """
     Constructs a bar of feature contibutions to
@@ -214,7 +241,7 @@ class FeatureSet(object):
     -------
     None.
     """
-    df_profile = self.profile()
+    df_profile = self.profileInstance()
     instances = df_profile.index.to_list()
     columns = [cn.INTERCEPT]
     columns.extend(self.list)
