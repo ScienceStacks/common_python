@@ -21,6 +21,7 @@ SER_SBFSET = "ser_sbfset"
 SER_COMB = "ser_comb"
 COMPUTES = [SER_SBFSET, SER_COMB]
 MISC_PCL = "feature_set_collection_misc.pcl"
+MIN_SL = 10e-10
 
 ############ FUNCTIONS #################
 def disjointify(ser_fset, min_score=MIN_SCORE):
@@ -269,7 +270,59 @@ class FeatureSetCollection(object):
     collection._ser_comb = readDF(SER_COMB)
     return collection
 
-  def plotProfile(self, fsets, is_plot=True,
+  def plotEvaluate(self, ser_X, min_score=0.8, ax=None,
+      title="",
+      is_plot=True):
+    """
+    Plots the results of a feature vector evaluation.
+
+    Parameters
+    ----------
+    ser_X: pd.DataFrame
+        Feature vector for a single instance
+    min_score: float
+        Minimum score for inclusion of a FeatureSet
+    is_plot: bool
+
+    Returns
+    -------
+    None.
+    """
+    # Initializations
+    df_X = pd.DataFrame(ser_X).T
+    fsets = [FeatureSet(s, analyzer=self._analyzer)
+        for s in self.ser_comb.index
+        if self.ser_comb.loc[s] >= min_score]
+    # Construct labels
+    labels = [f.str for f in fsets]
+    # Construct data
+    values = []
+    for idx, fset in enumerate(fsets):
+      value = fset.evaluate(df_X).values[0]
+      if np.isnan(value):
+        labels[idx] = "*%s" % labels[idx]
+        values.append(1)
+      else:
+        values.append(fset.evaluate(df_X).values[0])
+    # Construct plot Series
+    ser_plot = pd.Series(values)
+    ser_plot.index = labels
+    ser_plot[ser_plot < MIN_SL] = MIN_SL
+    ser_plot = -np.log10(ser_plot)
+    # Bar plot
+    if ax is None:
+      ax = ser_plot.plot.bar()
+    else:
+      ser_plot.plot.bar(ax=ax)
+    ax.set_ylabel("0s in SL")
+    ax.set_xticklabels(ser_plot.index.tolist(),
+        rotation=0)
+    ax.set_ylim([0, 5])
+    ax.set_title(title)
+    if is_plot:
+      plt.show()
+
+  def plotProfileInstance(self, fsets, is_plot=True,
       **kwargs):
     """
     Profile plots for feature sets.
@@ -282,7 +335,7 @@ class FeatureSetCollection(object):
     x_spacing = 3*count
     for idx, fset in enumerate(fsets):
       fset = FeatureSet(fset, analyzer=self._analyzer)
-      fset.plotProfile(ax=axes[idx],
+      fset.plotProfileInstance(ax=axes[idx],
           is_plot=False, x_spacing=x_spacing)
     if is_plot:
       plt.show()

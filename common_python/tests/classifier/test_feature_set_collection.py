@@ -1,4 +1,5 @@
 from common_python.tests.classifier import helpers as test_helpers
+from common_python.classifier import feature_set
 from common_python.classifier.feature_set_collection  \
     import FeatureSetCollection
 from common_python.classifier.feature_set  \
@@ -7,7 +8,9 @@ from common_python.classifier  \
     import feature_set_collection
 from common_python.testing import helpers
 from common_python import constants as cn
+from common_python.util.persister import Persister
 
+import copy
 import numpy as np
 import os
 import shutil
@@ -21,16 +24,33 @@ TEST_DIR_PATH = os.path.join(TEST_DIR,
     "test_feature_set_collection_%d" % CLASS)
 TEST_SERIALIZE_DIR = os.path.join(TEST_DIR,
     "test_feature_set_collection_serialize")
+TEST_PERSISTER_PATH = os.path.join(TEST_DIR,
+    "TEST_FEATURE_SET_COLLECTION.pcl")
+PERSISTER = Persister(TEST_PERSISTER_PATH)
 ANALYZER = test_helpers.getFeatureAnalyzer()
 MIN_SCORE = 0.9
+DF_X = ANALYZER.df_X
+SER_Y = ANALYZER.ser_y
+sorted_index = sorted(DF_X.index.tolist(),
+     key=feature_set.SORT_FUNC)
+DF_X = DF_X.loc[sorted_index, :]
+SER_Y = SER_Y.loc[sorted_index]
 
 
 ##########################################
 class TestFeatureSetCollection(unittest.TestCase):
 
   def setUp(self):
+    self.df_X = copy.deepcopy(DF_X)
+    self.ser_y = copy.deepcopy(SER_Y)
     self.collection = FeatureSetCollection(ANALYZER,
         min_score=MIN_SCORE)
+    if PERSISTER.isExist():
+      SER_COMB = PERSISTER.get()
+    else:
+      SER_COMB = PERSISTER.set(self.collection.ser_comb)
+      PERSISTER.set(SER_COMB)
+    self.collection._ser_sbfset = SER_COMB
 
   def testConstructor(self):
     if IGNORE_TEST:
@@ -62,7 +82,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     if not all(ser.eq(ser1)):
       import pdb; pdb.set_trace() # Catch intermitent bug
     self.assertTrue(all(ser.eq(ser1)))
-    some_true = [feature_set_collection.FEATURE_SEPARATOR
+    some_true = [cn.FEATURE_SEPARATOR
         in f for f in ser.index]
     self.assertTrue(any(some_true))
 
@@ -109,14 +129,21 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.assertEqual(len(self.collection.ser_sbfset),
         len(collection.ser_sbfset))
 
-  def testplotProfile(self):
+  def testPlotProfileInstance(self):
     if IGNORE_TEST:
       return
     # Smoke test
     fset_stgs = self.collection.ser_comb.index.tolist()
-    self.collection.plotProfile(fset_stgs,
+    self.collection.plotProfileInstance(fset_stgs,
         is_plot=IS_PLOT)
- 
+
+  def testPlotEvaluate(self):
+    if IGNORE_TEST:
+      return
+    for instance in ["T1.1", "T2.1"]:
+      ser_x = self.df_X.loc[instance]
+      self.collection.plotEvaluate(ser_x,
+          title=instance, is_plot=IS_PLOT)
 
 
 if __name__ == '__main__':

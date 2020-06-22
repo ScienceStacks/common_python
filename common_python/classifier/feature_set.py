@@ -181,7 +181,9 @@ class FeatureSet(object):
 
   def evaluate(self, df_X):
     """
-    Evaluates feature vector for FeatureSet to assess statistical significance.
+    Evaluates feature vector for FeatureSet to assess 
+    statistical significance. If no data are present,
+    the result is np.nan.
 
     Parameters
     ----------
@@ -199,8 +201,13 @@ class FeatureSet(object):
     for instance in df_X.index:
       trinary_values = tuple(df_X.loc[
           instance, self.list])
-      siglvls.append(df_trinary.loc[
-          [trinary_values], cn.SIGLVL_POS].values[0])
+      count = df_trinary.loc[[trinary_values], cn.COUNT]
+      count = count.values[0]
+      if count == 0:
+        siglvls.append(np.nan)
+      else:
+        siglvls.append(df_trinary.loc[
+            [trinary_values], cn.SIGLVL_POS].values[0])
     ser = pd.Series(siglvls)
     ser.index = df_X.index
     return ser
