@@ -97,7 +97,7 @@ class FeatureSet(object):
 
     Parameters
     ----------
-    sort_function: Function
+    sort_func: Function
         single value; returns float
 
     Returns
@@ -118,7 +118,6 @@ class FeatureSet(object):
         Index: trinary values of features
         Index.name: string representation of FeatureSet.
     """
-    # TODO: SIGLVL
     def calc(df, is_mean=True):
       dfg = df.groupby(self.list)
       if is_mean:
@@ -158,8 +157,8 @@ class FeatureSet(object):
     neg_list = []
     for _, row in df.iterrows():
       if row[cn.COUNT] == 0:
-        siglvl_pos = 1.0
-        siglvl_neg = 1.0
+        siglvl_pos = np.nan
+        siglvl_neg = np.nan
       else:
         count_pos = int(row[cn.COUNT]*row[cn.FRAC])
         if count_pos == 0:
@@ -180,8 +179,33 @@ class FeatureSet(object):
     df[cn.FEATURE_SET] = self.str
     return df
 
+  def evaluate(self, df_X):
+    """
+    Evaluates feature vector for FeatureSet to assess statistical significance.
 
-  def profileInstance(self, sort_function=SORT_FUNC):
+    Parameters
+    ----------
+    df_X: pd.DataFrame
+        Feature vector
+
+    Returns
+    -------
+    pd.Series.
+      value: signifcance level
+      index: instance index from df_X
+    """
+    df_trinary = self.profileTrinary()
+    siglvls = []
+    for instance in df_X.index:
+      trinary_values = tuple(df_X.loc[
+          instance, self.list])
+      siglvls.append(df_trinary.loc[
+          [trinary_values], cn.SIGLVL_POS].values[0])
+    ser = pd.Series(siglvls)
+    ser.index = df_X.index
+    return ser
+
+  def profileInstance(self, sort_func=SORT_FUNC):
     """
     Profiles the FeatureSet over instances
     by calculating the contribution to the classification.
@@ -198,7 +222,7 @@ class FeatureSet(object):
 
     Parameters
     ----------
-    sort_function: Function
+    sort_func: Function
         single value; returns float
 
     Returns
@@ -249,8 +273,8 @@ class FeatureSet(object):
     # Compute the sums
     sers = [df[f] for f in self.list]
     df[cn.SUM] = sum(sers) + df[cn.INTERCEPT]
-    if sort_function is not None:
-      sorted_index = sorted(instances, key=sort_function)
+    if sort_func is not None:
+      sorted_index = sorted(instances, key=sort_func)
       df = df.reindex(sorted_index)
     return df
 
