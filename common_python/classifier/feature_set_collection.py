@@ -328,14 +328,16 @@ class FeatureSetCollection(object):
     Profile plots for feature sets.
     :param list-FeatureSet/list-str
     :param bool is_plot:
-    :param dict options for plot:
+    :param dict kwargs: options for plot:
     """
     count = len(fsets)
     fig, axes = plt.subplots(1, count, **kwargs)
     x_spacing = 3*count
     for idx, fset in enumerate(fsets):
       fset = FeatureSet(fset, analyzer=self._analyzer)
-      fset.plotProfileInstance(ax=axes[idx],
+      accuracy = self.ser_comb.loc[fset.str]
+      title = "Acc: %2.2f" % accuracy
+      fset.plotProfileInstance(ax=axes[idx], title=title,
           is_plot=False, x_spacing=x_spacing)
     if is_plot:
       plt.show()
