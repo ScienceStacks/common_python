@@ -270,7 +270,7 @@ class FeatureSetCollection(object):
     collection._ser_comb = readDF(SER_COMB)
     return collection
 
-  def plotEvaluate(self, ser_X, min_score=0.8, ax=None,
+  def plotEvaluate(self, ser_X, num_fset=3, ax=None,
       title="",
       is_plot=True):
     """
@@ -280,8 +280,8 @@ class FeatureSetCollection(object):
     ----------
     ser_X: pd.DataFrame
         Feature vector for a single instance
-    min_score: float
-        Minimum score for inclusion of a FeatureSet
+    num_fset: int
+        Top feature sets selected
     is_plot: bool
 
     Returns
@@ -291,8 +291,7 @@ class FeatureSetCollection(object):
     # Initializations
     df_X = pd.DataFrame(ser_X).T
     fsets = [FeatureSet(s, analyzer=self._analyzer)
-        for s in self.ser_comb.index
-        if self.ser_comb.loc[s] >= min_score]
+        for s in self.ser_comb.index.tolist()[0:num_fset]]
     # Construct labels
     labels = [f.str for f in fsets]
     # Construct data
