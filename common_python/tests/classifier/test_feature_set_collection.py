@@ -9,15 +9,18 @@ from common_python.classifier  \
 from common_python.testing import helpers
 from common_python import constants as cn
 from common_python.util.persister import Persister
+from common_python.classifier import feature_analyzer
+from common import constants as xcn
 
 import copy
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import shutil
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR_PATH = os.path.join(TEST_DIR,
@@ -144,6 +147,43 @@ class TestFeatureSetCollection(unittest.TestCase):
       ser_x = self.df_X.loc[instance]
       self.collection.plotEvaluate(ser_x,
           title=instance, is_plot=IS_PLOT)
+
+  def testPlotFullProile(self):
+    return
+    STATES = range(6)
+    DATA_PATH = xcn.PROJECT_DIR
+    for directory in ["data", "feature_analyzer"]:
+        DATA_PATH = os.path.join(DATA_PATH, directory)
+    DATA_PATH_PAT = os.path.join(DATA_PATH, "%d") 
+    ANALYZER_DCT = feature_analyzer.deserialize(
+       {s: DATA_PATH_PAT % s for s in STATES})
+    ANALYZERS = ANALYZER_DCT.values()
+    COLLECTION_DCT = {s: feature_set_collection.
+        FeatureSetCollection.deserialize(
+        DATA_PATH_PAT % s) for s in STATES}
+    def fullProfile(ser_X, title=""):
+        num_row = 2
+        num_col = 3
+        fig, axes = plt.subplots(num_row, num_col,
+            figsize=(16, 10))
+        for idx, state in enumerate(STATES):
+          row = int(idx/num_col)
+          col = idx % num_col
+          collection = COLLECTION_DCT[state]
+          if row == 0:
+              label_xoffset = -0.1
+          else:
+              label_xoffset = 0.1
+          collection.plotEvaluate(ser_X, 
+              ax=axes[row, col], is_plot=False,
+              title = "State %d" % idx,
+              label_xoffset=label_xoffset)
+        fig.suptitle(title, fontsize=16)
+        plt.show()
+    #
+    instance = "T3.0"
+    ser_X = DF_X.loc[instance]
+    fullProfile(ser_X, title=instance)
 
 
 if __name__ == '__main__':

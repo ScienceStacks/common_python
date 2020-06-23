@@ -271,7 +271,7 @@ class FeatureSetCollection(object):
     return collection
 
   def plotEvaluate(self, ser_X, num_fset=3, ax=None,
-      title="",
+      title="", ylim=(0, 5), label_xoffset=-0.2,
       is_plot=True):
     """
     Plots the results of a feature vector evaluation.
@@ -283,6 +283,9 @@ class FeatureSetCollection(object):
     num_fset: int
         Top feature sets selected
     is_plot: bool
+    label_xoffset: int
+        How much the text label is offset from the bar
+        along the x-axis
 
     Returns
     -------
@@ -305,19 +308,25 @@ class FeatureSetCollection(object):
         values.append(fset.evaluate(df_X).values[0])
     # Construct plot Series
     ser_plot = pd.Series(values)
-    ser_plot.index = labels
+    ser_plot.index = ["" for _ in range(len(labels))]
     ser_plot[ser_plot < MIN_SL] = MIN_SL
     ser_plot = -np.log10(ser_plot)
     # Bar plot
+    width = 0.1
     if ax is None:
-      ax = ser_plot.plot.bar()
-    else:
-      ser_plot.plot.bar(ax=ax)
+      fig, ax = plt.subplots()
+      # ax = ser_plot.plot(kind="bar", width=width)
+    ax.bar(labels, ser_plot, width=width)
     ax.set_ylabel("0s in SL")
     ax.set_xticklabels(ser_plot.index.tolist(),
         rotation=0)
-    ax.set_ylim([0, 5])
+    ax.set_ylim(ylim)
     ax.set_title(title)
+    for idx, label in enumerate(labels):
+      ypos = 0.25
+      xpos = idx + label_xoffset
+      ax.text(xpos, ypos, label, rotation=90,
+          fontsize=8)
     if is_plot:
       plt.show()
 
