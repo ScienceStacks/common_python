@@ -179,7 +179,7 @@ class FeatureSet(object):
     df[cn.FEATURE_SET] = self.str
     return df
 
-  def evaluate(self, df_X):
+  def evaluate(self, df_X, min_count=3):
     """
     Evaluates feature vector for FeatureSet to assess 
     statistical significance. If no data are present,
@@ -189,6 +189,8 @@ class FeatureSet(object):
     ----------
     df_X: pd.DataFrame
         Feature vector
+    min_count: int
+        minimum number of case occurrences
 
     Returns
     -------
@@ -203,7 +205,7 @@ class FeatureSet(object):
           instance, self.list])
       count = df_trinary.loc[[trinary_values], cn.COUNT]
       count = count.values[0]
-      if count == 0:
+      if count < min_count:
         siglvls.append(np.nan)
       else:
         siglvls.append(df_trinary.loc[

@@ -272,7 +272,7 @@ class FeatureSetCollection(object):
 
   def plotEvaluate(self, ser_X, num_fset=3, ax=None,
       title="", ylim=(0, 5), label_xoffset=-0.2,
-      is_plot=True):
+      is_plot=True, **kwargs):
     """
     Plots the results of a feature vector evaluation.
 
@@ -286,6 +286,8 @@ class FeatureSetCollection(object):
     label_xoffset: int
         How much the text label is offset from the bar
         along the x-axis
+    kwargs: dict
+        optional arguments for FeatureSet.evaluate
 
     Returns
     -------
@@ -300,7 +302,7 @@ class FeatureSetCollection(object):
     # Construct data
     values = []
     for idx, fset in enumerate(fsets):
-      value = fset.evaluate(df_X).values[0]
+      value = fset.evaluate(df_X, **kwargs).values[0]
       if np.isnan(value):
         labels[idx] = "*%s" % labels[idx]
         values.append(1)
