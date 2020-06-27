@@ -19,9 +19,9 @@ MIN_FRAC_INCR = 1.01  # Must increase by at least 1%
 MIN_SCORE = 0
 SER_SBFSET = "ser_sbfset"
 SER_COMB = "ser_comb"
-COMPUTES = [SER_SBFSET, SER_COMB]
+DF_CASE = "df_case"
+COMPUTES = [SER_SBFSET, SER_COMB, DF_CASE]
 MISC_PCL = "feature_set_collection_misc.pcl"
-MIN_SL = 10e-10
 
 ############ FUNCTIONS #################
 def disjointify(ser_fset, min_score=MIN_SCORE):
@@ -73,6 +73,21 @@ class FeatureSetCollection(object):
     #  index: string representation of a set of features
     #  value: accuracy (score)
     self._ser_comb = None  # Combinations of feature sets
+    self._df_case = None  # Cases for FeatureSet
+
+  # TODO: Implement
+  @property
+  def df_case(self):
+    """
+    Dataframe describing cases for FeatureSets.
+    :return pd.Series:
+        Columns: cn.FEATURE_SET, cn.CASE, cn.SIGLVL
+    Notes:
+      1. cn.SIGLVL may be negative to 
+         indicate a negative case.
+    """
+    if self._df_case is None:
+      pass
 
   @property
   def ser_sbfset(self):
@@ -216,8 +231,9 @@ class FeatureSetCollection(object):
     # Save the computed values
     for stg in COMPUTES:
       result = eval("self.%s" % stg)
-      path = os.path.join(dir_path, "%s.csv" % stg)
-      result.to_csv(path)
+      if result is not None:
+        path = os.path.join(dir_path, "%s.csv" % stg)
+        result.to_csv(path)
     # Serialize constructor parameter values
     path = os.path.join(dir_path, MISC_PCL)
     persister = Persister(path)
@@ -268,11 +284,13 @@ class FeatureSetCollection(object):
     collection = cls(analyzer_dct[key], min_score=min_score)
     collection._ser_sbfset = readDF(SER_SBFSET)
     collection._ser_comb = readDF(SER_COMB)
+    collection._df_case = readDF(DF_CASE)
     return collection
 
   def plotEvaluate(self, ser_X, num_fset=3, ax=None,
-      title="", ylim=(0, 5), label_xoffset=-0.2,
-      is_plot=True, **kwargs):
+      title="", ylim=(-5, 5), label_xoffset=-0.2,
+      is_plot=True, is_include_neg=True,
+      **kwargs):
     """
     Plots the results of a feature vector evaluation.
 
@@ -286,6 +304,8 @@ class FeatureSetCollection(object):
     label_xoffset: int
         How much the text label is offset from the bar
         along the x-axis
+    is_include_neg: bool
+        Plot neg class as neg values
     kwargs: dict
         optional arguments for FeatureSet.evaluate
 
@@ -293,6 +313,15 @@ class FeatureSetCollection(object):
     -------
     None.
     """
+    def convert(v):
+      if v < 0:
+        v = np.log10(-v)
+      elif v > 0:
+        v = -np.log10(v)
+      else:
+        raise ValueError("Should not be 0.")
+      return v
+    #
     # Initializations
     df_X = pd.DataFrame(ser_X).T
     fsets = [FeatureSet(s, analyzer=self._analyzer)
@@ -302,17 +331,18 @@ class FeatureSetCollection(object):
     # Construct data
     values = []
     for idx, fset in enumerate(fsets):
-      value = fset.evaluate(df_X, **kwargs).values[0]
+      value = fset.evaluate(df_X, 
+          is_include_neg=is_include_neg,
+          **kwargs).values[0]
       if np.isnan(value):
         labels[idx] = "*%s" % labels[idx]
-        values.append(1)
+        values.append(0)
       else:
         values.append(fset.evaluate(df_X).values[0])
     # Construct plot Series
     ser_plot = pd.Series(values)
     ser_plot.index = ["" for _ in range(len(labels))]
-    ser_plot[ser_plot < MIN_SL] = MIN_SL
-    ser_plot = -np.log10(ser_plot)
+    ser_plot = pd.Series([convert(v) for v in ser_plot])
     # Bar plot
     width = 0.1
     if ax is None:
@@ -329,6 +359,10 @@ class FeatureSetCollection(object):
       xpos = idx + label_xoffset
       ax.text(xpos, ypos, label, rotation=90,
           fontsize=8)
+    # Add the 0 line if needed
+    if is_include_neg:
+      ax.plot([0, len(labels)-0.75], [0, 0],
+          color="black")
     if is_plot:
       plt.show()
 

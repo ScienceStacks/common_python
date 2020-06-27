@@ -19,6 +19,7 @@ import seaborn
 FEATURE_SEPARATOR = "+"
 SORT_FUNC = lambda v: float(v[1:])
 PROB_EQUAL = 0.5
+MIN_SL = 10e-10
 
 
 ############### CLASSES ####################
@@ -179,11 +180,14 @@ class FeatureSet(object):
     df[cn.FEATURE_SET] = self.str
     return df
 
-  def evaluate(self, df_X, min_count=3):
+  def evaluate(self, df_X, min_count=3,
+      is_include_neg=True, min_sl=MIN_SL):
     """
     Evaluates feature vector for FeatureSet to assess 
-    statistical significance. If no data are present,
-    the result is np.nan.
+    statistical significance. Optionally, the significance
+    level of the negative class is returned if its
+    absolute value is less than that of the positive
+    class.  If no data are present, the result is np.nan.
 
     Parameters
     ----------
@@ -208,8 +212,17 @@ class FeatureSet(object):
       if count < min_count:
         siglvls.append(np.nan)
       else:
-        siglvls.append(df_trinary.loc[
+        siglvl_pos = max(min_sl, df_trinary.loc[
             [trinary_values], cn.SIGLVL_POS].values[0])
+        siglvl_neg = max(min_sl, df_trinary.loc[
+            [trinary_values], cn.SIGLVL_NEG].values[0])
+        if siglvl_pos < siglvl_neg:
+            siglvl = siglvl_pos
+        else:
+            siglvl = - siglvl_neg
+        if not is_include_neg:
+            siglvl = siglvl_pos
+        siglvls.append(siglvl)
     ser = pd.Series(siglvls)
     ser.index = df_X.index
     return ser

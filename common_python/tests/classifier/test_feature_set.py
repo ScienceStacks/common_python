@@ -79,7 +79,8 @@ class TestFeatureSet(unittest.TestCase):
     if IGNORE_TEST:
       return
     fset = FeatureSet(FEATURE_SET_STG, analyzer=ANALYZER)
-    ser = fset.evaluate(self.df_X)
+    ser = fset.evaluate(self.df_X,
+        is_include_neg=False)
     self.assertEqual(len(ser), len(self.df_X))
     cls_1 = self.ser_y.index[self.ser_y == 1]
     cls_0 = self.ser_y.index[self.ser_y == 0]
@@ -87,6 +88,15 @@ class TestFeatureSet(unittest.TestCase):
     # negative class than for positive class.
     self.assertGreater(ser.loc[cls_0].mean(),
         ser.loc[cls_1].mean())
+
+  def testEvaluate2(self):
+    if IGNORE_TEST:
+      return
+    fset = FeatureSet(FEATURE_SET_STG, analyzer=ANALYZER)
+    ser_include = fset.evaluate(self.df_X,
+        is_include_neg=True)
+    num_pos = sum([1 for v in ser_include if v < 0])
+    self.assertGreater(num_pos, 0)
 
 
 if __name__ == '__main__':

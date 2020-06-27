@@ -19,8 +19,8 @@ import os
 import shutil
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR_PATH = os.path.join(TEST_DIR,
@@ -108,13 +108,13 @@ class TestFeatureSetCollection(unittest.TestCase):
           self.collection._analyzer.df_X[features]), 0)
 
   def testSerialize(self):
-    if IGNORE_TEST:
-      return
+    # TESTING
     self.collection.serialize(TEST_SERIALIZE_DIR)
     for stg in feature_set_collection.COMPUTES:
       path = os.path.join(TEST_SERIALIZE_DIR,
           "%s.csv" % stg)
-      self.assertTrue(os.path.isfile(path))
+      if stg != feature_set_collection.DF_CASE:
+        self.assertTrue(os.path.isfile(path))
     path = os.path.join(TEST_SERIALIZE_DIR,
         feature_set_collection.MISC_PCL)
     self.assertTrue(os.path.isfile(path))
