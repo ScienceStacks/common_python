@@ -75,19 +75,58 @@ class FeatureSetCollection(object):
     self._ser_comb = None  # Combinations of feature sets
     self._df_case = None  # Cases for FeatureSet
 
-  # TODO: Implement
   @property
   def df_case(self):
     """
-    Dataframe describing cases for FeatureSets.
+    Dataframe describing cases for the FeatureSets in
+    ser_comb. A case is an assignment of trinary
+    values to the features in a feature set.
     :return pd.Series:
-        Columns: cn.FEATURE_SET, cn.CASE, cn.SIGLVL
+        Columns: cn.FEATURE_SET, cn.CASE, cn.SIGLVL_ZEROES
     Notes:
-      1. cn.SIGLVL may be negative to 
-         indicate a negative case.
+      1. cn.SIGLVL_ZEROES may be negative to 
+         indicate significance level for a negative case.
     """
+    return self._makeCase()
+
+  # TODO: Test
+  def _makeCase(self): 
+    """
+    Dataframe describing cases for the FeatureSets in
+    ser_comb. A case is an assignment of trinary
+    values to the features in a feature set.
+    :return pd.Series:
+        Columns: cn.FEATURE_SET, cn.CASE, cn.SIGLVL_ZEROES
+    Notes:
+      1. cn.SIGLVL_ZEROES may be negative to 
+         indicate significance level for a negative case.
+    """
+    def convert(siglvl_pos, siglvl_neg):
+      if siglvl_pos < siglvl_neg:
+        signlvl  = -np.log10(-siglvl_pos)
+      else:
+        signlvl  = np.log10(-siglvl_neg)
+      return siglvl
+    #
     if self._df_case is None:
-      pass
+      dct = {
+          cn.FEATURE_SET: [], cn.CASE: [],
+          cn.SIGLVL_ZEROES: [] }
+      for fset_stg in self.ser_comb.index:
+        fset = FeatureSet(fset_stg,
+            analyzer=self._analyzer)
+        df_profile = fset.profileTrinary()
+        for case in df_profile.index:
+          siglvl_zeroes = convert(
+              df_profile.loc[case, cn.SIGLVL_POS],
+              df_profile.loc[case, cn.SIGLVL_NEG])
+          dct[cn.FEATURE_SET].append(fset.str)
+          dct[cn.CASE].append(fset.str)
+          dct[cn.SIGLVL_ZEROES].append(siglvl_zeroes)
+      self._df_case = pd.DataFrame(dct)
+    return self._df_case
+        
+        
 
   @property
   def ser_sbfset(self):
@@ -335,8 +374,9 @@ class FeatureSetCollection(object):
           is_include_neg=is_include_neg,
           **kwargs).values[0]
       if np.isnan(value):
-        labels[idx] = "*%s" % labels[idx]
-        values.append(0)
+        raise RuntimeError("Should not get nan")
+        #labels[idx] = "*%s" % labels[idx]
+        #values.append(min_sl)
       else:
         values.append(fset.evaluate(df_X).values[0])
     # Construct plot Series
@@ -355,7 +395,10 @@ class FeatureSetCollection(object):
     ax.set_ylim(ylim)
     ax.set_title(title)
     for idx, label in enumerate(labels):
-      ypos = 0.25
+      if is_include_neg:
+        ypos = ylim[0] + 1
+      else:
+        ypos = 0.25
       xpos = idx + label_xoffset
       ax.text(xpos, ypos, label, rotation=90,
           fontsize=8)

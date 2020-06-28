@@ -9,6 +9,7 @@ ENSEMBLE_PATH = os.path.join(CODE_DIR, "ensemble_file.%s" % PCL)
 
 # Column names
 ACTUAL = "actual"  # True value
+CASE = "case"  # Case for a feature vector
 CLASS = "class"
 COUNT = "count"  # A count
 CLS_FEATURE = "cls_feature"
@@ -30,6 +31,7 @@ PREDICTED = "predicted"  # Predicted valuejjj
 SCORE = "score"
 STERR = "sterr"  # Standard error (std of mean)
 SIGLVL = "siglvl"
+SIGLVL_ZEROES = "siglvl_zeroes"  # Number of zeroes in the significance level
 SIGLVL_POS = "siglvl_pos"
 SIGLVL_NEG = "siglvl_neg"
 STD = "std"  # Standard deviation of population

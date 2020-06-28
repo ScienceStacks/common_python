@@ -19,8 +19,8 @@ import os
 import shutil
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR_PATH = os.path.join(TEST_DIR,
@@ -108,7 +108,8 @@ class TestFeatureSetCollection(unittest.TestCase):
           self.collection._analyzer.df_X[features]), 0)
 
   def testSerialize(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     self.collection.serialize(TEST_SERIALIZE_DIR)
     for stg in feature_set_collection.COMPUTES:
       path = os.path.join(TEST_SERIALIZE_DIR,
@@ -149,7 +150,8 @@ class TestFeatureSetCollection(unittest.TestCase):
           title=instance, is_plot=IS_PLOT)
 
   def testPlotFullProile(self):
-    return
+    if IGNORE_TEST:
+      return
     STATES = range(6)
     DATA_PATH = xcn.PROJECT_DIR
     for directory in ["data", "feature_analyzer"]:
@@ -179,11 +181,16 @@ class TestFeatureSetCollection(unittest.TestCase):
               title = "State %d" % idx,
               label_xoffset=label_xoffset)
         fig.suptitle(title, fontsize=16)
-        plt.show()
+        if IS_PLOT:
+          plt.show()
     #
     instance = "T3.0"
     ser_X = DF_X.loc[instance]
     fullProfile(ser_X, title=instance)
+
+  def testMakeCase(self):
+    if IGNORE_TEST:
+      return
 
 
 if __name__ == '__main__':

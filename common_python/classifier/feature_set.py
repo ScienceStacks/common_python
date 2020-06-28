@@ -195,6 +195,8 @@ class FeatureSet(object):
         Feature vector
     min_count: int
         minimum number of case occurrences
+    min_sl: float
+        minimum significance level report
 
     Returns
     -------
@@ -210,7 +212,7 @@ class FeatureSet(object):
       count = df_trinary.loc[[trinary_values], cn.COUNT]
       count = count.values[0]
       if count < min_count:
-        siglvls.append(np.nan)
+        siglvls.append(1)
       else:
         siglvl_pos = max(min_sl, df_trinary.loc[
             [trinary_values], cn.SIGLVL_POS].values[0])
