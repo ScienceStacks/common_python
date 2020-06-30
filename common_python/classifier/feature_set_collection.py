@@ -346,6 +346,62 @@ class FeatureSetCollection(object):
     collection._df_case = readDF(DF_CASE)
     return collection
 
+  def _getNumZero(self, ser_X, fset_selector=lambda f: True):
+    """
+    Gets the number of zeroes in the significance level
+    for feature sets applicable to cases in ser_X.
+
+    Parameters
+    ----------
+    ser_X: pd.DataFrame
+        Feature vector for a single instance
+    fset_selector: Function
+        Args: fset
+        Returns: bool
+
+    Returns
+    -------
+    list-FeatureSet, list-float
+    """
+    fset_stgs = self.df_case[cn.FEATURE_SET].unique()
+    fsets = [FeatureSet(f) for f 
+        in fset_stgs if fset_selector(FeatureSet(f))]
+    num_zeroes = []
+    for fset in fsets:
+      case = ser_X.loc[fset.list].values
+      df_fset = self.df_case[
+          self.df_case[cn.FEATURE_SET] == fset.str]
+      sel = [all(df_fset.loc[i, cn.CASE] == case)
+          for i in df_fset.index]
+      num_zero = df_fset[sel][cn.NUM_ZERO].values[0]
+      num_zeroes.append(num_zero)
+    return fsets, num_zeroes
+
+  def plotEvaluateHistogram(self, ser_X, ax=None,
+      title="", ylim=(-5, 5),
+      is_plot=True,
+      fset_selector=lambda f: True,
+      **kwargs):
+    """
+    Plots the results of a feature vector evaluation.
+
+    Parameters
+    ----------
+    ser_X: pd.DataFrame
+        Feature vector for a single instance
+    is_plot: bool
+    fset_selector: Function
+        Args: fset
+        Returns: bool
+
+    Returns
+    -------
+    None.
+    """
+    num_zeroes = self._getNumZero( ser_X,
+        fset_selector=fset_selector())
+      
+
   def plotEvaluate(self, ser_X, num_fset=3, ax=None,
       title="", ylim=(-5, 5), label_xoffset=-0.2,
       is_plot=True, is_include_neg=True,

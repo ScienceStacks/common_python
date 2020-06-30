@@ -53,7 +53,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     else:
       SER_COMB = PERSISTER.set(self.collection.ser_comb)
       PERSISTER.set(SER_COMB)
-    self.collection._ser_sbfset = SER_COMB
+    self.collection._ser_comb = SER_COMB
 
   def testConstructor(self):
     if IGNORE_TEST:
@@ -197,6 +197,15 @@ class TestFeatureSetCollection(unittest.TestCase):
         cn.NUM_ZERO, cn.CASE]))
     #
     self.assertTrue(df.equals(self.collection.df_case))
+
+  def testGetNumZero(self):
+    if IGNORE_TEST:
+      return
+    instance = "T3.0"
+    ser_X = DF_X.loc[instance]
+    fsets, num_zeroes = self.collection._getNumZero(ser_X)
+    self.assertEqual(len(fsets), len(num_zeroes))
+
 
 
 if __name__ == '__main__':
