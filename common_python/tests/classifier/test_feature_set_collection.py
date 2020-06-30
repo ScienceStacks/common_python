@@ -191,6 +191,12 @@ class TestFeatureSetCollection(unittest.TestCase):
   def testMakeCase(self):
     if IGNORE_TEST:
       return
+    df = self.collection._makeCase()
+    self.assertTrue(helpers.isValidDataFrame(df,
+        expected_columns=[cn.FEATURE_SET,
+        cn.NUM_ZERO, cn.CASE]))
+    #
+    self.assertTrue(df.equals(self.collection.df_case))
 
 
 if __name__ == '__main__':

@@ -22,6 +22,8 @@ SER_COMB = "ser_comb"
 DF_CASE = "df_case"
 COMPUTES = [SER_SBFSET, SER_COMB, DF_CASE]
 MISC_PCL = "feature_set_collection_misc.pcl"
+MIN_SL = 1e-10
+MAX_SL = 1
 
 ############ FUNCTIONS #################
 def disjointify(ser_fset, min_score=MIN_SCORE):
@@ -89,45 +91,63 @@ class FeatureSetCollection(object):
     """
     return self._makeCase()
 
-  # TODO: Test
   def _makeCase(self): 
     """
     Dataframe describing cases for the FeatureSets in
     ser_comb. A case is an assignment of trinary
     values to the features in a feature set.
     :return pd.Series:
-        Columns: cn.FEATURE_SET, cn.CASE, cn.SIGLVL_ZEROES
+        Columns: cn.FEATURE_SET, cn.CASE, cn.NUM_ZERO
     Notes:
       1. cn.SIGLVL_ZEROES may be negative to 
          indicate significance level for a negative case.
     """
     def convert(siglvl_pos, siglvl_neg):
+      """
+      Converts significance level to number of zeroes.
+      Significance level for a negative class is the
+      negative of its number of zeroes.
+      """
+      def handleNanAndZero(s):
+        if np.isnan(s):
+          value = MAX_SL
+        else:
+          if s < MIN_SL:
+            value = MIN_SL
+          else:
+            value = s
+        return value
+      #
+      siglvl_pos = handleNanAndZero(siglvl_pos)
+      siglvl_neg = handleNanAndZero(siglvl_neg)
       if siglvl_pos < siglvl_neg:
-        signlvl  = -np.log10(-siglvl_pos)
+        num_zero = -np.log10(siglvl_pos)
+      elif siglvl_neg == 1:
+        num_zero = 0
       else:
-        signlvl  = np.log10(-siglvl_neg)
-      return siglvl
+        num_zero = np.log10(siglvl_neg)
+      return num_zero
     #
     if self._df_case is None:
       dct = {
           cn.FEATURE_SET: [], cn.CASE: [],
-          cn.SIGLVL_ZEROES: [] }
+          cn.NUM_ZERO: [] }
       for fset_stg in self.ser_comb.index:
         fset = FeatureSet(fset_stg,
             analyzer=self._analyzer)
         df_profile = fset.profileTrinary()
         for case in df_profile.index:
-          siglvl_zeroes = convert(
-              df_profile.loc[case, cn.SIGLVL_POS],
-              df_profile.loc[case, cn.SIGLVL_NEG])
+          siglvl_pos = df_profile.loc[[case],
+               cn.SIGLVL_POS][0]
+          siglvl_neg = df_profile.loc[[case],
+               cn.SIGLVL_NEG][0]
+          num_zero = convert(siglvl_pos, siglvl_neg)
           dct[cn.FEATURE_SET].append(fset.str)
-          dct[cn.CASE].append(fset.str)
-          dct[cn.SIGLVL_ZEROES].append(siglvl_zeroes)
+          dct[cn.CASE].append(case)
+          dct[cn.NUM_ZERO].append(num_zero)
       self._df_case = pd.DataFrame(dct)
     return self._df_case
         
-        
-
   @property
   def ser_sbfset(self):
     """
@@ -295,6 +315,7 @@ class FeatureSetCollection(object):
     def readDF(name):
      # Reads the file for the variable name if it exists
      # Returns a DataFrame or a Series
+      result = None
       UNNAMED = "Unnamed: 0"
       path = os.path.join(dir_path, "%s.csv" % name)
       if os.path.isfile(path):
@@ -305,9 +326,8 @@ class FeatureSetCollection(object):
           df.index.name = None
         if len(df.columns) == 1:
           result = pd.Series(df[df.columns.tolist()[0]])
-      else:
-        result = None
       return result
+    #
     # Get constructor parameter values
     path = os.path.join(dir_path, MISC_PCL)
     if os.path.isfile(path):
@@ -329,6 +349,7 @@ class FeatureSetCollection(object):
   def plotEvaluate(self, ser_X, num_fset=3, ax=None,
       title="", ylim=(-5, 5), label_xoffset=-0.2,
       is_plot=True, is_include_neg=True,
+      fset_selector=lambda f: True,
       **kwargs):
     """
     Plots the results of a feature vector evaluation.
@@ -345,6 +366,9 @@ class FeatureSetCollection(object):
         along the x-axis
     is_include_neg: bool
         Plot neg class as neg values
+    fset_selector: Function
+        Args: fset
+        Returns: bool
     kwargs: dict
         optional arguments for FeatureSet.evaluate
 
@@ -370,6 +394,8 @@ class FeatureSetCollection(object):
     # Construct data
     values = []
     for idx, fset in enumerate(fsets):
+      if not fset_selector(fset):
+        continue
       value = fset.evaluate(df_X, 
           is_include_neg=is_include_neg,
           **kwargs).values[0]
