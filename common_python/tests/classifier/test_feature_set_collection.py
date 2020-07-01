@@ -38,6 +38,8 @@ sorted_index = sorted(DF_X.index.tolist(),
      key=feature_set.SORT_FUNC)
 DF_X = DF_X.loc[sorted_index, :]
 SER_Y = SER_Y.loc[sorted_index]
+COLLECTION = FeatureSetCollection.deserialize(
+        TEST_SERIALIZE_DIR)
 
 
 ##########################################
@@ -46,14 +48,7 @@ class TestFeatureSetCollection(unittest.TestCase):
   def setUp(self):
     self.df_X = copy.deepcopy(DF_X)
     self.ser_y = copy.deepcopy(SER_Y)
-    self.collection = FeatureSetCollection(ANALYZER,
-        min_score=MIN_SCORE)
-    if PERSISTER.isExist():
-      SER_COMB = PERSISTER.get()
-    else:
-      SER_COMB = PERSISTER.set(self.collection.ser_comb)
-      PERSISTER.set(SER_COMB)
-    self.collection._ser_comb = SER_COMB
+    self.collection = copy.deepcopy(COLLECTION)
 
   def testConstructor(self):
     if IGNORE_TEST:
@@ -205,6 +200,14 @@ class TestFeatureSetCollection(unittest.TestCase):
     ser_X = DF_X.loc[instance]
     fsets, num_zeroes = self.collection._getNumZero(ser_X)
     self.assertEqual(len(fsets), len(num_zeroes))
+
+  def testPlotEvaluateHistogram(self):
+    if IGNORE_TEST:
+      return
+    for instance in ["T1.1", "T3.0"]:
+      ser_X = DF_X.loc[instance]
+      self.collection.plotEvaluateHistogram(ser_X,
+          is_plot=IS_PLOT)
 
 
 

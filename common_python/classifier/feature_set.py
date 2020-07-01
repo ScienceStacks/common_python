@@ -7,6 +7,7 @@ from common_python.util.persister import Persister
 from common_python.util import util
 
 import argparse
+import collections
 import copy
 import itertools
 import matplotlib.pyplot as plt
@@ -23,6 +24,48 @@ MIN_SL = 10e-10
 
 
 ############### CLASSES ####################
+class Case(object):
+  """
+  Instance of values for features in a feature set.
+  """
+
+  def __init__(self, fset, descriptor):
+    """
+    Parameters
+    ----------
+    fset: FeatureSet
+    descriptor: tuple/list/Series/Case/dict/array
+    """
+    if isinstance(descriptor, dict):
+      self.dict = descriptor
+    elif isinstance(descriptor, tuple) or  \
+        isinstance(descriptor, list) or \
+        isinstance(descriptor, np.ndarray):
+      self.dict = {f: t for f, t in 
+          zip(fset.list, descriptor)}
+    elif isinstance(descriptor, pd.Series):
+      self.dict = descriptor.to_dict()
+    elif isinstance(descriptor, Case):
+      self.dict = descriptor.dict
+    else:
+      raise RuntimeError(
+          "descriptor is invalid type.")
+    self.fset = FeatureSet(list(self.dict.keys()))
+    self.list = [v for v in self.dict.values()]
+    self.tuple = tuple(self.list)
+
+  def __repr__(self):
+    return ("%s: %s" % (str(self.fset), str(self.list)))
+
+  def equals(self, other):
+    if not self.fset.equals(other.fset):
+      return False
+    result = all([self.dict[k] == other.dict[k]
+        for k in self.dict.keys()])
+    return result
+
+
+####################################
 class FeatureSet(object):
   """
   Represetation of a set of features. Assumes
@@ -57,6 +100,7 @@ class FeatureSet(object):
     else:
       raise ValueError("Invalid argument type")
     self.list = list(self.set)
+    self.list.sort()
     if self._analyzer is not None:
       fit_partitions = [t for t, _ in 
           self._analyzer.partitions]
@@ -67,7 +111,7 @@ class FeatureSet(object):
           self._analyzer.ser_y,
           list_train_idxs=fit_partitions)
 
-  def __str__(self):
+  def __repr__(self):
     return self.str
 
   def equals(self, other):
@@ -357,10 +401,34 @@ class FeatureSet(object):
     #ax.set_ylabel('distance')
     #ax.set_xlabel('instance')
     ax.set_ylim(ylim)
-    # FIXME
-    #if title is None:
-    #  title = "Score: %3.2f" % self.ser_comb.loc[self.str]
     ax.set_title(title)
     ax.legend()
     if is_plot:
       plt.show()
+
+  def getCase(self, ser_X):
+    """
+    Extracts the case from the instance, where
+    the case is a valid feature set in ser_X.
+    This requires handling merged features.
+    :param pd.Series ser_X:
+    :param FeatureSet fset:
+    :return tuple:
+          values are in [-1, 0, 1]
+          values are ordered by self.list
+    """
+    dct = {}
+    for feature in self.list:
+      if feature_analyzer.SEPARATOR in feature:
+        # Handle composite feature
+        values = []
+        features = feature.split(
+            feature_analyzer.SEPARATOR) 
+        # Accomulate each value
+        for fea in features:
+          values.append(ser_X.loc[fea])
+        counter = collections.Counter(values)
+        dct[feature] = counter.most_common(1)[0][0]
+      else:
+        dct[feature] = ser_X.loc[feature]
+    return Case(self, dct)

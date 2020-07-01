@@ -2,12 +2,13 @@
 
 import common_python.constants as cn
 from common_python.classifier.feature_set  \
-    import FeatureSet
+    import FeatureSet, Case
 from common_python.classifier import util_classifier
 from common_python.classifier import feature_analyzer
 from common_python.util.persister import Persister
 
 import argparse
+import collections
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
@@ -136,14 +137,14 @@ class FeatureSetCollection(object):
         fset = FeatureSet(fset_stg,
             analyzer=self._analyzer)
         df_profile = fset.profileTrinary()
-        for case in df_profile.index:
-          siglvl_pos = df_profile.loc[[case],
+        for case_tuple in df_profile.index:
+          siglvl_pos = df_profile.loc[[case_tuple],
                cn.SIGLVL_POS][0]
-          siglvl_neg = df_profile.loc[[case],
+          siglvl_neg = df_profile.loc[[case_tuple],
                cn.SIGLVL_NEG][0]
           num_zero = convert(siglvl_pos, siglvl_neg)
           dct[cn.FEATURE_SET].append(fset.str)
-          dct[cn.CASE].append(case)
+          dct[cn.CASE].append(case_tuple)
           dct[cn.NUM_ZERO].append(num_zero)
       self._df_case = pd.DataFrame(dct)
     return self._df_case
@@ -212,6 +213,7 @@ class FeatureSetCollection(object):
       return
     #
     if self._ser_comb is None:
+      import pdb; pdb.set_trace()
       ser = self.disjointify(min_score=self._min_score)
       process_dct = ser.to_dict()
       result_dct = {}
@@ -368,20 +370,21 @@ class FeatureSetCollection(object):
         in fset_stgs if fset_selector(FeatureSet(f))]
     num_zeroes = []
     for fset in fsets:
-      case = ser_X.loc[fset.list].values
+      case_in_ser = Case(fset, 
+          ser_X.loc[fset.list].values)
       df_fset = self.df_case[
           self.df_case[cn.FEATURE_SET] == fset.str]
-      sel = [all(df_fset.loc[i, cn.CASE] == case)
+      cases = [Case(fset, df_fset.loc[i, cn.CASE])
           for i in df_fset.index]
+      sel = [case_in_ser.equals(c) for c in cases]
       num_zero = df_fset[sel][cn.NUM_ZERO].values[0]
       num_zeroes.append(num_zero)
     return fsets, num_zeroes
 
   def plotEvaluateHistogram(self, ser_X, ax=None,
-      title="", ylim=(-5, 5),
-      is_plot=True,
-      fset_selector=lambda f: True,
-      **kwargs):
+      title="", xlim=(-11, 11),
+      is_plot=True, max_count=None,
+      fset_selector=lambda f: True):
     """
     Plots the results of a feature vector evaluation.
 
@@ -398,8 +401,24 @@ class FeatureSetCollection(object):
     -------
     None.
     """
-    num_zeroes = self._getNumZero( ser_X,
-        fset_selector=fset_selector())
+    _, num_zeroes = self._getNumZero(ser_X,
+        fset_selector=fset_selector)
+    if max_count is None:
+      counter = collections.Counter(num_zeroes)
+      max_count = counter.most_common(1)[0][1]
+    if ax is None:
+      fig, ax = plt.subplots()
+    ax.hist(num_zeroes)
+    ax.set_xlabel("0s in SL")
+    ax.set_ylabel("count")
+    ax.set_xlim(xlim)
+    ax.set_ylim([0, max_count])
+    ax.set_title(title)
+    ax.plot(xlim, [0, 0], color="black")
+    ax.plot([0, 0], [0, max_count], color="black",
+        linestyle=":")
+    if is_plot:
+      plt.show()
       
 
   def plotEvaluate(self, ser_X, num_fset=3, ax=None,

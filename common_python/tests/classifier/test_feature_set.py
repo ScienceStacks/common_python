@@ -1,6 +1,7 @@
 from common_python.tests.classifier import helpers as test_helpers
+from common_python.classifier import feature_analyzer
 from common_python.classifier.feature_set  \
-    import FeatureSet
+    import FeatureSet, Case
 from common_python.classifier import feature_set
 from common_python.testing import helpers
 from common_python import constants as cn
@@ -8,6 +9,7 @@ from common_python import constants as cn
 import copy
 import numpy as np
 import os
+import pandas as pd
 import unittest
 
 IGNORE_TEST = False
@@ -25,7 +27,25 @@ DF_X = DF_X.loc[sorted_index, :]
 SER_Y = SER_Y.loc[sorted_index]
 FEATURE1 = "feature1"
 FEATURE2 = "feature2"
+FEATURE3 = "feature3"
 FEATURE_SET_STG = "Rv2009+Rv3830c"
+VALUE1 = 1
+VALUE2 = 2
+VALUES = [VALUE1, VALUE2]
+
+
+class TestCase(unittest.TestCase):
+
+  def setUp(self):
+    self.fset = FeatureSet([FEATURE1, FEATURE2])
+    self.case = Case(self.fset, VALUES)
+
+  def testConstructor(self):
+    if IGNORE_TEST:
+      return
+    dct = {FEATURE1: VALUE1, FEATURE2: VALUE2}
+    case = Case(self.fset, dct)
+    self.assertTrue(case.equals(self.case))
 
 
 class TestFeatureSet(unittest.TestCase):
@@ -97,6 +117,32 @@ class TestFeatureSet(unittest.TestCase):
         is_include_neg=True)
     num_pos = sum([1 for v in ser_include if v < 0])
     self.assertGreater(num_pos, 0)
+
+  def testGetCase(self):
+    if IGNORE_TEST:
+      return
+    value1 = 1
+    value2 = 2
+    value3 = 3
+    values = [value1, value2, value3]
+    ser_X = pd.Series(values)
+    ser_X.index = [FEATURE1, FEATURE2, FEATURE3]
+    #
+    fset_stg = "%s%s%s%s%s" % (FEATURE1,
+        feature_set.FEATURE_SEPARATOR, FEATURE2,
+        feature_set.FEATURE_SEPARATOR, FEATURE3)
+    fset = FeatureSet(fset_stg)
+    case = fset.getCase(ser_X)
+    other_case = Case(fset, (value1, value2, value3))
+    self.assertTrue(case.equals(other_case))
+    #
+    fset_stg = "%s%s%s%s%s" % (FEATURE1,
+        feature_analyzer.SEPARATOR, FEATURE2,
+        feature_set.FEATURE_SEPARATOR, FEATURE3)
+    fset = FeatureSet(fset_stg)
+    case = fset.getCase(ser_X)
+    expected_case = Case(fset, [value1, value3])
+    self.assertTrue(case.equals(expected_case))
 
 
 if __name__ == '__main__':
