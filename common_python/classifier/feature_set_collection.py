@@ -370,13 +370,11 @@ class FeatureSetCollection(object):
         in fset_stgs if fset_selector(FeatureSet(f))]
     num_zeroes = []
     for fset in fsets:
-      case_in_ser = Case(fset, 
-          ser_X.loc[fset.list].values)
+      case_in_ser = fset.getCase(ser_X)
       df_fset = self.df_case[
           self.df_case[cn.FEATURE_SET] == fset.str]
-      cases = [Case(fset, df_fset.loc[i, cn.CASE])
-          for i in df_fset.index]
-      sel = [case_in_ser.equals(c) for c in cases]
+      sel = [case_in_ser.tuple == t for t in
+          df_fset[cn.CASE]]
       num_zero = df_fset[sel][cn.NUM_ZERO].values[0]
       num_zeroes.append(num_zero)
     return fsets, num_zeroes
@@ -408,7 +406,7 @@ class FeatureSetCollection(object):
       max_count = counter.most_common(1)[0][1]
     if ax is None:
       fig, ax = plt.subplots()
-    ax.hist(num_zeroes)
+    ax.hist(num_zeroes, bins=xlim[1]-xlim[0]+1)
     ax.set_xlabel("0s in SL")
     ax.set_ylabel("count")
     ax.set_xlim(xlim)
