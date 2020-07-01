@@ -19,8 +19,8 @@ import os
 import shutil
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR_PATH = os.path.join(TEST_DIR,
@@ -202,7 +202,8 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.assertEqual(len(fsets), len(num_zeroes))
 
   def testPlotEvaluateHistogram(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     for instance in ["T1.1", "T3.0"]:
       ser_X = DF_X.loc[instance]
       self.collection.plotEvaluateHistogram(ser_X,
