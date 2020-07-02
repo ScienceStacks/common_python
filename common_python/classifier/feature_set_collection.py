@@ -388,7 +388,7 @@ class FeatureSetCollection(object):
     return [list(r) for r in zip(*result)]
 
   def plotEvaluateHistogram(self, ser_X, ax=None,
-      title="", xlim=(-11, 11),
+      title="", xlim=(-11, 11), ylim=None,
       is_plot=True, max_count=None, max_sl=1,
       fset_selector=lambda f: True):
     """
@@ -409,8 +409,11 @@ class FeatureSetCollection(object):
     -------
     None.
     """
-    _, num_zeroes = self._getNumZero(ser_X,
+    result = self._getNumZero(ser_X,
         fset_selector=fset_selector, max_sl=max_sl)
+    if len(result) == 0:
+      return
+    _, num_zeroes = result
     if max_count is None:
       counter = collections.Counter(num_zeroes)
       max_count = counter.most_common(1)[0][1]
@@ -420,7 +423,9 @@ class FeatureSetCollection(object):
     ax.set_xlabel("0s in SL")
     ax.set_ylabel("count")
     ax.set_xlim(xlim)
-    ax.set_ylim([0, max_count])
+    if ylim is None:
+      ylim = [0, max_count]
+    ax.set_ylim(ylim)
     ax.set_title(title)
     ax.plot(xlim, [0, 0], color="black")
     ax.plot([0, 0], [0, max_count], color="black",
