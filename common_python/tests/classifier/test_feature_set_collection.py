@@ -121,6 +121,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.collection.serialize(TEST_SERIALIZE_DIR)
     collection = FeatureSetCollection.deserialize(
         TEST_SERIALIZE_DIR)
+    self.assertTrue(collection.df_case is not None)
     self.assertEqual(collection._min_score,
        self.collection._min_score)
     self.assertEqual(len(self.collection.ser_comb),
@@ -200,6 +201,11 @@ class TestFeatureSetCollection(unittest.TestCase):
     ser_X = DF_X.loc[instance]
     fsets, num_zeroes = self.collection._getNumZero(ser_X)
     self.assertEqual(len(fsets), len(num_zeroes))
+    #
+    new_fsets, new_num_zeroes =  \
+         self.collection._getNumZero(ser_X, max_sl=0.001)
+    self.assertEqual(len(new_fsets), len(new_num_zeroes))
+    self.assertGreater(len(fsets), len(new_fsets))
 
   def testPlotEvaluateHistogram(self):
     if IGNORE_TEST:
@@ -207,7 +213,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     for instance in ["T1.1", "T3.0"]:
       ser_X = DF_X.loc[instance]
       self.collection.plotEvaluateHistogram(ser_X,
-          is_plot=IS_PLOT)
+          is_plot=IS_PLOT, max_sl=0.01)
 
 
 

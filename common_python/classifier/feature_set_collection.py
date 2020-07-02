@@ -213,7 +213,6 @@ class FeatureSetCollection(object):
       return
     #
     if self._ser_comb is None:
-      import pdb; pdb.set_trace()
       ser = self.disjointify(min_score=self._min_score)
       process_dct = ser.to_dict()
       result_dct = {}
@@ -317,7 +316,7 @@ class FeatureSetCollection(object):
     def readDF(name):
      # Reads the file for the variable name if it exists
      # Returns a DataFrame or a Series
-      result = None
+      df = None
       UNNAMED = "Unnamed: 0"
       path = os.path.join(dir_path, "%s.csv" % name)
       if os.path.isfile(path):
@@ -327,8 +326,8 @@ class FeatureSetCollection(object):
           del df[UNNAMED]
           df.index.name = None
         if len(df.columns) == 1:
-          result = pd.Series(df[df.columns.tolist()[0]])
-      return result
+          df = pd.Series(df[df.columns.tolist()[0]])
+      return df
     #
     # Get constructor parameter values
     path = os.path.join(dir_path, MISC_PCL)
@@ -346,9 +345,12 @@ class FeatureSetCollection(object):
     collection._ser_sbfset = readDF(SER_SBFSET)
     collection._ser_comb = readDF(SER_COMB)
     collection._df_case = readDF(DF_CASE)
+    collection._df_case[cn.CASE] = [eval(v) for v in
+      collection._df_case[cn.CASE]]
     return collection
 
-  def _getNumZero(self, ser_X, fset_selector=lambda f: True):
+  def _getNumZero(self, ser_X,
+      fset_selector=lambda f: True, max_sl=1):
     """
     Gets the number of zeroes in the significance level
     for feature sets applicable to cases in ser_X.
@@ -365,6 +367,7 @@ class FeatureSetCollection(object):
     -------
     list-FeatureSet, list-float
     """
+    min_num_zero = np.abs(np.log10(max_sl))
     fset_stgs = self.df_case[cn.FEATURE_SET].unique()
     fsets = [FeatureSet(f) for f 
         in fset_stgs if fset_selector(FeatureSet(f))]
@@ -375,13 +378,18 @@ class FeatureSetCollection(object):
           self.df_case[cn.FEATURE_SET] == fset.str]
       sel = [case_in_ser.tuple == t for t in
           df_fset[cn.CASE]]
-      num_zero = df_fset[sel][cn.NUM_ZERO].values[0]
-      num_zeroes.append(num_zero)
-    return fsets, num_zeroes
+      num_zero = df_fset[sel][cn.NUM_ZERO].values
+      if len(num_zero) == 1:
+        num_zeroes.append(num_zero[0])
+      else:
+        print("Missing case for %s" % fset.str)
+    result = [(f, n) for f, n in zip(fsets, num_zeroes)
+        if np.abs(n) >= min_num_zero]
+    return [list(r) for r in zip(*result)]
 
   def plotEvaluateHistogram(self, ser_X, ax=None,
       title="", xlim=(-11, 11),
-      is_plot=True, max_count=None,
+      is_plot=True, max_count=None, max_sl=1,
       fset_selector=lambda f: True):
     """
     Plots the results of a feature vector evaluation.
@@ -394,13 +402,15 @@ class FeatureSetCollection(object):
     fset_selector: Function
         Args: fset
         Returns: bool
+    max_sl: float
+        Maximum significance level plotted
 
     Returns
     -------
     None.
     """
     _, num_zeroes = self._getNumZero(ser_X,
-        fset_selector=fset_selector)
+        fset_selector=fset_selector, max_sl=max_sl)
     if max_count is None:
       counter = collections.Counter(num_zeroes)
       max_count = counter.most_common(1)[0][1]
