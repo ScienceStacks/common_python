@@ -17,7 +17,6 @@ import pandas as pd
 import scipy.stats as stats
 import seaborn
 
-FEATURE_SEPARATOR = "+"
 SORT_FUNC = lambda v: float(v[1:])
 PROB_EQUAL = 0.5
 MIN_SL = 10e-10
@@ -88,8 +87,8 @@ class FeatureSet(object):
       self.set = FeatureSet._unmakeStr(descriptor)
       self.str = FeatureSet._makeStr(self.set)
       self._analyzer = analyzer
-    elif isinstance(descriptor, set)  \
-        or isinstance(descriptor, list):
+    elif isinstance(descriptor, set) or  \
+        isinstance(descriptor, collections.abc.Iterable):
       self.set = set(descriptor)
       self.str = FeatureSet._makeStr(self.set)
       self._analyzer = analyzer
@@ -251,17 +250,19 @@ class FeatureSet(object):
     df_trinary = self.profileTrinary()
     siglvls = []
     for instance in df_X.index:
-      trinary_values = tuple(df_X.loc[
-          instance, self.list])
-      count = df_trinary.loc[[trinary_values], cn.COUNT]
-      count = count.values[0]
+      ser = df_X.loc[instance, :]
+      case = self.getCase(ser)
+      sel = [i == case.tuple for i in 
+          df_trinary.index.tolist()]
+      df_trinary_values = df_trinary[sel]
+      ser = df_trinary_values.T
+      ser = pd.Series(ser[ser.columns.tolist()[0]])
+      count = df_trinary.loc[sel][cn.COUNT].values[0]
       if count < min_count:
         siglvls.append(1)
       else:
-        siglvl_pos = max(min_sl, df_trinary.loc[
-            [trinary_values], cn.SIGLVL_POS].values[0])
-        siglvl_neg = max(min_sl, df_trinary.loc[
-            [trinary_values], cn.SIGLVL_NEG].values[0])
+        siglvl_pos = max(min_sl, ser.loc[cn.SIGLVL_POS])
+        siglvl_neg = max(min_sl, ser.loc[cn.SIGLVL_NEG])
         if siglvl_pos < siglvl_neg:
             siglvl = siglvl_pos
         else:

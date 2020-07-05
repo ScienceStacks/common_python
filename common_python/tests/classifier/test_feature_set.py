@@ -129,8 +129,8 @@ class TestFeatureSet(unittest.TestCase):
     ser_X.index = [FEATURE1, FEATURE2, FEATURE3]
     #
     fset_stg = "%s%s%s%s%s" % (FEATURE1,
-        feature_set.FEATURE_SEPARATOR, FEATURE2,
-        feature_set.FEATURE_SEPARATOR, FEATURE3)
+        cn.FEATURE_SEPARATOR, FEATURE2,
+        cn.FEATURE_SEPARATOR, FEATURE3)
     fset = FeatureSet(fset_stg)
     case = fset.getCase(ser_X)
     other_case = Case(fset, (value1, value2, value3))
@@ -138,7 +138,7 @@ class TestFeatureSet(unittest.TestCase):
     #
     fset_stg = "%s%s%s%s%s" % (FEATURE1,
         feature_analyzer.SEPARATOR, FEATURE2,
-        feature_set.FEATURE_SEPARATOR, FEATURE3)
+        cn.FEATURE_SEPARATOR, FEATURE3)
     fset = FeatureSet(fset_stg)
     case = fset.getCase(ser_X)
     expected_case = Case(fset, [value1, value3])

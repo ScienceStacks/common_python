@@ -404,6 +404,8 @@ class FeatureSetCollection(object):
         Returns: bool
     max_sl: float
         Maximum significance level plotted
+    max_count: int
+        Maximum count of occurrences
 
     Returns
     -------
@@ -428,7 +430,7 @@ class FeatureSetCollection(object):
     ax.set_ylim(ylim)
     ax.set_title(title)
     ax.plot(xlim, [0, 0], color="black")
-    ax.plot([0, 0], [0, max_count], color="black",
+    ax.plot([0, 0], [0, ylim[1]], color="black",
         linestyle=":")
     if is_plot:
       plt.show()
@@ -475,8 +477,9 @@ class FeatureSetCollection(object):
     #
     # Initializations
     df_X = pd.DataFrame(ser_X).T
+    num = min(num_fset, len(self.ser_comb))
     fsets = [FeatureSet(s, analyzer=self._analyzer)
-        for s in self.ser_comb.index.tolist()[0:num_fset]]
+        for s in self.ser_comb.index.tolist()[0:num]]
     # Construct labels
     labels = [f.str for f in fsets]
     # Construct data
@@ -484,44 +487,50 @@ class FeatureSetCollection(object):
     for idx, fset in enumerate(fsets):
       if not fset_selector(fset):
         continue
-      value = fset.evaluate(df_X, 
-          is_include_neg=is_include_neg,
-          **kwargs).values[0]
+      try:
+        value = fset.evaluate(df_X, 
+            is_include_neg=is_include_neg,
+            **kwargs).values[0]
+      except:
+        import pdb; pdb.set_trace()
       if np.isnan(value):
         raise RuntimeError("Should not get nan")
         #labels[idx] = "*%s" % labels[idx]
         #values.append(min_sl)
       else:
-        values.append(fset.evaluate(df_X).values[0])
+        values.append(value)
     # Construct plot Series
-    ser_plot = pd.Series(values)
-    ser_plot.index = ["" for _ in range(len(labels))]
-    ser_plot = pd.Series([convert(v) for v in ser_plot])
-    # Bar plot
-    width = 0.1
-    if ax is None:
-      fig, ax = plt.subplots()
-      # ax = ser_plot.plot(kind="bar", width=width)
-    ax.bar(labels, ser_plot, width=width)
-    ax.set_ylabel("0s in SL")
-    ax.set_xticklabels(ser_plot.index.tolist(),
-        rotation=0)
-    ax.set_ylim(ylim)
-    ax.set_title(title)
-    for idx, label in enumerate(labels):
+    if len(values) == 0:
+      print("***No fset found satisfying constraints.")
+    else:
+      ser_plot = pd.Series(values)
+      ser_plot.index = ["" for _ in range(len(labels))]
+      ser_plot = pd.Series([convert(v) for v in ser_plot])
+      # Bar plot
+      width = 0.1
+      if ax is None:
+        fig, ax = plt.subplots()
+        # ax = ser_plot.plot(kind="bar", width=width)
+      ax.bar(labels, ser_plot, width=width)
+      ax.set_ylabel("0s in SL")
+      ax.set_xticklabels(ser_plot.index.tolist(),
+          rotation=0)
+      ax.set_ylim(ylim)
+      ax.set_title(title)
+      for idx, label in enumerate(labels):
+        if is_include_neg:
+          ypos = ylim[0] + 1
+        else:
+          ypos = 0.25
+        xpos = idx + label_xoffset
+        ax.text(xpos, ypos, label, rotation=90,
+            fontsize=8)
+      # Add the 0 line if needed
       if is_include_neg:
-        ypos = ylim[0] + 1
-      else:
-        ypos = 0.25
-      xpos = idx + label_xoffset
-      ax.text(xpos, ypos, label, rotation=90,
-          fontsize=8)
-    # Add the 0 line if needed
-    if is_include_neg:
-      ax.plot([0, len(labels)-0.75], [0, 0],
-          color="black")
-    if is_plot:
-      plt.show()
+        ax.plot([0, len(labels)-0.75], [0, 0],
+            color="black")
+      if is_plot:
+        plt.show()
 
   def plotProfileInstance(self, fsets, is_plot=True,
       **kwargs):
