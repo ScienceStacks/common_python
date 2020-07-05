@@ -480,23 +480,18 @@ class FeatureSetCollection(object):
     num = min(num_fset, len(self.ser_comb))
     fsets = [FeatureSet(s, analyzer=self._analyzer)
         for s in self.ser_comb.index.tolist()[0:num]]
-    # Construct labels
-    labels = [f.str for f in fsets]
     # Construct data
     values = []
+    new_fsets = []
     for idx, fset in enumerate(fsets):
       if not fset_selector(fset):
         continue
-      try:
-        value = fset.evaluate(df_X, 
-            is_include_neg=is_include_neg,
-            **kwargs).values[0]
-      except:
-        import pdb; pdb.set_trace()
+      new_fsets.append(fset)
+      value = fset.evaluate(df_X, 
+          is_include_neg=is_include_neg,
+          **kwargs).values[0]
       if np.isnan(value):
         raise RuntimeError("Should not get nan")
-        #labels[idx] = "*%s" % labels[idx]
-        #values.append(min_sl)
       else:
         values.append(value)
     # Construct plot Series
@@ -504,7 +499,8 @@ class FeatureSetCollection(object):
       print("***No fset found satisfying constraints.")
     else:
       ser_plot = pd.Series(values)
-      ser_plot.index = ["" for _ in range(len(labels))]
+      ser_plot.index = ["" for _ in range(len(values))]
+      labels  = [f.str for f in new_fsets]
       ser_plot = pd.Series([convert(v) for v in ser_plot])
       # Bar plot
       width = 0.1
@@ -529,6 +525,7 @@ class FeatureSetCollection(object):
       if is_include_neg:
         ax.plot([0, len(labels)-0.75], [0, 0],
             color="black")
+      ax.set_xticklabels([])
       if is_plot:
         plt.show()
 

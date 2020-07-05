@@ -19,8 +19,8 @@ import os
 import shutil
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR_PATH = os.path.join(TEST_DIR,
@@ -138,8 +138,7 @@ class TestFeatureSetCollection(unittest.TestCase):
         is_plot=IS_PLOT)
 
   def testPlotEvaluate(self):
-    if IGNORE_TEST:
-      return
+    # TESTING
     for instance in ["T1.1", "T2.1"]:
       ser_x = self.df_X.loc[instance]
       self.collection.plotEvaluate(ser_x,
