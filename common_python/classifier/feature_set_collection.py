@@ -434,11 +434,44 @@ class FeatureSetCollection(object):
         linestyle=":")
     if is_plot:
       plt.show()
-      
 
+  def fullEvaluate(ser_X, title="", **kwargs):
+    """
+    Plots all evaluate profiles.
+
+    Parameters
+    ----------
+    ser_X: pd.DataFrame
+        Feature vector for a single instance
+    kwargs: dict
+        optional arguments for FeatureSet.evaluate
+
+    Returns
+    -------
+    None.
+    """
+    num_row = 2 
+    num_col = 3 
+    fig, axes = plt.subplots(num_row, num_col,
+      figsize=(16, 10))
+    for idx, state in enumerate(STATES):
+      row = int(idx/num_col)
+      col = idx % num_col
+      collection = COLLECTION_DCT[state]
+      if row == 0:
+        label_xoffset = -0.1
+      else:
+        label_xoffset = 0.1 
+      collection.plotEvaluate(ser_X, 
+        ax=axes[row, col], is_plot=False,
+        title = "State %d" % idx,
+        label_xoffset=label_xoffset, **kwargs)
+    fig.suptitle(title, fontsize=16)
+    plt.show()
+      
   def plotEvaluate(self, ser_X, num_fset=3, ax=None,
       title="", ylim=(-5, 5), label_xoffset=-0.2,
-      is_plot=True, is_include_neg=True,
+      is_plot=True, is_include_neg=True, max_sl=0.01,
       fset_selector=lambda f: True,
       **kwargs):
     """
@@ -459,6 +492,8 @@ class FeatureSetCollection(object):
     fset_selector: Function
         Args: fset
         Returns: bool
+    max_sl: float
+        Maximum significance level included in plot
     kwargs: dict
         optional arguments for FeatureSet.evaluate
 
@@ -486,10 +521,12 @@ class FeatureSetCollection(object):
     for idx, fset in enumerate(fsets):
       if not fset_selector(fset):
         continue
-      new_fsets.append(fset)
       value = fset.evaluate(df_X, 
           is_include_neg=is_include_neg,
           **kwargs).values[0]
+      if np.abs(value) >= max_sl:
+        continue
+      new_fsets.append(fset)
       if np.isnan(value):
         raise RuntimeError("Should not get nan")
       else:

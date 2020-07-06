@@ -142,7 +142,8 @@ class TestFeatureSetCollection(unittest.TestCase):
       return
     for instance in ["T1.1", "T2.1"]:
       ser_x = self.df_X.loc[instance]
-      self.collection.plotEvaluate(ser_x,
+      self.collection.plotEvaluate(ser_x, max_sl=1,
+          label_xoffset=-0.1,
           title=instance, is_plot=IS_PLOT)
 
   def testPlotFullProile(self):

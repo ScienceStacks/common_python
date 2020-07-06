@@ -239,7 +239,7 @@ class FeatureSet(object):
     min_count: int
         minimum number of case occurrences
     min_sl: float
-        minimum significance level report
+        minimum significance level reported
 
     Returns
     -------
