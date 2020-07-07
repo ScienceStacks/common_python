@@ -517,13 +517,15 @@ class FeatureSetCollection(object):
         for s in self.ser_comb.index.tolist()[0:num]]
     # Construct data
     values = []
+    cases = []
     new_fsets = []
     for idx, fset in enumerate(fsets):
       if not fset_selector(fset):
         continue
-      value = fset.evaluate(df_X, 
+      df = fset.evaluate(df_X, 
           is_include_neg=is_include_neg,
-          **kwargs).values[0]
+          **kwargs)
+      value = df[cn.SIGLVL].values[0]
       if np.abs(value) >= max_sl:
         continue
       new_fsets.append(fset)
@@ -531,13 +533,14 @@ class FeatureSetCollection(object):
         raise RuntimeError("Should not get nan")
       else:
         values.append(value)
+        cases.append(Case.make(df[cn.CASE].values[0]))
     # Construct plot Series
     if len(values) == 0:
       print("***No fset found satisfying constraints.")
     else:
       ser_plot = pd.Series(values)
       ser_plot.index = ["" for _ in range(len(values))]
-      labels  = [f.str for f in new_fsets]
+      labels  = [str(c) for c in cases]
       ser_plot = pd.Series([convert(v) for v in ser_plot])
       # Bar plot
       width = 0.1

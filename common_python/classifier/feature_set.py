@@ -20,6 +20,7 @@ import seaborn
 SORT_FUNC = lambda v: float(v[1:])
 PROB_EQUAL = 0.5
 MIN_SL = 10e-10
+SEPARATORS = ["[", "]"]  # Separators for case values
 
 
 ############### CLASSES ####################
@@ -54,7 +55,10 @@ class Case(object):
     self.tuple = tuple(self.list)
 
   def __repr__(self):
-    return ("%s: %s" % (str(self.fset), str(self.list)))
+    stgs = ["%s%s%d%s" % (f, SEPARATORS[0], 
+        v, SEPARATORS[1]) for f, v in
+        zip(self.fset.list, self.list)]
+    return cn.FEATURE_SEPARATOR.join(stgs)
 
   def equals(self, other):
     if not self.fset.equals(other.fset):
@@ -62,6 +66,31 @@ class Case(object):
     result = all([self.dict[k] == other.dict[k]
         for k in self.dict.keys()])
     return result
+
+  @classmethod
+  def make(cls, stg):
+    """
+    Creates a case object from its string representation.
+
+    Parameters
+    ----------
+    stg: str
+        String representation of case object
+
+    Returns
+    ----------
+    Case
+    """
+    elements = stg.split(cn.FEATURE_SEPARATOR)
+    features = []
+    values = []
+    for element in elements:
+      lpos = element.index(SEPARATORS[0])
+      features.append(element[:lpos])
+      rpos = element.index(SEPARATORS[1])
+      values.append(int(element[lpos+1: rpos]))
+    fset = FeatureSet(features)
+    return Case(fset, values)
 
 
 ####################################
@@ -243,15 +272,18 @@ class FeatureSet(object):
 
     Returns
     -------
-    pd.Series.
-      value: signifcance level
+    pd.DataFrame
+      cn.SIGLVL: signifcance level
+      cn.CASE: string representation of case
       index: instance index from df_X
     """
     df_trinary = self.profileTrinary()
     siglvls = []
+    cases = []
     for instance in df_X.index:
       ser = df_X.loc[instance, :]
       case = self.getCase(ser)
+      cases.append(str(case))
       sel = [i == case.tuple for i in 
           df_trinary.index.tolist()]
       df_trinary_values = df_trinary[sel]
@@ -270,9 +302,12 @@ class FeatureSet(object):
         if not is_include_neg:
             siglvl = siglvl_pos
         siglvls.append(siglvl)
-    ser = pd.Series(siglvls)
-    ser.index = df_X.index
-    return ser
+    df = pd.DataFrame({
+        cn.SIGLVL: siglvls,
+        cn.CASE: cases,
+        })
+    df.index = df_X.index
+    return df
 
   def profileInstance(self, sort_func=SORT_FUNC):
     """

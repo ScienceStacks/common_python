@@ -12,8 +12,8 @@ import os
 import pandas as pd
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR_PATH = os.path.join(TEST_DIR,
@@ -30,7 +30,7 @@ FEATURE2 = "feature2"
 FEATURE3 = "feature3"
 FEATURE_SET_STG = "Rv2009+Rv3830c"
 VALUE1 = 1
-VALUE2 = 2
+VALUE2 = -1 
 VALUES = [VALUE1, VALUE2]
 
 
@@ -46,6 +46,12 @@ class TestCase(unittest.TestCase):
     dct = {FEATURE1: VALUE1, FEATURE2: VALUE2}
     case = Case(self.fset, dct)
     self.assertTrue(case.equals(self.case))
+
+  def testMake(self):
+    # TESTING
+    case = Case.make(str(self.case))
+    self.assertTrue(case.equals(self.case))
+
 
 
 class TestFeatureSet(unittest.TestCase):
@@ -99,14 +105,15 @@ class TestFeatureSet(unittest.TestCase):
     if IGNORE_TEST:
       return
     fset = FeatureSet(FEATURE_SET_STG, analyzer=ANALYZER)
-    ser = fset.evaluate(self.df_X,
+    df = fset.evaluate(self.df_X,
         is_include_neg=False)
-    self.assertEqual(len(ser), len(self.df_X))
+    ser = df[cn.SIGLVL]
+    self.assertEqual(len(df), len(self.df_X))
     cls_1 = self.ser_y.index[self.ser_y == 1]
     cls_0 = self.ser_y.index[self.ser_y == 0]
     # Should have higher significance levels for
     # negative class than for positive class.
-    self.assertGreater(ser.loc[cls_0].mean(),
+    self.assertGreater(df[cn.SIGLVL].loc[cls_0].mean(),
         ser.loc[cls_1].mean())
 
   def testEvaluate2(self):
@@ -114,7 +121,7 @@ class TestFeatureSet(unittest.TestCase):
       return
     fset = FeatureSet(FEATURE_SET_STG, analyzer=ANALYZER)
     ser_include = fset.evaluate(self.df_X,
-        is_include_neg=True)
+        is_include_neg=True)[cn.SIGLVL]
     num_pos = sum([1 for v in ser_include if v < 0])
     self.assertGreater(num_pos, 0)
 
