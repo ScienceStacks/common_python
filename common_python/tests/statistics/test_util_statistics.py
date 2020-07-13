@@ -8,6 +8,7 @@ import scipy.stats
 import unittest
 
 IGNORE_TEST = False
+IS_PLOT = False
 SIZE = 10
 DF = pd.DataFrame({
     'nz-1': range(SIZE),
@@ -57,11 +58,16 @@ class TestFunctions(unittest.TestCase):
       return
     def test(size, num_choose, prob):
       probs = np.repeat(prob, size)
-      result = util_statistics.generalizedBinomialDensity(
+      r1 = util_statistics.generalizedBinomialDensity(
           probs, num_choose)
       expected = scipy.stats.binom.pmf(num_choose,
           size, prob)
-      self.assertTrue(np.isclose(result, expected))
+      self.assertTrue(np.isclose(r1, expected))
+      #
+      r2 = util_statistics.generalizedBinomialDensity(
+          probs, num_choose, is_sampled=True)
+      diff = np.abs(r1 - r2)
+      self.assertTrue(np.isclose(r1, r2))
     #
     test(4, 0, 0.25)
     test(4, 4, 0.25)
@@ -81,10 +87,24 @@ class TestFunctions(unittest.TestCase):
           PROBS, num_choose)
       expected = scipy.stats.binom.pmf(num_choose,
           len(PROBS), prob)
-      import pdb; pdb.set_trace()
       self.assertTrue(np.isclose(result, expected))
     #
     test(len(PROBS))
+
+  def testGeneralizedBinomialDensity3(self):
+    if IGNORE_TEST:
+      return
+    def test(size, num_choose, prob):
+      probs = np.repeat(prob, size)
+      expected = scipy.stats.binom.pmf(num_choose,
+          size, prob)
+      result = util_statistics.generalizedBinomialDensity(
+          probs, num_choose, is_sampled=True)
+      diff = np.abs(expected - result)
+      self.assertTrue(np.isclose(diff, 0))
+    #
+    test(20, 4, 0.1)
+    test(500, 20, 0.01)
 
   def testGeneralizedBinomialDensity2(self):
     if IGNORE_TEST:
@@ -126,6 +146,17 @@ class TestFunctions(unittest.TestCase):
     test(4, 4, 0.25)
     test(8, 6, 0.2)
     test(10, 5, 0.02)
+
+  def testChoose(self):
+    if IGNORE_TEST:
+      return
+    self.assertEqual(util_statistics.choose(10, 3), 120)
+    for num_total in range(10, 20):
+      for num_choose in range(1, 8):
+        r1 = util_statistics.choose(num_total, num_choose)
+        r2 = util_statistics.choose(num_total, 
+            num_total - num_choose)
+        self.assertEqual(r1, r2)
       
 
 if __name__ == '__main__':
