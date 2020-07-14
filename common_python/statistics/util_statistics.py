@@ -91,6 +91,7 @@ def generalizedBinomialDensity(probs, num_choose,
     #         <= num_sample
     num_sample = int(np.log10(SMALL_PROB)/
         np.log10(1 - 1/num_prob))
+    num_sample = 100*num_sample
     for _ in range(num_sample):
       occur_idxs = random.sample(indices, num_choose)
       non_occur_idxs = list(set_indices.difference(
@@ -130,11 +131,13 @@ def choose(num_total, num_choose):
   denom = reduce(op.mul, range(1, r+1), 1)
   return numer // denom
 
-def generalizedBinomialTail(probs, num_choose):
+def generalizedBinomialTail(probs, num_choose,
+    **kwargs):
   """
   Calculates P(n >= num_choose)
   :param list-float probs: probability of each event
   :param int num_choose: number of events
+  :param dict kwargs: passed to generalizedBionomial
   :return float:
   """
   length = len(probs)
@@ -144,5 +147,6 @@ def generalizedBinomialTail(probs, num_choose):
   #
   result = 0
   for num in range(num_choose, length+1):
-    result += generalizedBinomialDensity(probs, num)
+    result += generalizedBinomialDensity(probs, num,
+        **kwargs)
   return result

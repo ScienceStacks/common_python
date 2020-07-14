@@ -7,8 +7,8 @@ import pandas as pd
 import scipy.stats
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 SIZE = 10
 DF = pd.DataFrame({
     'nz-1': range(SIZE),
@@ -91,21 +91,6 @@ class TestFunctions(unittest.TestCase):
     #
     test(len(PROBS))
 
-  def testGeneralizedBinomialDensity3(self):
-    if IGNORE_TEST:
-      return
-    def test(size, num_choose, prob):
-      probs = np.repeat(prob, size)
-      expected = scipy.stats.binom.pmf(num_choose,
-          size, prob)
-      result = util_statistics.generalizedBinomialDensity(
-          probs, num_choose, is_sampled=True)
-      diff = np.abs(expected - result)
-      self.assertTrue(np.isclose(diff, 0))
-    #
-    test(20, 4, 0.1)
-    test(500, 20, 0.01)
-
   def testGeneralizedBinomialDensity2(self):
     if IGNORE_TEST:
       return
@@ -128,6 +113,36 @@ class TestFunctions(unittest.TestCase):
         SIZE, HIGH_PROB)
     self.assertLess(low_prob, high_prob)
 
+  def testGeneralizedBinomialDensity3(self):
+    if IGNORE_TEST:
+      return
+    def test(size, num_choose, prob):
+      probs = np.repeat(prob, size)
+      expected = scipy.stats.binom.pmf(num_choose,
+          size, prob)
+      result = util_statistics.generalizedBinomialDensity(
+          probs, num_choose, is_sampled=True)
+      diff = np.abs(expected - result)
+      self.assertTrue(np.isclose(diff, 0))
+    #
+    test(20, 4, 0.1)
+    test(500, 20, 0.01)
+
+  def testGeneralizedBinomialDensity4(self):
+    if IGNORE_TEST:
+      return
+    SIZE = 10
+    PROB_LOW = 0.3
+    PROB_HIGH = 0.4
+    PROBS = np.repeat(PROB_LOW, SIZE)
+    PROBS = np.concatenate([PROBS,
+        np.repeat(PROB_HIGH, SIZE)])
+    r_exact = util_statistics.generalizedBinomialDensity(
+        PROBS, SIZE, is_sampled=False)
+    r_smpl = util_statistics.generalizedBinomialDensity(
+        PROBS, SIZE, is_sampled=True)
+    self.assertLess(np.abs(r_exact - r_smpl), 0.001)
+
   def testGeneralizedBinomialTail(self):
     if IGNORE_TEST:
       return
@@ -146,6 +161,21 @@ class TestFunctions(unittest.TestCase):
     test(4, 4, 0.25)
     test(8, 6, 0.2)
     test(10, 5, 0.02)
+
+  def testGeneralizedBinomialTail2(self):
+    # TESTING
+    SIZE = 5
+    PROB_LOW = 0.3
+    PROB_HIGH = 0.4
+    PROBS = np.repeat(PROB_LOW, SIZE)
+    PROBS = np.concatenate([PROBS,
+        np.repeat(PROB_HIGH, SIZE)])
+    r_exact = util_statistics.generalizedBinomialTail(
+        PROBS, 0, is_sampled=False)
+    r_smpl = util_statistics.generalizedBinomialTail(
+        PROBS, 0, is_sampled=True)
+    self.assertTrue(np.isclose(r_exact, 1))
+    self.assertTrue(np.isclose(r_smpl, 1, atol=0.001))
 
   def testChoose(self):
     if IGNORE_TEST:
