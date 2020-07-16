@@ -98,7 +98,13 @@ class FeatureSetCollection(object):
     ser_comb. A case is an assignment of trinary
     values to the features in a feature set.
     :return pd.Series:
-        Columns: cn.FEATURE_SET, cn.CASE, cn.NUM_ZERO
+        Columns: 
+          cn.FEATURE_SET
+          cn.CASE - string representation of case
+          cn.NUM_ZERO - number of zeroes in the
+                        significance level; positive
+                        for positive case and negative
+                        for negative case.
     Notes:
       1. cn.SIGLVL_ZEROES may be negative to 
          indicate significance level for a negative case.

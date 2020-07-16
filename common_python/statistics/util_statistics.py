@@ -72,6 +72,12 @@ def generalizedBinomialDensity(probs, num_choose,
   :param int num_choose: number of events
   :param bool is_sampled: sample the combinatorics space
   :return float:
+  Notes:
+    1. The exact calculation scales poorly forr
+       len(probs) > 10.
+    2. Sampled is fairly accurate if there is not a
+       large difference between the probabilities,
+       especially if the maximum difference is < 0.1.
   """
   SMALL_PROB = 0.01  # Max prob of not choosing an index
   num_prob = len(probs)

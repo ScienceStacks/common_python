@@ -21,6 +21,7 @@ SORT_FUNC = lambda v: float(v[1:])
 PROB_EQUAL = 0.5
 MIN_SL = 10e-10
 SEPARATORS = ["[", "]"]  # Separators for case values
+MIN_COUNT = 3  # Minimum number of instances in a case
 
 
 ############### CLASSES ####################
@@ -252,7 +253,7 @@ class FeatureSet(object):
     df[cn.FEATURE_SET] = self.str
     return df
 
-  def evaluate(self, df_X, min_count=3,
+  def evaluate(self, df_X, min_count=MIN_COUNT,
       is_include_neg=True, min_sl=MIN_SL):
     """
     Evaluates feature vector for FeatureSet to assess 
