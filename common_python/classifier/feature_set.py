@@ -1,4 +1,27 @@
-'''Representation and analysis of features in a classifier.'''
+"""
+Representation and analysis of features in a classifier.
+Key concepts are:
+
+  A case is a measurement with a known class label.
+  
+  Features have trinary values for expression levels: -1, 0, 1.
+  
+  A feature set is a set of features used for a classifier.
+
+  A feature vector is the assignment of values to a features
+  in a feature set.
+
+  The indexed cases for a feature vector are the cases that
+  are compatible with the feature vector.
+  
+  A classifier construted from a feature set partitions the cases.
+  That is, two feature vectors for the feature set, their
+  indexed cases have a non-null intersection only if the
+  feature vectors are identical.
+  
+  An inferred classification is the majority class of cases
+  selected by a feature vector for a feature set.
+"""
 
 import common_python.constants as cn
 from common_python.classifier import util_classifier
@@ -20,22 +43,25 @@ import seaborn
 SORT_FUNC = lambda v: float(v[1:])
 PROB_EQUAL = 0.5
 MIN_SL = 10e-10
-SEPARATORS = ["[", "]"]  # Separators for case values
-MIN_COUNT = 3  # Minimum number of instances in a case
+SEPARATORS = ["[", "]"]  # Separators for index values
+MIN_COUNT = 3  # Minimum number of cases selected to
+               # consider the classification inferred
+               # by a case index.
 
 
 ############### CLASSES ####################
-class Case(object):
+class FeatureVector(object):
   """
-  Instance of values for features in a feature set.
+  Representation of a feature vector for a feature set.
+  Provides information about the features and their values.
   """
 
-  def __init__(self, fset, descriptor):
+  def __init__(self, fset: FeatureSet, descriptor):
     """
     Parameters
     ----------
     fset: FeatureSet
-    descriptor: tuple/list/Series/Case/dict/array
+    descriptor: tuple/list/Series/FeatureVector/dict/array
     """
     if isinstance(descriptor, dict):
       self.dict = descriptor
@@ -46,7 +72,7 @@ class Case(object):
           zip(fset.list, descriptor)}
     elif isinstance(descriptor, pd.Series):
       self.dict = descriptor.to_dict()
-    elif isinstance(descriptor, Case):
+    elif isinstance(descriptor, FeatureVector):
       self.dict = descriptor.dict
     else:
       raise RuntimeError(
@@ -69,9 +95,9 @@ class Case(object):
     return result
 
   @classmethod
-  def make(cls, stg):
+  def make(cls, stg: string):
     """
-    Creates a case object from its string representation.
+    Creates an FeatureVector object from its string representation.
 
     Parameters
     ----------
@@ -80,7 +106,7 @@ class Case(object):
 
     Returns
     ----------
-    Case
+    FeatureVector
     """
     elements = stg.split(cn.FEATURE_SEPARATOR)
     features = []
@@ -91,7 +117,7 @@ class Case(object):
       rpos = element.index(SEPARATORS[1])
       values.append(int(element[lpos+1: rpos]))
     fset = FeatureSet(features)
-    return Case(fset, values)
+    return FeatureVector(fset, values)
 
 
 ####################################
@@ -283,7 +309,7 @@ class FeatureSet(object):
     cases = []
     for instance in df_X.index:
       ser = df_X.loc[instance, :]
-      case = self.getCase(ser)
+      case = self.getFeatureVector(ser)
       cases.append(str(case))
       sel = [i == case.tuple for i in 
           df_trinary.index.tolist()]
@@ -308,6 +334,7 @@ class FeatureSet(object):
         cn.CASE: cases,
         })
     df.index = df_X.index
+    import pdb; pdb.set_trace()
     return df
 
   def profileInstance(self, sort_func=SORT_FUNC):
@@ -443,7 +470,7 @@ class FeatureSet(object):
     if is_plot:
       plt.show()
 
-  def getCase(self, ser_X):
+  def getFeatureVector(self, ser_X):
     """
     Extracts the case from the instance, where
     the case is a valid feature set in ser_X.
@@ -468,4 +495,4 @@ class FeatureSet(object):
         dct[feature] = counter.most_common(1)[0][0]
       else:
         dct[feature] = ser_X.loc[feature]
-    return Case(self, dct)
+    return FeatureVector(self, dct)

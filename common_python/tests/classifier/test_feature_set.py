@@ -12,8 +12,8 @@ import os
 import pandas as pd
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 CLASS = 1
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_DIR_PATH = os.path.join(TEST_DIR,
@@ -48,7 +48,8 @@ class TestCase(unittest.TestCase):
     self.assertTrue(case.equals(self.case))
 
   def testMake(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     case = Case.make(str(self.case))
     self.assertTrue(case.equals(self.case))
 
