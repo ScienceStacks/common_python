@@ -54,28 +54,35 @@ class FeatureVector(object):
   Provides information about the features and their values.
   """
 
-  def __init__(self, fset, descriptor):
+  def __init__(self, *pargs):
     """
-    Parameters
+    Parameters (positional)
     ----------
     fset: FeatureSet
     descriptor: tuple/list/Series/FeatureVector/dict/array
         Describes the relationship between values and features
     """
-    if isinstance(descriptor, dict):
-      self.dict = descriptor
-    elif isinstance(descriptor, tuple) or  \
-        isinstance(descriptor, list) or \
-        isinstance(descriptor, np.ndarray):
-      self.dict = {f: t for f, t in 
-          zip(fset.list, descriptor)}
-    elif isinstance(descriptor, pd.Series):
-      self.dict = descriptor.to_dict()
-    elif isinstance(descriptor, FeatureVector):
-      self.dict = descriptor.dict
+    first_arg = pargs[0]
+    # Handle types that provide for FeatureSet specification
+    if isinstance(first_arg, dict):
+      self.dict = dict(first_arg)
+    elif isinstance(first_arg, pd.Series):
+      self.dict = first_arg.to_dict()
+    elif isinstance(first_arg, FeatureVector):
+      self.dict = dict(first_arg.dict)
+    # Handle types that require two arguments
     else:
-      raise RuntimeError(
-          "descriptor is invalid type.")
+      if len(pargs) != 2:
+        raise RuntimeError("Type requires FeatureSet")
+      fset = pargs[0]
+      descriptor = pargs[1]
+      if isinstance(descriptor, dict):
+        values = descriptor.values()
+      else:
+        values = list(descriptor)
+      self.dict = {f: t for f, t in 
+          zip(fset.list, values)}
+    #
     self.fset = FeatureSet(list(self.dict.keys()))
     self.list = [v for v in self.dict.values()]
     self.tuple = tuple(self.list)
@@ -87,11 +94,48 @@ class FeatureVector(object):
     return cn.FEATURE_SEPARATOR.join(stgs)
 
   def equals(self, other):
+    """
+    Checks for exact equality.
+
+    Parameters
+    ----------
+    other : FeatureSet
+
+    Returns
+    -------
+    bool
+    """
     if not self.fset.equals(other.fset):
       return False
     result = all([self.dict[k] == other.dict[k]
         for k in self.dict.keys()])
     return result
+
+  def isCompatible(self, other):
+    """
+    Determines if the attributes in common have
+    the same value.
+
+    Parameters
+    ----------
+    other : FeatureSet
+
+    Returns
+    -------
+    bool
+    """
+    keys = set(self.dict.keys()).intersection(
+        other.dict.keys())
+    if len(keys) == 0:
+      return False
+    this_dct = {k: v for k, v in self.dict.items()
+        if k in keys}
+    other_dct = {k: v for k, v in other.dict.items()
+        if k in keys}
+    result = all([this_dct[k] == other_dct[k]
+        for k in keys])
+    return result
+
 
   @classmethod
   def make(cls, stg: str):
@@ -290,7 +334,9 @@ class FeatureSet(object):
     Parameters
     ----------
     df_X: pd.DataFrame
-        Feature vector
+        Index: instance to evaluate
+        Columns: feature names
+        Values: values of features
     min_count: int
         minimum number of cases that must be present
         for each feature vector in the data

@@ -137,6 +137,20 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.collection.plotProfileInstance(fset_stgs,
         is_plot=IS_PLOT)
 
+  def testGetFVEvaluations(self):
+    if IGNORE_TEST:
+      return
+    def test(instance, sl_range):
+      ser_x = self.df_X.loc[instance]
+      fvs, sls = self.collection._getFVEvaluations(
+          ser_x, max_sl=1)
+      sl = sls[0]
+      self.assertGreater(sl, sl_range[0])
+      self.assertLess(sl, sl_range[1])
+    #
+    test("T1.1", [0.2, 1.0])
+    test("T8.1", [-0.1, 10e-3])
+
   def testPlotEvaluate(self):
     if IGNORE_TEST:
       return

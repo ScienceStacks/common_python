@@ -15,6 +15,7 @@ import numpy as np
 import os
 import pandas as pd
 import seaborn
+import typing
 
 MIN_FRAC_INCR = 1.01  # Must increase by at least 1%
 MIN_SCORE = 0
@@ -474,11 +475,60 @@ class FeatureSetCollection(object):
     fig.suptitle(title, fontsize=16)
     plt.show()
       
-  def plotEvaluate(self, ser_X, num_fset=3, ax=None,
+  def _getFVEvaluations(self, ser_X:pd.Series, num_fset:int=3,
+      max_sl:float=0.01,
+      fset_selector:typing.Callable=lambda f: True,
+      is_include_neg:bool=True, **kwargs):
+    """
+    Plots the results of a feature vector evaluation.
+
+    Parameters
+    ----------
+    ser_X: Feature vector for a single instance
+    num_fset: Top feature sets selected
+    max_sl: maximum significance level considered
+    is_include_neg: include neg class as neg values
+    fset_selector: Function
+        Args: fset
+        Returns: bool
+    kwargs: dict
+        optional arguments for FeatureSet.evaluate
+
+    Returns
+    -------
+    list-FeatureVectors
+        Feature vectors applicable to data
+    list-float
+        Significance level corresponding to feature set
+    """
+    # Initializations
+    df_X = pd.DataFrame(ser_X).T
+    num = min(num_fset, len(self.ser_comb))
+    fsets = [FeatureSet(s, analyzer=self._analyzer)
+        for s in self.ser_comb.index.tolist()[0:num]]
+    # Construct data
+    sig_lvls = []
+    feature_vectors = []
+    for idx, fset in enumerate(fsets):
+      if not fset_selector(fset):
+        continue
+      df = fset.evaluate(df_X, 
+          is_include_neg=is_include_neg,
+          **kwargs)
+      sig_lvl = df[cn.SIGLVL].values[0]
+      if np.abs(sig_lvl) >= max_sl:
+        continue
+      if np.isnan(sig_lvl):
+        raise RuntimeError("Should not get nan")
+      else:
+        sig_lvls.append(sig_lvl)
+        feature_vectors.append(FeatureVector.make(
+            df[cn.FEATURE_VECTOR].values[0]))
+    return feature_vectors, sig_lvls
+      
+  def plotEvaluate(self, ser_X, is_include_neg=True, ax=None,
       title="", ylim=(-5, 5), label_xoffset=-0.2,
-      is_plot=True, is_include_neg=True, max_sl=0.01,
-      fset_selector=lambda f: True,
-      **kwargs):
+      is_plot=True, **kwargs):
     """
     Plots the results of a feature vector evaluation.
 
@@ -486,21 +536,12 @@ class FeatureSetCollection(object):
     ----------
     ser_X: pd.DataFrame
         Feature vector for a single instance
-    num_fset: int
-        Top feature sets selected
     is_plot: bool
     label_xoffset: int
         How much the text label is offset from the bar
         along the x-axis
-    is_include_neg: bool
-        Plot neg class as neg values
-    fset_selector: Function
-        Args: fset
-        Returns: bool
-    max_sl: float
-        Maximum significance level included in plot
     kwargs: dict
-        optional arguments for FeatureSet.evaluate
+        optional arguments for constructing evaluation data
 
     Returns
     -------
@@ -515,37 +556,15 @@ class FeatureSetCollection(object):
         raise ValueError("Should not be 0.")
       return v
     #
-    # Initializations
-    df_X = pd.DataFrame(ser_X).T
-    num = min(num_fset, len(self.ser_comb))
-    fsets = [FeatureSet(s, analyzer=self._analyzer)
-        for s in self.ser_comb.index.tolist()[0:num]]
-    # Construct data
-    values = []
-    feature_vectors = []
-    new_fsets = []
-    for idx, fset in enumerate(fsets):
-      if not fset_selector(fset):
-        continue
-      df = fset.evaluate(df_X, 
-          is_include_neg=is_include_neg,
-          **kwargs)
-      value = df[cn.SIGLVL].values[0]
-      if np.abs(value) >= max_sl:
-        continue
-      new_fsets.append(fset)
-      if np.isnan(value):
-        raise RuntimeError("Should not get nan")
-      else:
-        values.append(value)
-        feature_vectors.append(FeatureVector.make(
-            df[cn.FEATURE_VECTOR].values[0]))
+    feature_vectors, sig_lvls = self._getFVEvaluations(ser_X,
+        is_include_neg=is_include_neg, **kwargs)
+    count = len(feature_vectors)
     # Construct plot Series
-    if len(values) == 0:
+    if count == 0:
       print("***No fset found that is consistent with the feature vector.")
     else:
-      ser_plot = pd.Series(values)
-      ser_plot.index = ["" for _ in range(len(values))]
+      ser_plot = pd.Series(sig_lvls)
+      ser_plot.index = ["" for _ in range(count)]
       labels  = [str(c) for c in feature_vectors]
       ser_plot = pd.Series([convert(v) for v in ser_plot])
       # Bar plot

@@ -31,6 +31,7 @@ FEATURE3 = "feature3"
 FEATURE_SET_STG = "Rv2009+Rv3830c"
 VALUE1 = 1
 VALUE2 = -1 
+VALUE3 = 10
 VALUES = [VALUE1, VALUE2]
 
 
@@ -47,6 +48,51 @@ class TestFeatureVector(unittest.TestCase):
     feature_vector = FeatureVector(self.fset, dct)
     self.assertTrue(feature_vector.equals(
         self.feature_vector))
+    #
+    feature_vector2 = FeatureVector(dct)
+    feature_vector.equals(feature_vector2)
+    #
+    feature_vector2 = FeatureVector(pd.Series(dct))
+    feature_vector.equals(feature_vector2)
+
+  def testIsCompatible(self):
+    if IGNORE_TEST:
+      return
+    dct1 = {FEATURE1: VALUE1, FEATURE2: VALUE2}
+    dct2 = {FEATURE1: VALUE1, FEATURE3: VALUE3}
+    dct3 = {FEATURE3: VALUE3}
+    def test(dct1, dct2):
+      fset1 = FeatureSet(dct1.keys())
+      fset2 = FeatureSet(dct2.keys())
+      feature_vector1 = FeatureVector(fset1, dct1)
+      feature_vector2 = FeatureVector(fset2, dct2)
+      result = feature_vector1.isCompatible(
+          feature_vector2)
+      return result
+    #
+    self.assertTrue(test(dct1, dct1))
+    self.assertTrue(test(dct1, dct2))
+    self.assertFalse(test(dct1, dct3))
+
+
+  def testIsCompatible(self):
+    if IGNORE_TEST:
+      return
+    dct1 = {FEATURE1: VALUE1, FEATURE2: VALUE2}
+    dct2 = {FEATURE1: VALUE1, FEATURE3: VALUE3}
+    dct3 = {FEATURE3: VALUE3}
+    def test(dct1, dct2):
+      fset1 = FeatureSet(dct1.keys())
+      fset2 = FeatureSet(dct2.keys())
+      feature_vector1 = FeatureVector(fset1, dct1)
+      feature_vector2 = FeatureVector(fset2, dct2)
+      result = feature_vector1.isCompatible(
+          feature_vector2)
+      return result
+    #
+    self.assertTrue(test(dct1, dct1))
+    self.assertTrue(test(dct1, dct2))
+    self.assertFalse(test(dct1, dct3))
 
   def testMake(self):
     if IGNORE_TEST:
