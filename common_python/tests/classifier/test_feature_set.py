@@ -1,7 +1,7 @@
 from common_python.tests.classifier import helpers as test_helpers
 from common_python.classifier import feature_analyzer
 from common_python.classifier.feature_set  \
-    import FeatureSet, Case
+    import FeatureSet, FeatureVector
 from common_python.classifier import feature_set
 from common_python.testing import helpers
 from common_python import constants as cn
@@ -34,24 +34,27 @@ VALUE2 = -1
 VALUES = [VALUE1, VALUE2]
 
 
-class TestCase(unittest.TestCase):
+class TestFeatureVector(unittest.TestCase):
 
   def setUp(self):
     self.fset = FeatureSet([FEATURE1, FEATURE2])
-    self.case = Case(self.fset, VALUES)
+    self.feature_vector = FeatureVector(self.fset, VALUES)
 
   def testConstructor(self):
     if IGNORE_TEST:
       return
     dct = {FEATURE1: VALUE1, FEATURE2: VALUE2}
-    case = Case(self.fset, dct)
-    self.assertTrue(case.equals(self.case))
+    feature_vector = FeatureVector(self.fset, dct)
+    self.assertTrue(feature_vector.equals(
+        self.feature_vector))
 
   def testMake(self):
     if IGNORE_TEST:
       return
-    case = Case.make(str(self.case))
-    self.assertTrue(case.equals(self.case))
+    feature_vector= FeatureVector.make(
+        str(self.feature_vector))
+    self.assertTrue(feature_vector.equals(
+        self.feature_vector))
 
 
 
@@ -126,7 +129,7 @@ class TestFeatureSet(unittest.TestCase):
     num_pos = sum([1 for v in ser_include if v < 0])
     self.assertGreater(num_pos, 0)
 
-  def testGetCase(self):
+  def testGetFeatureVector(self):
     if IGNORE_TEST:
       return
     value1 = 1
@@ -140,17 +143,19 @@ class TestFeatureSet(unittest.TestCase):
         cn.FEATURE_SEPARATOR, FEATURE2,
         cn.FEATURE_SEPARATOR, FEATURE3)
     fset = FeatureSet(fset_stg)
-    case = fset.getCase(ser_X)
-    other_case = Case(fset, (value1, value2, value3))
-    self.assertTrue(case.equals(other_case))
+    vector = fset.getFeatureVector(ser_X)
+    other_vector= FeatureVector(fset, 
+       (value1, value2, value3))
+    self.assertTrue(vector.equals(other_vector))
     #
     fset_stg = "%s%s%s%s%s" % (FEATURE1,
         feature_analyzer.SEPARATOR, FEATURE2,
         cn.FEATURE_SEPARATOR, FEATURE3)
     fset = FeatureSet(fset_stg)
-    case = fset.getCase(ser_X)
-    expected_case = Case(fset, [value1, value3])
-    self.assertTrue(case.equals(expected_case))
+    vector = fset.getFeatureVector(ser_X)
+    expected_vector = FeatureVector(fset,
+        [value1, value3])
+    self.assertTrue(vector.equals(expected_vector))
 
 
 if __name__ == '__main__':

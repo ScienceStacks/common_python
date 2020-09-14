@@ -109,7 +109,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     for stg in feature_set_collection.COMPUTES:
       path = os.path.join(TEST_SERIALIZE_DIR,
           "%s.csv" % stg)
-      if stg != feature_set_collection.DF_CASE:
+      if stg != feature_set_collection.DF_FV:
         self.assertTrue(os.path.isfile(path))
     path = os.path.join(TEST_SERIALIZE_DIR,
         feature_set_collection.MISC_PCL)
@@ -121,7 +121,7 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.collection.serialize(TEST_SERIALIZE_DIR)
     collection = FeatureSetCollection.deserialize(
         TEST_SERIALIZE_DIR)
-    self.assertTrue(collection.df_case is not None)
+    self.assertTrue(collection.df_fv is not None)
     self.assertEqual(collection._min_score,
        self.collection._min_score)
     self.assertEqual(len(self.collection.ser_comb),
@@ -188,12 +188,12 @@ class TestFeatureSetCollection(unittest.TestCase):
   def testMakeCase(self):
     if IGNORE_TEST:
       return
-    df = self.collection._makeCase()
+    df = self.collection._makeFeatureVector()
     self.assertTrue(helpers.isValidDataFrame(df,
         expected_columns=[cn.FEATURE_SET,
-        cn.NUM_ZERO, cn.CASE]))
+        cn.NUM_ZERO, cn.FEATURE_VECTOR]))
     #
-    self.assertTrue(df.equals(self.collection.df_case))
+    self.assertTrue(df.equals(self.collection.df_fv))
 
   def testGetNumZero(self):
     if IGNORE_TEST:

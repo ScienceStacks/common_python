@@ -9,13 +9,13 @@ ENSEMBLE_PATH = os.path.join(CODE_DIR, "ensemble_file.%s" % PCL)
 
 # Column names
 ACTUAL = "actual"  # True value
-CASE = "case"  # Case for a feature vector
 CLASS = "class"
 COUNT = "count"  # A count
 CLS_FEATURE = "cls_feature"
 CMP_FEATURE = "cmp_feature"
 FEATURE = "feature"
 FEATURE_SET = "feature_set"
+FEATURE_VECTOR = "feature_vector"
 FRAC = "frac"  # A fractiona
 FRACNEG = "fracneg"  # A fractiona
 FRACPOS = "fracpos"  # A fractiona

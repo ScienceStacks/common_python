@@ -9,12 +9,10 @@ Key concepts are:
   A feature set is a set of features used for a classifier.
 
   A feature vector is the assignment of values to a features
-  in a feature set.
-
-  The indexed cases for a feature vector are the cases that
-  are compatible with the feature vector.
+  in a feature set. The collection of feature vectors
+  for a classifier is an index for the cases.
   
-  A classifier construted from a feature set partitions the cases.
+  A (determiistic) classifier construted partitions the cases.
   That is, two feature vectors for the feature set, their
   indexed cases have a non-null intersection only if the
   feature vectors are identical.
@@ -56,12 +54,13 @@ class FeatureVector(object):
   Provides information about the features and their values.
   """
 
-  def __init__(self, fset: FeatureSet, descriptor):
+  def __init__(self, fset, descriptor):
     """
     Parameters
     ----------
     fset: FeatureSet
     descriptor: tuple/list/Series/FeatureVector/dict/array
+        Describes the relationship between values and features
     """
     if isinstance(descriptor, dict):
       self.dict = descriptor
@@ -95,14 +94,14 @@ class FeatureVector(object):
     return result
 
   @classmethod
-  def make(cls, stg: string):
+  def make(cls, stg: str):
     """
     Creates an FeatureVector object from its string representation.
 
     Parameters
     ----------
     stg: str
-        String representation of case object
+        String representation of FeatureVector
 
     Returns
     ----------
@@ -293,7 +292,8 @@ class FeatureSet(object):
     df_X: pd.DataFrame
         Feature vector
     min_count: int
-        minimum number of case occurrences
+        minimum number of cases that must be present
+        for each feature vector in the data
     min_sl: float
         minimum significance level reported
 
@@ -301,17 +301,17 @@ class FeatureSet(object):
     -------
     pd.DataFrame
       cn.SIGLVL: signifcance level
-      cn.CASE: string representation of case
+      cn.FEATURE_VECTOR: string representation of a FeatureVector
       index: instance index from df_X
     """
     df_trinary = self.profileTrinary()
     siglvls = []
-    cases = []
+    feature_vectors = []
     for instance in df_X.index:
       ser = df_X.loc[instance, :]
-      case = self.getFeatureVector(ser)
-      cases.append(str(case))
-      sel = [i == case.tuple for i in 
+      feature_vector = self.getFeatureVector(ser)
+      feature_vectors.append(str(feature_vector))
+      sel = [i == feature_vector.tuple for i in 
           df_trinary.index.tolist()]
       df_trinary_values = df_trinary[sel]
       ser = df_trinary_values.T
@@ -331,10 +331,9 @@ class FeatureSet(object):
         siglvls.append(siglvl)
     df = pd.DataFrame({
         cn.SIGLVL: siglvls,
-        cn.CASE: cases,
+        cn.FEATURE_VECTOR: feature_vectors,
         })
     df.index = df_X.index
-    import pdb; pdb.set_trace()
     return df
 
   def profileInstance(self, sort_func=SORT_FUNC):
@@ -472,9 +471,9 @@ class FeatureSet(object):
 
   def getFeatureVector(self, ser_X):
     """
-    Extracts the case from the instance, where
-    the case is a valid feature set in ser_X.
-    This requires handling merged features.
+    Extracts the feature vector.
+    This requires handling merged features, those
+    with "--".
     :param pd.Series ser_X:
     :param FeatureSet fset:
     :return tuple:

@@ -2,7 +2,7 @@
 
 import common_python.constants as cn
 from common_python.classifier.feature_set  \
-    import FeatureSet, Case
+    import FeatureSet, FeatureVector
 from common_python.classifier import util_classifier
 from common_python.classifier import feature_analyzer
 from common_python.util.persister import Persister
@@ -20,8 +20,8 @@ MIN_FRAC_INCR = 1.01  # Must increase by at least 1%
 MIN_SCORE = 0
 SER_SBFSET = "ser_sbfset"
 SER_COMB = "ser_comb"
-DF_CASE = "df_case"
-COMPUTES = [SER_SBFSET, SER_COMB, DF_CASE]
+DF_FV = "df_fv"
+COMPUTES = [SER_SBFSET, SER_COMB, DF_FV]
 MISC_PCL = "feature_set_collection_misc.pcl"
 MIN_SL = 1e-10
 MAX_SL = 1
@@ -76,31 +76,27 @@ class FeatureSetCollection(object):
     #  index: string representation of a set of features
     #  value: accuracy (score)
     self._ser_comb = None  # Combinations of feature sets
-    self._df_case = None  # Cases for FeatureSet
+    self._df_fv = None  # Feature vectors in cases
 
   @property
-  def df_case(self):
+  def df_fv(self):
     """
-    Dataframe describing cases for the FeatureSets in
-    ser_comb. A case is an assignment of trinary
-    values to the features in a feature set.
+    Dataframe describing feature vectors.
     :return pd.Series:
-        Columns: cn.FEATURE_SET, cn.CASE, cn.SIGLVL_ZEROES
+        Columns: cn.FEATURE_SET, cn.FEATURE_VECTOR, cn.SIGLVL_ZEROES
     Notes:
       1. cn.SIGLVL_ZEROES may be negative to 
          indicate significance level for a negative case.
     """
-    return self._makeCase()
+    return self._makeFeatureVector()
 
-  def _makeCase(self): 
+  def _makeFeatureVector(self): 
     """
-    Dataframe describing cases for the FeatureSets in
-    ser_comb. A case is an assignment of trinary
-    values to the features in a feature set.
+    Dataframe describing the FeatureVectors.
     :return pd.Series:
         Columns: 
           cn.FEATURE_SET
-          cn.CASE - string representation of case
+          cn.FEATURE_VECTOR - string representation of case
           cn.NUM_ZERO - number of zeroes in the
                         significance level; positive
                         for positive case and negative
@@ -135,25 +131,25 @@ class FeatureSetCollection(object):
         num_zero = np.log10(siglvl_neg)
       return num_zero
     #
-    if self._df_case is None:
+    if self._df_fv is None:
       dct = {
-          cn.FEATURE_SET: [], cn.CASE: [],
+          cn.FEATURE_SET: [], cn.FEATURE_VECTOR: [],
           cn.NUM_ZERO: [] }
       for fset_stg in self.ser_comb.index:
         fset = FeatureSet(fset_stg,
             analyzer=self._analyzer)
         df_profile = fset.profileTrinary()
-        for case_tuple in df_profile.index:
-          siglvl_pos = df_profile.loc[[case_tuple],
+        for feature_tuple in df_profile.index:
+          siglvl_pos = df_profile.loc[[feature_tuple],
                cn.SIGLVL_POS][0]
-          siglvl_neg = df_profile.loc[[case_tuple],
+          siglvl_neg = df_profile.loc[[feature_tuple],
                cn.SIGLVL_NEG][0]
           num_zero = convert(siglvl_pos, siglvl_neg)
           dct[cn.FEATURE_SET].append(fset.str)
-          dct[cn.CASE].append(case_tuple)
+          dct[cn.FEATURE_VECTOR].append(feature_tuple)
           dct[cn.NUM_ZERO].append(num_zero)
-      self._df_case = pd.DataFrame(dct)
-    return self._df_case
+      self._df_fv = pd.DataFrame(dct)
+    return self._df_fv
         
   @property
   def ser_sbfset(self):
@@ -350,9 +346,12 @@ class FeatureSetCollection(object):
     collection = cls(analyzer_dct[key], min_score=min_score)
     collection._ser_sbfset = readDF(SER_SBFSET)
     collection._ser_comb = readDF(SER_COMB)
-    collection._df_case = readDF(DF_CASE)
-    collection._df_case[cn.CASE] = [eval(v) for v in
-      collection._df_case[cn.CASE]]
+    collection._df_fv = readDF(DF_FV)
+    # FIXME: Corrected for change in name
+    collection._df_fv = collection._df_fv.rename(
+        columns={"case": cn.FEATURE_VECTOR})
+    collection._df_fv[cn.FEATURE_VECTOR] = [eval(v) for v in
+      collection._df_fv[cn.FEATURE_VECTOR]]
     return collection
 
   def _getNumZero(self, ser_X,
@@ -374,21 +373,21 @@ class FeatureSetCollection(object):
     list-FeatureSet, list-float
     """
     min_num_zero = np.abs(np.log10(max_sl))
-    fset_stgs = self.df_case[cn.FEATURE_SET].unique()
+    fset_stgs = self.df_fv[cn.FEATURE_SET].unique()
     fsets = [FeatureSet(f) for f 
         in fset_stgs if fset_selector(FeatureSet(f))]
     num_zeroes = []
     for fset in fsets:
-      case_in_ser = fset.getCase(ser_X)
-      df_fset = self.df_case[
-          self.df_case[cn.FEATURE_SET] == fset.str]
-      sel = [case_in_ser.tuple == t for t in
-          df_fset[cn.CASE]]
+      vector_in_ser = fset.getFeatureVector(ser_X)
+      df_fset = self.df_fv[
+          self.df_fv[cn.FEATURE_SET] == fset.str]
+      sel = [vector_in_ser.tuple == t for t in
+          df_fset[cn.FEATURE_VECTOR]]
       num_zero = df_fset[sel][cn.NUM_ZERO].values
       if len(num_zero) == 1:
         num_zeroes.append(num_zero[0])
       else:
-        print("Missing case for %s" % fset.str)
+        print("Missing feature vector for %s" % fset.str)
     result = [(f, n) for f, n in zip(fsets, num_zeroes)
         if np.abs(n) >= min_num_zero]
     return [list(r) for r in zip(*result)]
@@ -523,7 +522,7 @@ class FeatureSetCollection(object):
         for s in self.ser_comb.index.tolist()[0:num]]
     # Construct data
     values = []
-    cases = []
+    feature_vectors = []
     new_fsets = []
     for idx, fset in enumerate(fsets):
       if not fset_selector(fset):
@@ -539,14 +538,15 @@ class FeatureSetCollection(object):
         raise RuntimeError("Should not get nan")
       else:
         values.append(value)
-        cases.append(Case.make(df[cn.CASE].values[0]))
+        feature_vectors.append(FeatureVector.make(
+            df[cn.FEATURE_VECTOR].values[0]))
     # Construct plot Series
     if len(values) == 0:
       print("***No fset found satisfying constraints.")
     else:
       ser_plot = pd.Series(values)
       ser_plot.index = ["" for _ in range(len(values))]
-      labels  = [str(c) for c in cases]
+      labels  = [str(c) for c in feature_vectors]
       ser_plot = pd.Series([convert(v) for v in ser_plot])
       # Bar plot
       width = 0.1
