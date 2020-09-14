@@ -542,7 +542,7 @@ class FeatureSetCollection(object):
             df[cn.FEATURE_VECTOR].values[0]))
     # Construct plot Series
     if len(values) == 0:
-      print("***No fset found satisfying constraints.")
+      print("***No fset found that is consistent with the feature vector.")
     else:
       ser_plot = pd.Series(values)
       ser_plot.index = ["" for _ in range(len(values))]
