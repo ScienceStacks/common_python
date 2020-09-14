@@ -53,17 +53,6 @@ def runner(sigma=1.5, num_dim=5, impurity=0.0):
           # RandomHypergridHarness
       stds=np.repeat(STD, num_dim), impurity=impurity, num_point=NUM_POINT)
 
-def testAnalyze():
-  sigma = 2.0
-  num_dim = 8
-  impurity = 0
-  df = HypergridHarnessMetaClassifier.analyze(
-      is_rel=True,  # analyze
-      mclf_dct=None,  # HypergridHarnessMetaClassifier
-      sigmas=sigma, num_repl=3, # MetaClassifier
-          # RandomHypergridHarness
-      stds=np.repeat(STD, num_dim), impurity=impurity, num_point=NUM_POINT)
-
 
 ################# TESTS ##################
 class TestHypergridHarnessMetaClassifier(unittest.TestCase):
