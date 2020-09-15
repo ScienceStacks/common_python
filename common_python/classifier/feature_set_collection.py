@@ -526,6 +526,30 @@ class FeatureSetCollection(object):
             df[cn.FEATURE_VECTOR].values[0]))
     return feature_vectors, sig_lvls
       
+  def getEvaluationDF(self, ser_X, **kwargs):
+    """
+    Constructs a dataframe 
+
+    Parameters
+    ----------
+    ser_X: pd.DataFrame
+        Feature vector to be evaluated
+    kwargs: dict
+        optional arguments for constructing evaluation data
+
+    Returns
+    -------
+    None.
+    """
+    feature_vectors, sig_lvls = self._getFVEvaluations(
+        ser_X, **kwargs)
+    df = pd.DataFrame({
+        cn.FEATURE_VECTOR: [str(f) for f in feature_vectors],
+        cn.SIGLVL: sig_lvls,
+        })
+    df = df.sort_values(cn.SIGLVL, ascending=True)
+    return df
+      
   def plotEvaluate(self, ser_X, is_include_neg=True, ax=None,
       title="", ylim=(-5, 5), label_xoffset=-0.2,
       is_plot=True, **kwargs):
@@ -535,7 +559,10 @@ class FeatureSetCollection(object):
     Parameters
     ----------
     ser_X: pd.DataFrame
-        Feature vector for a single instance
+        Feature vector to be evaluated
+    ax: Axis for plot
+    is_include_neg: bool
+        Include negative cases
     is_plot: bool
     label_xoffset: int
         How much the text label is offset from the bar
