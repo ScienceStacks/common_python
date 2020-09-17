@@ -475,7 +475,7 @@ class FeatureSetCollection(object):
     fig.suptitle(title, fontsize=16)
     plt.show()
       
-  def _getFVEvaluations(self, ser_X:pd.Series, num_fset:int=3,
+  def getFVEvaluations(self, ser_X:pd.Series, num_fset:int=3,
       max_sl:float=0.01,
       fset_selector:typing.Callable=lambda f: True,
       is_include_neg:bool=True, **kwargs):
@@ -496,10 +496,9 @@ class FeatureSetCollection(object):
 
     Returns
     -------
-    list-FeatureVectors
-        Feature vectors applicable to data
-    list-float
-        Significance level corresponding to feature set
+    pd.Dataframe
+       Columns from FeatureSet.evaluate
+       FEATURE_SET
     """
     # Initializations
     df_X = pd.DataFrame(ser_X).T
@@ -507,48 +506,18 @@ class FeatureSetCollection(object):
     fsets = [FeatureSet(s, analyzer=self._analyzer)
         for s in self.ser_comb.index.tolist()[0:num]]
     # Construct data
-    sig_lvls = []
+    siglvls = []
     feature_vectors = []
-    for idx, fset in enumerate(fsets):
-      if not fset_selector(fset):
-        continue
+    dfs = []
+    for fset in fsets:
       df = fset.evaluate(df_X, 
-          is_include_neg=is_include_neg,
-          **kwargs)
-      sig_lvl = df[cn.SIGLVL].values[0]
-      if np.abs(sig_lvl) >= max_sl:
-        continue
-      if np.isnan(sig_lvl):
-        raise RuntimeError("Should not get nan")
-      else:
-        sig_lvls.append(sig_lvl)
-        feature_vectors.append(FeatureVector.make(
-            df[cn.FEATURE_VECTOR].values[0]))
-    return feature_vectors, sig_lvls
-      
-  def getEvaluationDF(self, ser_X, **kwargs):
-    """
-    Constructs a dataframe 
-
-    Parameters
-    ----------
-    ser_X: pd.DataFrame
-        Feature vector to be evaluated
-    kwargs: dict
-        optional arguments for constructing evaluation data
-
-    Returns
-    -------
-    None.
-    """
-    feature_vectors, sig_lvls = self._getFVEvaluations(
-        ser_X, **kwargs)
-    df = pd.DataFrame({
-        cn.FEATURE_VECTOR: [str(f) for f in feature_vectors],
-        cn.SIGLVL: sig_lvls,
-        })
-    df = df.sort_values(cn.SIGLVL, ascending=True)
-    return df
+          is_include_neg=is_include_neg, **kwargs)
+      df_sub = df[df[cn.SIGLVL] < max_sl]
+      df_sub = df_sub[df_sub[cn.COUNT] >= num_fset]
+      df_sub[cn.FEATURE_SET] = fset
+      dfs.append(df_sub)
+    df_result = pd.concat(dfs)
+    return df_result
       
   def plotEvaluate(self, ser_X, is_include_neg=True, ax=None,
       title="", ylim=(-5, 5), label_xoffset=-0.2,
@@ -583,14 +552,16 @@ class FeatureSetCollection(object):
         raise ValueError("Should not be 0.")
       return v
     #
-    feature_vectors, sig_lvls = self._getFVEvaluations(ser_X,
+    df = self.getFVEvaluations(ser_X,
         is_include_neg=is_include_neg, **kwargs)
+    feature_vectors = df[cn.FEATURE_VECTOR]
+    siglvls = df[cn.SIGLVL]
     count = len(feature_vectors)
     # Construct plot Series
     if count == 0:
       print("***No fset found that is consistent with the feature vector.")
     else:
-      ser_plot = pd.Series(sig_lvls)
+      ser_plot = pd.Series(siglvls)
       ser_plot.index = ["" for _ in range(count)]
       labels  = [str(c) for c in feature_vectors]
       ser_plot = pd.Series([convert(v) for v in ser_plot])

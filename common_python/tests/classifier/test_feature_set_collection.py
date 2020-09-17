@@ -137,27 +137,15 @@ class TestFeatureSetCollection(unittest.TestCase):
     self.collection.plotProfileInstance(fset_stgs,
         is_plot=IS_PLOT)
 
-  def testGetEvaluationDF(self):
-    if IGNORE_TEST:
-      return
-    def test(instance, sl_range):
-      ser_x = self.df_X.loc[instance]
-      df = self.collection.getEvaluationDF(
-          ser_x, max_sl=1)
-      self.assertTrue(helpers.isValidDataFrame(df,
-          expected_columns=[cn.FEATURE_VECTOR,
-          cn.SIGLVL]))
-    #
-    test("T1.1", [0.2, 1.0])
-    test("T8.1", [-0.1, 10e-3])
-
   def testGetFVEvaluations(self):
     if IGNORE_TEST:
       return
     def test(instance, sl_range):
       ser_x = self.df_X.loc[instance]
-      fvs, sls = self.collection._getFVEvaluations(
+      df = self.collection.getFVEvaluations(
           ser_x, max_sl=1)
+      fvs = df[cn.FEATURE_VECTOR]
+      sls = df[cn.SIGLVL]
       sl = np.abs(sls[0])
       self.assertGreater(sl, sl_range[0])
       self.assertLess(sl, sl_range[1])
