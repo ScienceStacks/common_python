@@ -348,11 +348,15 @@ class FeatureSet(object):
     pd.DataFrame
       cn.SIGLVL: signifcance level
       cn.FEATURE_VECTOR: string representation of a FeatureVector
+      cn.COUNT: number of cases
+      cn.FRAC: fraction of positive cases
       index: instance index from df_X
     """
     df_trinary = self.profileTrinary()
     siglvls = []
     feature_vectors = []
+    counts = []
+    fracs = []
     for instance in df_X.index:
       ser = df_X.loc[instance, :]
       feature_vector = self.getFeatureVector(ser)
@@ -363,6 +367,8 @@ class FeatureSet(object):
       ser = df_trinary_values.T
       ser = pd.Series(ser[ser.columns.tolist()[0]])
       count = df_trinary.loc[sel][cn.COUNT].values[0]
+      counts.append(count)
+      fracs.append(ser.loc[cn.FRAC])
       if count < min_count:
         siglvls.append(1)
       else:
@@ -378,6 +384,8 @@ class FeatureSet(object):
     df = pd.DataFrame({
         cn.SIGLVL: siglvls,
         cn.FEATURE_VECTOR: feature_vectors,
+        cn.COUNT: counts,
+        cn.FRAC: fracs,
         })
     df.index = df_X.index
     return df
