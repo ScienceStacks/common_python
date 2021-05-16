@@ -7,9 +7,9 @@ SUffix conventions
   *s - list
 
 """
-import src.constants as cn
-import src.sympyUtil as su
-from src.eigenCollection import EigenCollection
+import common_python.LTIModel.constants as cn
+from common_python.sympy import sympyUtil as su
+from common_python.LTIModel.eigenCollection import EigenCollection
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -60,7 +60,8 @@ class LTIModel():
         self.initialVec = initialVec
         self.rVec = rVec
         # Results
-        self.eigenCollection = None
+        self.eigenCollection = EigenCollection(self.aMat)
+        self.eigenCollection.completeEigenvectors()
         self.solutionVec = None
         self.evaluatedSolutionVec = None
 
@@ -74,8 +75,6 @@ class LTIModel():
         sympy.Matrix (N X 1)
         """
         # TODO: Handle imaginary eigenvalues
-        # FIXME: fundamental matrix does not include the constants and so
-        #        I'm incorrectly calculating Yp
         def vectorRoundToZero(vec):
             if vec.cols > 1:
                 RuntimeError("Can only handle vectors.")
@@ -93,14 +92,30 @@ class LTIModel():
         initialVec = su.evaluate(self.initialVec, isNumpy=False, subs=subs)
         # Find the complete set of eigenvectors, handling cases
         # in which the algebraic multiplicity > geometric multiplicity
-        self.eigenCollection = EigenCollection(aMat)
-        self.eigenCollection.completeEigenvectors()
         timer.print(name="solve_1")
         # Construct vector of solutions
         vecs = []
-        for eigenInfo in self.eigenCollection.eigenInfos:
+        eigenInfos = self.eigenCollection.pruneConjugates()
+        for eigenInfo in eigenInfos:
             for eigenVector in eigenInfo.vecs:
-                vecs.append(eigenVector * sympy.exp(eigenInfo.val * t))
+                if su.isReal(eigenInfo.val) or su.isSympy(eigenInfo.val):
+                    expr = sympy.exp(eigenInfo.val * t)
+                    vecs.append(eigenVector * expr)
+                else:
+                    if eigenInfo.mul > 1:
+                        msg = "Large multiciplies for complex eigenvalues."
+                        raise RuntimeError(msg)
+                    # Add two vectors since the conjugate eigenvalues are
+                    # done together
+                    realEig, imagEig = su.asRealImag(eigenInfo.val)
+                    realVec, imagVec = su.vectorAsRealImag(eigenVector)
+                    expEx = sympy.exp(realEig * t)
+                    cosEx = sympy.cos(imagEig * t)
+                    sinEx = sympy.sin(imagEig * t)
+                    expr =  expEx * (realVec * cosEx - imagVec * sinEx)
+                    vecs.append(expr)
+                    expr =  expEx * (realVec * sinEx + imagVec * cosEx)
+                    vecs.append(expr)
         # Construct the fundamental matrix
         fundamentalMat= sympy.Matrix(vecs)
         fundamentalMat = fundamentalMat.reshape(self.numRow, self.numRow)

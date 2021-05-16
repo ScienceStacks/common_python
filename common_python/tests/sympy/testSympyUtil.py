@@ -9,7 +9,7 @@ import unittest
 
 IGNORE_TEST = False
 IS_PLOT = False
-VARIABLES = "X Y Z"
+VARIABLES = "t X Y Z k0 k1 k2"
 
 
 #############################
@@ -144,7 +144,100 @@ class TestFunctions(unittest.TestCase):
         test(expression.evalf(), expected = 3.0)
         test(3.0)
         test(-3.0)
-       
+
+    def testRecursiveEquals(self):
+        if IGNORE_TEST:
+            return
+        self.assertTrue(su.recursiveEquals(3.0, 3.0))
+        expr = X * 3.0
+        self.assertTrue(su.recursiveEquals(expr, 3.0, subs={X: 1.0}))
+        # Not equal
+        self.assertFalse(su.recursiveEquals(expr, 3.0, subs={X: 2.0}))
+        # Equal structures
+        result = su.recursiveEquals((expr, expr), (3.0, 3.0), subs={X: 1.0})
+        self.assertTrue(result)
+        obj1 = sympy.Matrix([expr, expr])
+        obj2 = sympy.Matrix([3.0, 3.0])
+        result = su.recursiveEquals(obj1, obj2, subs={X: 1.0})
+        self.assertTrue(result)
+        # Complex structures
+        obj1 = sympy.Matrix([expr, expr])
+        obj1 = sympy.Matrix([obj1, obj1, obj1])
+        obj2 = sympy.Matrix([3.0, 3.0])
+        obj2 = sympy.Matrix([obj2, obj2, obj2])
+        result = su.recursiveEquals(obj1, obj2, subs={X: 1.0})
+        self.assertTrue(result)
+        result = su.recursiveEquals(obj1, obj2, subs={X: 2.0})
+        self.assertFalse(result)
+        # Different structures
+        result = su.recursiveEquals(expr, (3.0, 3.0), subs={X: 1.0})
+        self.assertFalse(result)
+        # Same structures, different values
+        result = su.recursiveEquals((expr, expr), (3.0, 3.0), subs={X: 1.1})
+        self.assertFalse(result)
+
+    def testRecursiveEvaluate(self):
+        if IGNORE_TEST:
+            return
+        def test(obj, expected, subs={}):
+            newObj = su.recursiveEvaluate(obj, subs=subs)
+            self.assertTrue(su.recursiveEquals(newObj, obj, subs=subs))
+        # Tests
+        expr = 3 * X
+        # Complex structures
+        obj1 = sympy.Matrix([expr, expr])
+        obj1 = sympy.Matrix([obj1, obj1, obj1])
+        obj2 = sympy.Matrix([3.0, 3.0])
+        obj2 = sympy.Matrix([obj2, obj2, obj2])
+        test(obj1, obj2, subs={X: 1.0})
+        # Simple tests
+        test(3.0, 3.0)
+        test(expr, 3.0, subs={X: 1})
+
+    def testIsNumber(self):
+        if IGNORE_TEST:
+            return
+        def test(obj, isNum):
+            self.assertEqual(su.isNumber(obj), isNum)
+        #
+        test(3.0, True)
+        test(complex(3.0), True)
+        test(X, False)
+        expr = 3 * X
+        expr = expr.subs(X, 1)
+        test(expr, True)
+
+    def testIsSympy(self):
+        if IGNORE_TEST:
+            return
+        self.assertTrue(su.isSympy(X))
+        self.assertFalse(su.isSympy(3.0))
+        self.assertTrue(su.isSympy(sympy.Matrix([X])))
+        expr = 3 * X
+        expr = expr.subs(X, 1)
+        self.assertTrue(su.isSympy(expr))
+
+    def testIsConjugate(self):
+        if IGNORE_TEST:
+            return
+        cmplx1 = 2 + 3j
+        cmplx2 = 2 - 3j
+        self.assertTrue(su.isConjugate(cmplx1, cmplx2))
+        expr = X * cmplx1
+        expr = expr.subs(X, 1.0)
+        self.assertTrue(su.isConjugate(expr, cmplx2))
+
+    def testVectorAsRealImag(self):
+        if IGNORE_TEST:
+            return
+        vec = sympy.Matrix([ 2 + 3j, 2j, 2])
+        realVec, imagVec = su.vectorAsRealImag(vec)
+        for idx, item in enumerate(vec):
+            real, imag = su.asRealImag(item)
+            self.assertEqual(real, realVec[idx])
+            self.assertEqual(imag, imagVec[idx])
+     
+   
 
 
 if __name__ == '__main__':

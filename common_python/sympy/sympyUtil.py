@@ -15,6 +15,7 @@ Notes
 
 """
 
+import copy
 import inspect
 import matplotlib.pyplot as plt
 import numpy as np
@@ -91,7 +92,13 @@ def substitute(expression, subs={}):
     -------
     sympy.expression
     """
-    expr = expression.copy()
+    if isNumber(expression):
+        return expression
+    try:
+        expr = expression.copy()
+    except TypeError as err:
+        import pdb; pdb.set_trace()
+        pass
     for key, value in subs.items():
         expr = expr.subs(key, value)
     return sympy.simplify(expr)
@@ -102,7 +109,7 @@ def evaluate(expression, dct=None, isNumpy=True, **kwargs):
 
     Parameters
     ----------
-    expression: sympy.Add
+    expression: sympy.Add/number
     isNumpy: bool
         return float or ndarray of float
     dct: dict
@@ -114,8 +121,12 @@ def evaluate(expression, dct=None, isNumpy=True, **kwargs):
     -------
     float/np.ndarray
     """
-    newDct = _getDct(dct, inspect.currentframe())
-    return _evaluate(expression, isNumpy=isNumpy, dct=newDct, **kwargs)
+    if isSympy(expression):
+        newDct = _getDct(dct, inspect.currentframe())
+        val = _evaluate(expression, isNumpy=isNumpy, dct=newDct, **kwargs)
+    else:
+        val = expression
+    return val
 
 def _evaluate(expression, dct, isNumpy=True, **kwargs):
     """
@@ -143,9 +154,12 @@ def _evaluate(expression, dct, isNumpy=True, **kwargs):
         else:
             try:
                 result = float(val)
-            except Exception:
-                import pdb; pdb.set_trace()
-                pass
+            except Exception as err:
+                try:
+                    result = complex(val)
+                except Exception as err:
+                    import pdb; pdb.set_trace()
+                    pass
     else:
         result = val
     return result
@@ -251,22 +265,82 @@ def expressionToNumber(expression):
     # Convert expression to a number
     if isSympy(expression):
         val = expression.evalf()
-        try:
+        if val.is_real:
             val = float(val)
-        except TypeError:
+        else:
             val = complex(val)
     else:
         val = expression  # already a number
     # Eliminate small values
     if np.abs(val) < SMALL_VALUE:
         val = 0
-    if np.angle(val) < SMALL_VALUE:
+    if np.abs(np.angle(val)) < SMALL_VALUE:
         val = np.sign(val) * np.abs(val)
     return val
 
+def asRealImag(val):
+    if isSympy(val):
+        return val.as_real_imag()
+    else:
+        cmplxVal = complex(val)
+        return (cmplxVal.real, cmplxVal.imag)
+
+def isConjugate(val1, val2):
+    """
+    Tests for complex conjugates.
+
+    Parameters
+    ----------
+    val1: number or expression
+    val2: number or expression
+    
+    Returns
+    -------
+    bool
+    """
+    realImag = [asRealImag(val1), asRealImag(val2)]
+    isSameReal = realImag[0][0] == realImag[1][0]
+    isSameImag = realImag[0][1] == -realImag[1][1]
+    return isSameReal and isSameImag
+
 def isSympy(val):
+    """
+    Tests if this is a sympy object.
+
+    Parameters
+    ----------
+    val: object
+    
+    Returns
+    -------
+    bool
+    """
     properties = dir(val)
     return ("is_symbol" in properties) or ("evalf" in properties)
+
+def isNumber(val):
+    """
+    Tests if this is a number in base python or sympy.
+
+    Parameters
+    ----------
+    val: float/int/complex/sympy.expression
+    
+    Returns
+    -------
+    bool
+    """
+    try:
+        _ = complex(val)
+        return True
+    except TypeError:
+        return False
+
+def isReal(val):
+    if isSympy(val):
+        return val.is_real
+    else:
+        return np.isreal(val)
     
 def isZero(val):
     """
@@ -289,7 +363,6 @@ def isZero(val):
         if np.isclose(np.abs(val), 0):
             return True
     except TypeError:
-        import pdb; pdb.set_trace()
         newVal = complex(val)
         return np.abs(newVal) == 0
 
@@ -330,6 +403,83 @@ def solveLinearSingular(aMat, bVec, isParameterized=False):
             solutionVec = solutionVec.subs(parameter, DEFAULT_VALUE)
     solutionVec = solutionVec.evalf()
     return solutionVec
-   
+
+def isIndexable(obj):
+    return "__getitem__" in dir(obj)
+
+def recursiveEvaluate(obj, **kwargs):
+    """
+    Recursively evaluates symbols encountered in muteable indexables of type:
+    list, np.array, sympy.Matrix (and maybe others)
+
+    Parameters
+    ----------
+    obj: sympy.expr/number/indexable
+        an indexable support indexing.
+    kwargs: dict
+        keyword arguments for evaluate
     
+    Returns
+    -------
+    object with same structure as original
+    """
+    if isIndexable(obj):
+        # Is a container of other objects
+        if "tuple" in str(obj.__class__):
+            newObj = list(obj)
+        else:
+            newObj = copy.deepcopy(obj)
+        for idx, entry in enumerate(newObj):
+            newObj[idx] = recursiveEvaluate(entry, **kwargs)
+        return newObj
+    else:
+       # Do the numeric evaluation
+       return evaluate(obj, **kwargs)
+
+def recursiveEquals(obj1, obj2, **kwargs):
+    """
+    Recursively evaluates if two indexable, mutable objects are equal
+    under subtituions.
+
+    Parameters
+    ----------
+    obj: sympy.expr/number/indexable
+        an indexable support indexing.
+    kwargs: dict
+        keyword arguments for evaluate
     
+    Returns
+    -------
+    bool
+    """
+    if isIndexable(obj1) != isIndexable(obj2):
+        return False
+    if isIndexable(obj1):
+        for entry1, entry2 in zip(obj1, obj2):
+            if not recursiveEquals(entry1, entry2, **kwargs):
+                return False
+        return True
+    else:
+       # Do the numeric evaluation
+       return np.isclose(evaluate(obj1, **kwargs), evaluate(obj2, **kwargs))
+
+def vectorAsRealImag(vec):
+    """
+    Expresses a vector as the sum of real and imaginary parts.
+
+    Parameters
+    ----------
+    vec - sympy.Matrix
+    
+    Returns
+    -------
+    sympy.Matrix, sympy.Matrix
+        real vector, imaginary vector
+    """
+    reals = []
+    imags = []
+    for entry in vec:
+        real, imag = asRealImag(entry)
+        reals.append(real)
+        imags.append(imag)
+    return sympy.Matrix(reals),  sympy.Matrix(imags)

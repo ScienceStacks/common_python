@@ -92,10 +92,10 @@ class EigenCollection():
         self.eigenvalDct = {simplify(k): v for k, v in 
               self.matrix.eigenvals().items()}
         # Create the raw EigenInfo
-        for eigenInfo in self.matrix.eigenvects():
-            eigenvalue = simplify(eigenInfo[0])
+        for entry in self.matrix.eigenvects():
+            eigenvalue = simplify(entry[0])
             algebraicMultiplicity = self.eigenvalDct[eigenvalue]
-            vecs = [self._vectorRoundToZero(v) for v in eigenInfo[2]]
+            vecs = [self._vectorRoundToZero(v) for v in entry[2]]
             vecs = [v.evalf() for v in vecs]
             eigenInfos.append(EigenInfo(
                   self.matrix,
@@ -116,7 +116,6 @@ class EigenCollection():
                     eigenInfos.append(otherEigenInfo)
             numEigenValue = sum([e.mul for e in eigenInfos])
             if numEigenValue != self.matrix.rows:
-                import pdb; pdb.set_trace()
                 raise RuntimeError("Missing or extra eigenvalue?")
             self.eigenInfos = eigenInfos
         except TypeError:
@@ -168,3 +167,25 @@ class EigenCollection():
         if np.abs(v) < SMALL_VALUE:
             return 0
         return v
+
+    def pruneConjugates(self):
+        """
+        Returns the eigenInfos with only one member of each conjugate pair.
+        
+        Returns
+        -------
+        list-EigenInfo
+        """
+        eigenInfos = []
+        for idx, eigenInfo1 in enumerate(self.eigenInfos[:-1]):
+            isConjugate = False
+            for eigenInfo2 in self.eigenInfos[idx + 1:]:
+                if su.isConjugate(eigenInfo1.val, eigenInfo2.val):
+                    isConjugate = True
+                    break
+            if not isConjugate:
+                eigenInfos.append(eigenInfo1)
+        eigenInfos.append(self.eigenInfos[-1])
+        return eigenInfos
+            
+            

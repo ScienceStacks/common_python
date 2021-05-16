@@ -1,0 +1,6 @@
+matplotlib
+pandas
+numpy
+lmfit
+tellurium
+sympy
