@@ -42,7 +42,7 @@ class Timer():
         self.start()
 
 
-class LTIModel():
+class LTISolver():
 
     def __init__(self, aMat, initialVec, rVec=None):
         """
@@ -62,6 +62,9 @@ class LTIModel():
         # Results
         self.eigenCollection = EigenCollection(self.aMat)
         self.eigenCollection.completeEigenvectors()
+        self.fundamentalMat = None
+        self.coefHomogeneousVec = None
+        self.particularVec = None
         self.solutionVec = None
         self.evaluatedSolutionVec = None
 
@@ -117,32 +120,33 @@ class LTIModel():
                     expr =  expEx * (realVec * sinEx + imagVec * cosEx)
                     vecs.append(expr)
         # Construct the fundamental matrix
-        fundamentalMat= sympy.Matrix(vecs)
-        fundamentalMat = fundamentalMat.reshape(self.numRow, self.numRow)
-        fundamentalMat = sympy.simplify(fundamentalMat.transpose())
+        self.fundamentalMat= sympy.Matrix(vecs)
+        self.fundamentalMat = self.fundamentalMat.reshape(self.numRow, self.numRow)
+        self.fundamentalMat = sympy.simplify(self.fundamentalMat.transpose())
         timer.print(name="solve_2")
         # Find the coefficients for the homogeneous system
         # This is done without computing an inverse since the A matrix
         # may be singular.
-        t0Mat = sympy.simplify(fundamentalMat.subs(t, 0)) # evaluate at time 0
-        coefHomogeneousVec = su.solveLinearSingular(t0Mat, initialVec)
+        t0Mat = sympy.simplify(self.fundamentalMat.subs(t, 0)) # evaluate at time 0
+        self.coefHomogeneousVec = su.solveLinearSingular(t0Mat, initialVec)
         timer.print(name="solve_3")
         # Particular solution 
         if self.rVec is not None:
             rVec = su.evaluate(self.rVec, isNumpy=False, subs=subs)
-            invfundMat = fundamentalMat.inv()
+            invfundMat = self.fundamentalMat.inv()
             timer.print(name="solve_4a")
             dCoefMat = invfundMat*rVec
             timer.print(name="solve_4b")
             coefMat = sympy.integrate(dCoefMat, t)
             timer.print(name="solve_4c")
-            particularVec = fundamentalMat * dCoefMat
+            self.particularVec = self.fundamentalMat * dCoefMat
             timer.print(name="solve_4")
         else:
-            particularVec = sympy.zeros(self.numRow, 1)
+            self.particularVec = sympy.zeros(self.numRow, 1)
             timer.print(name="solve_5")
         # Full solution
-        self.solutionVec =  particularVec + fundamentalMat*coefHomogeneousVec
+        self.solutionVec =  self.particularVec \
+              + self.fundamentalMat*self.coefHomogeneousVec
         timer.print(name="solve_6")
         self.solutionVec = sympy.simplify(self.solutionVec)
         timer.print(name="solve_7")
