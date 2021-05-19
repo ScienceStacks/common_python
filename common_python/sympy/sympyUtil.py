@@ -41,7 +41,7 @@ def _getDct(dct, frame):
         dct = frame.f_back.f_locals
     return dct
 
-def addSymbols(symbolStr, dct=None):
+def addSymbols(symbolStr, dct=None, real=True, negative=False):
     """
     Adds symbols to the dictionary.
 
@@ -50,14 +50,15 @@ def addSymbols(symbolStr, dct=None):
     symbolStr: str
     dct: dict
         default: globals() of caller
+    kwarg: optional arguments for sympy.symbols
     """
     newDct = _getDct(dct, inspect.currentframe())
-    _addSymbols(symbolStr, newDct)
+    _addSymbols(symbolStr, newDct, real=real, negative=negative)
 
-def _addSymbols(symbolStr, dct):
+def _addSymbols(symbolStr, dct, **kwargs):
     symbols = symbolStr.split(" ")
     for idx, symbol in enumerate(symbols):
-        dct[symbol] = sympy.Symbol(symbol)
+        dct[symbol] = sympy.Symbol(symbol, **kwargs)
 
 def removeSymbols(symbolStr, dct=None):
     """
@@ -84,6 +85,7 @@ def substitute(expression, subs={}):
 
     Parameters
     ----------
+    expression: sympy.expression
     subs: dict
        key: sympy.symbol
        value: number
@@ -99,8 +101,15 @@ def substitute(expression, subs={}):
     except TypeError as err:
         import pdb; pdb.set_trace()
         pass
+    # Must be an expression
+    symbolDct = {s.name: s for s in expression.free_symbols}
+    # Update entry in substitution to be the same as the expression
+    newSubs = dict(subs)
     for key, value in subs.items():
-        expr = expr.subs(key, value)
+        if key.name in symbolDct.keys():
+            del newSubs[key]
+            newSubs[symbolDct[key.name]] = value
+    expr = expr.subs(newSubs)
     return sympy.simplify(expr)
 
 def evaluate(expression, dct=None, isNumpy=True, **kwargs):
@@ -123,7 +132,7 @@ def evaluate(expression, dct=None, isNumpy=True, **kwargs):
     """
     if isSympy(expression):
         newDct = _getDct(dct, inspect.currentframe())
-        val = _evaluate(expression, isNumpy=isNumpy, dct=newDct, **kwargs)
+        val = _evaluate(expression, newDct, isNumpy=isNumpy, **kwargs)
     else:
         val = expression
     return val

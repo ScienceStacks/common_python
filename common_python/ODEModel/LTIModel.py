@@ -7,9 +7,9 @@ SUffix conventions
   *s - list
 
 """
-import common_python.LTIModel.constants as cn
+import common_python.ODEModel.constants as cn
 from common_python.sympy import sympyUtil as su
-from common_python.LTIModel.eigenCollection import EigenCollection
+from common_python.ODEModel.eigenCollection import EigenCollection
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -42,7 +42,7 @@ class Timer():
         self.start()
 
 
-class LTISolver():
+class LTIModel():
 
     def __init__(self, aMat, initialVec, rVec=None):
         """
@@ -52,6 +52,8 @@ class LTISolver():
             A marix
         initialVec: sympy.Matrix (N X 1)
             Initial values
+        t: sympy.Symbol
+            time variable
         rVec: sympy.Matrix (N X 1)
             r matrix in the differential equation
         """

@@ -5,7 +5,7 @@ Key properties:
     algebraicMultipliciaty - algebraic multiplicity
 """ 
 
-import common_python.LTIModel.constants as cn
+import common_python.ODEModel.constants as cn
 import common_python.sympy.sympyUtil as su
 
 import collections

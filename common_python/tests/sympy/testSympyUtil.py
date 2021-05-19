@@ -10,6 +10,7 @@ import unittest
 IGNORE_TEST = False
 IS_PLOT = False
 VARIABLES = "t X Y Z k0 k1 k2"
+su.addSymbols(VARIABLES, dct=globals())
 
 
 #############################
@@ -18,7 +19,7 @@ VARIABLES = "t X Y Z k0 k1 k2"
 class TestFunctions(unittest.TestCase):
 
     def setUp(self):
-        su.addSymbols(VARIABLES, dct=globals())
+        pass
 
     def testAddSymbols(self):
         if IGNORE_TEST:
@@ -52,14 +53,27 @@ class TestFunctions(unittest.TestCase):
     def testSubstitute(self):
         if IGNORE_TEST:
             return
-        Y = su.substitute(2*X + 1, subs={X: Z})
+        X, Y, Z = sympy.symbols("X Y Z")
+        expr = 2*X + 1
+        subs = {X: Z}
+        Y = su.substitute(expr, subs=subs)
         self.assertTrue("Z" in str(Y))
+        # Test for substitution if duplicate name but different symbol
+        expr = 2*X + 1
+        X = sympy.Symbol("X")
+        Y = su.substitute(expr, subs={X: Z})
 
     def testEvaluate(self):
         if IGNORE_TEST:
             return
         val = su.evaluate(2*X + 1, subs={X: 2})
         self.assertEqual(val, 5)
+        #
+        val = su.evaluate(2*X + 1, subs={X: 2}, dct=globals())
+        self.assertEqual(val, 5)
+        #
+        val = su.evaluate(2*X + 1, subs={X: 2}, isNumpy=False, dct=globals())
+        self.assertTrue(val.is_number)
 
     def testEvaluate2(self):
         if IGNORE_TEST:
@@ -78,35 +92,6 @@ class TestFunctions(unittest.TestCase):
         newNames = [n for n in locals().keys()
               if (n[0] == nameRoot) and (len(n) == 3)]
         self.assertEqual(len(newNames), numRow)
-
-    # FIXME:
-    def testSolveLinearSystem(self):
-        return
-        if IGNORE_TEST:
-            return
-        data1 = [
-              [0,  1, 0, 0, 1],
-              [2,  -2, 0, 0, 0],
-              [2,  -2, 0, 0, 0],
-              [0,  0, 6, 6, 0]
-              ]
-        data2 = [
-              [0,  1, 0, 0],
-              [2,  -2, 0, 0],
-              [2,  -2, 0, 0],
-              [0,  0, 6, 6]
-              ]
-        bArr = np.array([1, 0, 0, 0])
-        aArr = np.array(data2)
-        result = np.linalg.solve(aArr, bArr)
-        import pdb; pdb.set_trace()
-        aMat = sympy.Matrix(data1)
-        w, x, y, z = sympy.symbols("w x y z")
-        result = sympy.solve_linear_system_LU(aMat, [w, x, y, z])
-        import pdb; pdb.set_trace()
-        x = aMat.LUsolve(bMat)
-        result = su.solveLinearSystem(aMat, bMat)
-        import pdb; pdb.set_trace()
 
     def testIsZero(self):
         if IGNORE_TEST:

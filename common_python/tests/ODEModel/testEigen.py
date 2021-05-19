@@ -1,6 +1,6 @@
 import common_python.sympy.sympyUtil as su
-import common_python.LTIModel.constants as cn
-from common_python.LTIModel.eigenCollection import EigenCollection
+import common_python.ODEModel.constants as cn
+from common_python.ODEModel.eigenCollection import EigenCollection
 
 import numpy as np
 import pandas as pd
