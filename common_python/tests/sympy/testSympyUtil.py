@@ -69,10 +69,10 @@ class TestFunctions(unittest.TestCase):
         val = su.evaluate(2*X + 1, subs={X: 2})
         self.assertEqual(val, 5)
         #
-        val = su.evaluate(2*X + 1, subs={X: 2}, dct=globals())
+        val = su.evaluate(2*X + 1, subs={X: 2})
         self.assertEqual(val, 5)
         #
-        val = su.evaluate(2*X + 1, subs={X: 2}, isNumpy=False, dct=globals())
+        val = su.evaluate(2*X + 1, subs={X: 2}, isNumpy=False)
         self.assertTrue(val.is_number)
 
     def testEvaluate2(self):

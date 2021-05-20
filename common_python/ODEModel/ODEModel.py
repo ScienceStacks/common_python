@@ -1,22 +1,17 @@
-""" Model of linear time-invariant systems.
+""" Model for non-linear ODE """ 
 
-SUffix conventions
-  *Arr - numpy array
-  *Mat - sympy.Matrix N X N
-  *Vec - sympy.Matrix N X 1
-  *s - list
-
-"""
-from common_python.util.timer import Timer
+import common_python.ODEModel.constants as cn
 from common_python.sympy import sympyUtil as su
-from common_python.ODEModel.eigenCollection import EigenCollection
 
 import matplotlib.pyplot as plt
+import numpy as np
 import sympy
+import time
 
 X = "x"
 t = sympy.Symbol("t")
 IS_TIMER = False
+
 
 
 class LTIModel():
@@ -47,22 +42,30 @@ class LTIModel():
         self.solutionVec = None
         self.evaluatedSolutionVec = None
 
-    def solve(self, subs=None):
+    def solve(self, subs={}):
         """
         Solves the LTI system symbolically.
         Updates self.solutionVec.
-
+        
         Returns
         -------
         sympy.Matrix (N X 1)
         """
-        if subs is None:
-            subs = {}
         # TODO: Handle imaginary eigenvalues
-        timer = Timer("solve", isEnable=IS_TIMER)
+        def vectorRoundToZero(vec):
+            if vec.cols > 1:
+                RuntimeError("Can only handle vectors.")
+            newValues = [roundToZero(v) for v in vec]
+            return sympy.Matrix(newValues)
+        #
+        def roundToZero(v):
+            if np.abs(v) < SMALL_VALUE:
+                return 0
+            return v
+        #
+        timer = Timer("solve")
         # Do evaluations
         aMat = su.evaluate(self.aMat, isNumpy=False, subs=subs)
-        self.eigenCollection = EigenCollection(aMat)
         initialVec = su.evaluate(self.initialVec, isNumpy=False, subs=subs)
         # Find the complete set of eigenvectors, handling cases
         # in which the algebraic multiplicity > geometric multiplicity
@@ -101,7 +104,7 @@ class LTIModel():
         t0Mat = sympy.simplify(self.fundamentalMat.subs(t, 0)) # evaluate at time 0
         self.coefHomogeneousVec = su.solveLinearSingular(t0Mat, initialVec)
         timer.print(name="solve_3")
-        # Particular solution
+        # Particular solution 
         if self.rVec is not None:
             rVec = su.evaluate(self.rVec, isNumpy=False, subs=subs)
             invfundMat = self.fundamentalMat.inv()
@@ -110,7 +113,7 @@ class LTIModel():
             timer.print(name="solve_4b")
             coefMat = sympy.integrate(dCoefMat, t)
             timer.print(name="solve_4c")
-            self.particularVec = self.fundamentalMat * coefMat
+            self.particularVec = self.fundamentalMat * dCoefMat
             timer.print(name="solve_4")
         else:
             self.particularVec = sympy.zeros(self.numRow, 1)
@@ -123,7 +126,7 @@ class LTIModel():
         timer.print(name="solve_7")
         return self.solutionVec
 
-    def evaluate(self, subs=None, **kwargs):
+    def evaluate(self, subs={}, **kwargs):
         """
         Returns a numerical solution.
 
@@ -131,13 +134,11 @@ class LTIModel():
         ----------
         kwargs: dict
             dictionary of symbol value assignments
-
+        
         Returns
         -------
         numpy.ndarray (N X 1)
         """
-        if subs is None:
-            subs = {}
         if self.solutionVec is None:
             _ = self.solve(subs=subs)
         return su.evaluate(self.solutionVec, subs=subs, **kwargs)
@@ -166,7 +167,7 @@ class LTIModel():
         arrs = [vec.subs(t, tval) for tval in tVals]
         # Plot the results
         labels = ["x_%d" % n for n in range(len(vec))]
-        _, ax = plt.subplots(1)
+        fig, ax = plt.subplots(1)
         for idx in range(len(vec)):
             yvals = [arr[idx] for arr in arrs]
             ax.plot(tVals, yvals)
@@ -176,3 +177,5 @@ class LTIModel():
         ax.set_title(title)
         if isPlot:
             plt.show()
+        
+

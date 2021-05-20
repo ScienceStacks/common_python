@@ -3,12 +3,11 @@ Key properties:
     value - eigenvalue
     vectors - eigenvectors
     algebraicMultipliciaty - algebraic multiplicity
-""" 
+"""
 
 import common_python.ODEModel.constants as cn
 import common_python.sympy.sympyUtil as su
 
-import collections
 import numpy as np
 import sympy
 
@@ -41,7 +40,6 @@ class EigenInfo():
         return EigenInfo(self.matrix.copy(), self.val, self.vecs.copy(),
               self.mul)
 
-    # TODO: Not sure that I'm using the correct vectors for those added
     def completeEigenvectors(self):
         """
         Adds eigenVectors if the algebraic multiciplicity > geometric multiciplicy
@@ -53,7 +51,7 @@ class EigenInfo():
         newVecs = []  # Constructed solution vectors
         termVecs = [lastVec]  # vectors used in constructing solution vectors
         numvec = len(self.vecs)
-        for num in range(1, numvec+1):
+        for _ in range(1, numvec+1):
             # Compute a new vector
             mat = self.matrix - sympy.eye(self.numRow) * self.val
             termVec = su.solveLinearSingular(mat, lastVec)
@@ -68,8 +66,8 @@ class EigenInfo():
             newVecs.append(timeVec)
             lastVec = timeVec
         self.vecs.extend(newVecs)
-        
-    
+
+
 class EigenCollection():
     # Container for all EigenInfo for a matrix
 
@@ -89,7 +87,7 @@ class EigenCollection():
         #
         self.matrix = matrix
         eigenInfos = []  # Container for eigenInfos
-        self.eigenvalDct = {simplify(k): v for k, v in 
+        self.eigenvalDct = {simplify(k): v for k, v in
               self.matrix.eigenvals().items()}
         # Create the raw EigenInfo
         for entry in self.matrix.eigenvects():
@@ -130,7 +128,7 @@ class EigenCollection():
         Parameters
         ----------
         vecs: list-sympy.Matrix
-        
+
         Returns
         -------
         vecs: list-sympy.Matrix
@@ -151,15 +149,15 @@ class EigenCollection():
         Ensures that all eigenvalues have a complete set of eigenvectors.
         """
         _ = [e.completeEigenvectors() for e in self.eigenInfos]
-   
-    @staticmethod 
+
+    @staticmethod
     def _vectorRoundToZero(vec):
         if vec.cols > 1:
             RuntimeError("Can only handle vectors.")
         newValues = [EigenCollection._roundToZero(v) for v in vec]
         return sympy.Matrix(newValues)
-    
-    @staticmethod 
+
+    @staticmethod
     def _roundToZero(v):
         if "is_symbol" in dir(v):
             if not v.is_Number:
@@ -171,7 +169,7 @@ class EigenCollection():
     def pruneConjugates(self):
         """
         Returns the eigenInfos with only one member of each conjugate pair.
-        
+
         Returns
         -------
         list-EigenInfo
@@ -187,5 +185,3 @@ class EigenCollection():
                 eigenInfos.append(eigenInfo1)
         eigenInfos.append(self.eigenInfos[-1])
         return eigenInfos
-            
-            

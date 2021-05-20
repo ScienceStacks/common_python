@@ -17,7 +17,6 @@ Notes
 
 import copy
 import inspect
-import matplotlib.pyplot as plt
 import numpy as np
 import sympy
 
@@ -32,7 +31,7 @@ def _getDct(dct, frame):
     ----------
     dct: dictionary to use if non-None
     frame: stack frame
-    
+
     Returns
     -------
     dict
@@ -57,7 +56,7 @@ def addSymbols(symbolStr, dct=None, real=True, negative=False):
 
 def _addSymbols(symbolStr, dct, **kwargs):
     symbols = symbolStr.split(" ")
-    for idx, symbol in enumerate(symbols):
+    for symbol in symbols:
         dct[symbol] = sympy.Symbol(symbol, **kwargs)
 
 def removeSymbols(symbolStr, dct=None):
@@ -79,7 +78,7 @@ def _removeSymbols(symbolStr, dct):
         if symbol in dct.keys():
             del dct[symbol]
 
-def substitute(expression, subs={}):
+def substitute(expression, subs=None):
     """
     Substitutes into the expression.
 
@@ -89,18 +88,16 @@ def substitute(expression, subs={}):
     subs: dict
        key: sympy.symbol
        value: number
-    
+
     Returns
     -------
     sympy.expression
     """
+    if subs is None:
+        subs = {}
     if isNumber(expression):
         return expression
-    try:
-        expr = expression.copy()
-    except TypeError as err:
-        import pdb; pdb.set_trace()
-        pass
+    expr = expression.copy()
     # Must be an expression
     symbolDct = {s.name: s for s in expression.free_symbols}
     # Update entry in substitution to be the same as the expression
@@ -112,7 +109,7 @@ def substitute(expression, subs={}):
     expr = expr.subs(newSubs)
     return sympy.simplify(expr)
 
-def evaluate(expression, dct=None, isNumpy=True, **kwargs):
+def evaluate(expression, isNumpy=True, **kwargs):
     """
     Evaluates the solution for the substitutions provided.
 
@@ -121,23 +118,20 @@ def evaluate(expression, dct=None, isNumpy=True, **kwargs):
     expression: sympy.Add/number
     isNumpy: bool
         return float or ndarray of float
-    dct: dict
-        Namespace dictionary
     kwargs: dict
         keyword arguments for substitute
-    
+
     Returns
     -------
     float/np.ndarray
     """
     if isSympy(expression):
-        newDct = _getDct(dct, inspect.currentframe())
-        val = _evaluate(expression, newDct, isNumpy=isNumpy, **kwargs)
+        val = _evaluate(expression, isNumpy=isNumpy, **kwargs)
     else:
         val = expression
     return val
 
-def _evaluate(expression, dct, isNumpy=True, **kwargs):
+def _evaluate(expression, isNumpy=True, **kwargs):
     """
     Evaluates the solution for the substitutions provided.
 
@@ -146,11 +140,9 @@ def _evaluate(expression, dct, isNumpy=True, **kwargs):
     expression: sympy.Add
     isNumpy: bool
         return float or ndarray of float
-    dct: dict
-        Namespace dictionary
     kwargs: dict
         keyword arguments for substitute
-    
+
     Returns
     -------
     float/np.ndarray
@@ -163,12 +155,8 @@ def _evaluate(expression, dct, isNumpy=True, **kwargs):
         else:
             try:
                 result = float(val)
-            except Exception as err:
-                try:
-                    result = complex(val)
-                except Exception as err:
-                    import pdb; pdb.set_trace()
-                    pass
+            except TypeError:
+                result = complex(val)
     else:
         result = val
     return result
@@ -184,7 +172,7 @@ def mkVector(nameRoot, numRow, dct=None):
     numRow: int
     dct: dict
         Namespace dictionary
-    
+
     Returns
     -------
     sympy.Matrix numRow X 1
@@ -206,13 +194,13 @@ def flatten(vec):
     Parameters
     ----------
     vec: symbpy.Matrix N X 1
-    
+
     Returns
     -------
     list
     """
     return [ [v for v in z] for z in vec][0]
-    
+
 def vectorRoundToZero(vec):
     if vec.cols > 1:
         RuntimeError("Can only handle vectors.")
@@ -238,7 +226,7 @@ def solveLinearSystem(aMat, bMat):
         A
     bMat: sympy.Matrix (N X 1)
         b
-    
+
     Returns
     -------
     sympy.Matrix: N X 1
@@ -252,7 +240,7 @@ def solveLinearSystem(aMat, bMat):
     lst = flatten(result)
     # Handle case of multiple solutions
     subs = {s: 1 for s in lst if s in dummySymbols}
-    return sympy.Matrix(lst)
+    return evaluate(sympy.Matrix(lst), subs=subs)
 
 def expressionToNumber(expression):
     """
@@ -262,11 +250,11 @@ def expressionToNumber(expression):
     Parameters
     ----------
     expression: sympy.Add
-    
+
     Returns
     -------
     float/complex
-    
+
     Raises
     -------
     TypeError if not convertable to a number
@@ -290,9 +278,8 @@ def expressionToNumber(expression):
 def asRealImag(val):
     if isSympy(val):
         return val.as_real_imag()
-    else:
-        cmplxVal = complex(val)
-        return (cmplxVal.real, cmplxVal.imag)
+    cmplxVal = complex(val)
+    return (cmplxVal.real, cmplxVal.imag)
 
 def isConjugate(val1, val2):
     """
@@ -302,7 +289,7 @@ def isConjugate(val1, val2):
     ----------
     val1: number or expression
     val2: number or expression
-    
+
     Returns
     -------
     bool
@@ -319,7 +306,7 @@ def isSympy(val):
     Parameters
     ----------
     val: object
-    
+
     Returns
     -------
     bool
@@ -334,7 +321,7 @@ def isNumber(val):
     Parameters
     ----------
     val: float/int/complex/sympy.expression
-    
+
     Returns
     -------
     bool
@@ -348,17 +335,16 @@ def isNumber(val):
 def isReal(val):
     if isSympy(val):
         return val.is_real
-    else:
-        return np.isreal(val)
-    
+    return np.isreal(val)
+
 def isZero(val):
     """
     Tests if a scalar, number or symbol, is 0.
-   
+
     Parameters
     ----------
     val: number or symbol or expression
-    
+
     Returns
     -------
     bool
@@ -366,7 +352,7 @@ def isZero(val):
     if isSympy(val):
         try:
             val = expressionToNumber(val)
-        except:
+        except Exception:
             return False
     try:
         if np.isclose(np.abs(val), 0):
@@ -378,7 +364,7 @@ def isZero(val):
 def isVecZero(vec):
     """
     Tests if a vector, numbers or symbols, are equal.
-   
+
     Parameters
     ----------
     vec: sympy.Matrix (N X 1)
@@ -399,7 +385,7 @@ def solveLinearSingular(aMat, bVec, isParameterized=False):
     ----------
     aMat: sympy.Matrix N X N
     bVec: sympy.Matrix N X 1
-    
+
     Returns
     -------
     sympy.Matrix N X 1
@@ -427,7 +413,7 @@ def recursiveEvaluate(obj, **kwargs):
         an indexable support indexing.
     kwargs: dict
         keyword arguments for evaluate
-    
+
     Returns
     -------
     object with same structure as original
@@ -441,9 +427,8 @@ def recursiveEvaluate(obj, **kwargs):
         for idx, entry in enumerate(newObj):
             newObj[idx] = recursiveEvaluate(entry, **kwargs)
         return newObj
-    else:
-       # Do the numeric evaluation
-       return evaluate(obj, **kwargs)
+    # Do the numeric evaluation
+    return evaluate(obj, **kwargs)
 
 def recursiveEquals(obj1, obj2, **kwargs):
     """
@@ -456,7 +441,7 @@ def recursiveEquals(obj1, obj2, **kwargs):
         an indexable support indexing.
     kwargs: dict
         keyword arguments for evaluate
-    
+
     Returns
     -------
     bool
@@ -468,9 +453,8 @@ def recursiveEquals(obj1, obj2, **kwargs):
             if not recursiveEquals(entry1, entry2, **kwargs):
                 return False
         return True
-    else:
-       # Do the numeric evaluation
-       return np.isclose(evaluate(obj1, **kwargs), evaluate(obj2, **kwargs))
+    # Do the numeric evaluation
+    return np.isclose(evaluate(obj1, **kwargs), evaluate(obj2, **kwargs))
 
 def vectorAsRealImag(vec):
     """
@@ -479,7 +463,7 @@ def vectorAsRealImag(vec):
     Parameters
     ----------
     vec - sympy.Matrix
-    
+
     Returns
     -------
     sympy.Matrix, sympy.Matrix
