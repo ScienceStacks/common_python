@@ -29,8 +29,6 @@ class LTIModel():
             A marix
         initialVec: sympy.Matrix (N X 1)
             Initial values
-        t: sympy.Symbol
-            time variable
         rVec: sympy.Matrix (N X 1)
             r matrix in the differential equation
         """
