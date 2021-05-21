@@ -1,7 +1,8 @@
 import common_python.sympy.sympyUtil as su
 import common_python.ODEModel.constants as cn
-from common_python.ODEModel.ODEModel import ODEModel, ODEFixedPoint
+from common_python.ODEModel.ODEModel import ODEModel, FixedPoint, EigenEntry
 
+import itertools
 import numpy as np
 import pandas as pd
 import sympy
@@ -10,7 +11,7 @@ import unittest
 
 IGNORE_TEST = False
 IS_PLOT = False
-VARIABLES = "t A P M K_AN K_AM N Kd_A Kd_M K_MP K_PA k_0 K_MP kd_M"
+VARIABLES = "t A P M K_AN K_AM N Kd_A Kd_M K_MP K_PA k_0 K_MP kd_M X Y"
 su.addSymbols(VARIABLES, dct=globals())
 STATE_DCT = {
       A: K_AN * N - Kd_A * A * M,
@@ -37,18 +38,59 @@ SUBS = {Kd_A: 1, K_MP: 1, K_PA: 1, k_0: 2.0, Kd_M: 1, N: 1,
 #############################
 # Tests
 #############################
-class TestODEFixedPoint(unittest.TestCase):
+class TestEigenEntry(unittest.TestCase):
+
+    def setUp(self):
+        self.init()
+
+    def init(self, value=X, mul=1, vectors=None):
+        self.value = value
+        self.mul = mul
+        if vectors is None:
+            vectors = [sympy.Matrix([X, 2 * X])]
+        self.vectors = vectors
+        self.entry = EigenEntry(self.value, self.mul, self.vectors)
+
+    def testConstructor(self):
+        if IGNORE_TEST:
+            return
+        self.assertTrue(self.entry.isReal)
+
+    def testConstructor2(self):
+        if IGNORE_TEST:
+            return
+        self.init(value= (2+3j))
+        self.assertFalse(self.entry.isReal)
+
+    def testGetEigenvalues(self):
+        if IGNORE_TEST:
+            return
+        # Complex
+        self.init(value= (2+3j))
+        values = self.entry.getEigenvalues()
+        self.assertEqual(len(values), 2)
+        self.assertTrue(su.isConjugate(values[0], values[1]))
+
+    def testGetEigenvectors(self):
+        if IGNORE_TEST:
+            return
+        vectors = self.entry.getEigenvectors()
+        self.assertEqual(len(vectors), 1)
+
+
+
+class TestFixedPoint(unittest.TestCase):
 
     def setUp(self):
         self.init(STATE_DCT, VALUE_DCT)
 
-    def init(self, stateDct, valueDct, subs=SUBS):
+    def init(self, stateDct, valueDct, subs=SUBS, isEigenvecs=True):
         self.stateSymVec = sympy.Matrix(list(stateDct.keys()))
         self.stateSymVec = sympy.Matrix(list(stateDct.keys()))
-        self.stateEprVec = sympy.Matrix([stateDct[s]
-              for s in self.stateSymVec])
+        self.stateEprVec = sympy.Matrix([stateDct[s] for s in self.stateSymVec])
         self.jacobianMat  = self.stateEprVec.jacobian(self.stateSymVec)
-        self.fixedPoint = ODEFixedPoint(valueDct, self.jacobianMat, subs=subs)
+        self.fixedPoint = FixedPoint(valueDct, self.jacobianMat, subs=subs,
+              isEigenvecs=isEigenvecs)
 
     def testConstructor(self):
         if IGNORE_TEST:
@@ -64,10 +106,22 @@ class TestODEFixedPoint(unittest.TestCase):
     def testConstructor2(self):
         if IGNORE_TEST:
             return
-        self.init(STATE2_DCT, VALUE_DCT)
+        self.init(STATE2_DCT, VALUE_DCT, subs=SUBS, isEigenvecs=False)
         self.assertTrue("Matrix" in str(type(self.fixedPoint.jacobianMat)))
-        numReal = sum([v.is_real for v in self.fixedPoint.eigenValues])
+        numReal = sum([1 for e in self.fixedPoint.eigenEntries if e.value.is_real])
         self.assertEqual(numReal, 1)
+
+    def testGetJacobian(self):
+        if IGNORE_TEST:
+            return
+        mat = self.fixedPoint.getJacobian()
+        self.assertTrue("Matrix" in str(type(mat)))
+
+    def testGetEigenvalues(self):
+        if IGNORE_TEST:
+            return
+        eigenvalues = self.fixedPoint.getEigenvalues()
+        self.assertEqual(len(eigenvalues), 3)
 
 
 class TestODEModel(unittest.TestCase):

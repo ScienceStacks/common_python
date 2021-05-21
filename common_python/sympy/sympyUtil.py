@@ -78,6 +78,12 @@ def _removeSymbols(symbolStr, dct):
         if symbol in dct.keys():
             del dct[symbol]
 
+def isSymbol(obj):
+    if "is_symbol" in dir(obj):
+        return obj.is_symbol
+    else:
+        return False
+
 def substitute(expression, subs=None):
     """
     Substitutes into the expression.
@@ -97,6 +103,11 @@ def substitute(expression, subs=None):
         subs = {}
     if isNumber(expression):
         return expression
+    if isSymbol(expression):
+        if expression.name in subs:
+            return subs[expression.name]
+        else:
+            return expression
     expr = expression.copy()
     # Must be an expression
     symbolDct = {s.name: s for s in expression.free_symbols}
@@ -149,6 +160,8 @@ def _evaluate(expression, isNumpy=True, **kwargs):
     """
     expr = substitute(expression, **kwargs)
     val = expr.evalf()
+    if hasSymbols(val):
+        return val
     if isNumpy:
         if "rows" in dir(expression):
             result = np.array(val)
@@ -299,6 +312,12 @@ def isConjugate(val1, val2):
     isSameImag = realImag[0][1] == -realImag[1][1]
     return isSameReal and isSameImag
 
+def hasSymbols(val):
+    if isSympy(val):
+        return len(val.free_symbols) > 0
+    else:
+        return False
+
 def isSympy(val):
     """
     Tests if this is a sympy object.
@@ -390,6 +409,7 @@ def solveLinearSingular(aMat, bVec, isParameterized=False):
     -------
     sympy.Matrix N X 1
     """
+    # FIXME: find the symbols using free_symbols
     solution = aMat.gauss_jordan_solve(bVec)
     solutionVec = solution[0]
     if not isParameterized:
@@ -424,9 +444,10 @@ def recursiveEvaluate(obj, **kwargs):
             newObj = list(obj)
         else:
             newObj = copy.deepcopy(obj)
+        newerObj = copy.deepcopy(newObj)
         for idx, entry in enumerate(newObj):
-            newObj[idx] = recursiveEvaluate(entry, **kwargs)
-        return newObj
+            newerObj[idx] = recursiveEvaluate(entry, **kwargs)
+        return newerObj
     # Do the numeric evaluation
     return evaluate(obj, **kwargs)
 
@@ -476,3 +497,22 @@ def vectorAsRealImag(vec):
         reals.append(real)
         imags.append(imag)
     return sympy.Matrix(reals),  sympy.Matrix(imags)
+
+def eigenvects(mat):
+    """
+    Computes eigenvector results, handling near zero determinants.
+
+    Parameters
+    ----------
+    mat: sympy.Matrix
+    
+    Returns
+    -------
+    eigenvect entries returned by sympy.eigenvects()
+    """
+    # Check if symbols are present
+    if hasSymbols(mat):
+        return mat.eigenvects()
+    # Purely numeric matrix
+    newMat = recursiveEvaluate(mat.as_mutable())
+    return newMat.eigenvects()
