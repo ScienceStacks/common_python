@@ -127,8 +127,24 @@ class TestFixedPoint(unittest.TestCase):
 class TestODEModel(unittest.TestCase):
 
     def setUp(self):
-        su.addSymbols(VARIABLES, dct=globals())
-        self.eigenInfo = mkEigenInfo()
+        self.model = ODEModel(STATE_DCT, isEigenvecs=False)
+
+    def testConstrutor(self):
+        if IGNORE_TEST:
+            return
+        self.assertEqual(len(self.model.fixedPoints), 1)
+        self.assertGreater(len(self.model.jacobianMat.free_symbols), 0)
+    
+    def testGetFixedPointValues(self):
+        if IGNORE_TEST:
+            return
+        fixedPointValues = self.model.getFixedPointValues(subs=SUBS)
+        self.assertEqual(len(fixedPointValues), 1)
+        fixedPointValue = fixedPointValues[0]
+        diff = set(fixedPointValue.keys()).symmetric_difference(STATE_SYM_VEC)
+        self.assertEqual(len(diff), 0)
+        trues = [isinstance(v, float) for v in fixedPointValue.values()]
+        self.assertTrue(all(trues))
 
 
 

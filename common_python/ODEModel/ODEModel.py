@@ -160,7 +160,7 @@ class ODEModel():
             def mkDct(points):
                 if isinstance(points, dict):
                     return points
-                return {v: p for p, v in zip(points, equationVars)}
+                return {v: p for p, v in zip(points, self.stateSymVec)}
             #
             if isinstance(fixedPoints, dict):
                 fixedDcts = [mkDct(fixedPoints)]
@@ -170,7 +170,26 @@ class ODEModel():
                     fixedDcts.append(mkDct(fixedPoint))
             return fixedDcts
         # Calculate the fixed points
-        fixedPoints = sympy.solve(equationVec, equationVars)
+        fixedPoints = sympy.solve(self.stateEprVec, self.stateSymVec)
         fixedDcts = mkFixedDcts(fixedPoints)
         return [FixedPoint(f, self.jacobianMat, isEigenvecs=self.isEigenvecs)
               for f in fixedDcts]
+
+    def getFixedPointValues(self, subs=None):
+        """
+        Returns of values of all fixed points.
+
+        Parameters
+        ----------
+        subs: dict
+        
+        Returns
+        -------
+        list-dict
+            key: sympy.Symbol (state variable)
+            value: float/expression
+        """
+        if subs is None:
+            subs = {}
+        return [{k: su.evaluate(v, subs=subs) for k, v in f.valueDct.iteritems()}
+              for f in self.fixedPoints]
