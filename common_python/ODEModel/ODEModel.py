@@ -121,9 +121,25 @@ class FixedPoint():
         if subs is None:
             subs = {}
         eigenvalues = []
-        [eigenvalues.extend(su.evaluate(e.getEigenvalues(), subs=subs))
+        [eigenvalues.extend(su.recursiveEvaluate(e.getEigenvalues(), subs=subs))
               for e in self.eigenEntries]
-        return eigenvalues
+        # Filter possible redundancies because of subtitutions
+        newEigenvalues = []
+        for idx, eigenvalue1 in enumerate(eigenvalues[:-1]):
+            isAdd = True
+            for eigenvalue2 in eigenvalues[idx+1:]:
+                try:
+                    num = su.expressionToNumber(eigenvalue1 - eigenvalue2)
+                    if np.isclose(num , 0):
+                        isAdd = False
+                        break
+                except TypeError:
+                    # Handle comparison of symbols
+                    continue
+            if isAdd:
+                newEigenvalues.append(eigenvalue1)
+        newEigenvalues.append(eigenvalues[-1])
+        return newEigenvalues
 
 
 class ODEModel():

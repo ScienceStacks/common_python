@@ -70,6 +70,11 @@ class TestEigenEntry(unittest.TestCase):
         values = self.entry.getEigenvalues()
         self.assertEqual(len(values), 2)
         self.assertTrue(su.isConjugate(values[0], values[1]))
+        # Symbol
+        self.init(value=1*X)
+        values = self.entry.getEigenvalues(subs={X: 1})
+        self.assertEqual(len(values), 1)
+        self.assertEqual(values[0], 1)
 
     def testGetEigenvectors(self):
         if IGNORE_TEST:
@@ -143,7 +148,8 @@ class TestODEModel(unittest.TestCase):
         fixedPointValue = fixedPointValues[0]
         diff = set(fixedPointValue.keys()).symmetric_difference(STATE_SYM_VEC)
         self.assertEqual(len(diff), 0)
-        trues = [isinstance(v, float) for v in fixedPointValue.values()]
+        trues = [isinstance(su.expressionToNumber(v), float)
+              for v in fixedPointValue.values()]
         self.assertTrue(all(trues))
 
     def testBug1(self):
@@ -160,6 +166,9 @@ class TestODEModel(unittest.TestCase):
         }
         modelA = ODEModel(STATE_DCT, isEigenvecs=False)
         fps = modelA.getFixedPointValues()
+        for fp in modelA.fixedPoints:
+            eigenvalues = fp.getEigenvalues(subs=SUBS)
+        self.assertEqual(len(eigenvalues), 3)
 
 
 

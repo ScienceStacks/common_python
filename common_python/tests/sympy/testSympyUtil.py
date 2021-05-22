@@ -221,6 +221,15 @@ class TestFunctions(unittest.TestCase):
             real, imag = su.asRealImag(item)
             self.assertEqual(real, realVec[idx])
             self.assertEqual(imag, imagVec[idx])
+
+    def testHasSymbols(self):
+        if IGNORE_TEST:
+            return
+        self.assertTrue(su.hasSymbols(X))
+        self.assertFalse(su.hasSymbols(3))
+        self.assertTrue(su.hasSymbols([X, 3]))
+        self.assertFalse(su.hasSymbols([3, 3]))
+        
      
    
 

@@ -106,6 +106,8 @@ def substitute(expression, subs=None):
     if isSymbol(expression):
         if expression.name in subs:
             return subs[expression.name]
+        elif expression in subs:
+            return subs[expression]
         else:
             return expression
     expr = expression.copy()
@@ -158,7 +160,16 @@ def _evaluate(expression, isNumpy=True, **kwargs):
     -------
     float/np.ndarray
     """
+    if isNumber(expression):
+        if isNumpy:
+            return expressionToNumber(expression)
+        else:
+            return expression
+    # Evaluate
     expr = substitute(expression, **kwargs)
+    # Symbol substitution can create a number
+    if isNumber(expr):
+        return expr
     val = expr.evalf()
     if hasSymbols(val):
         return val
@@ -312,11 +323,18 @@ def isConjugate(val1, val2):
     isSameImag = realImag[0][1] == -realImag[1][1]
     return isSameReal and isSameImag
 
-def hasSymbols(val):
+def _hasSymbols(val):
     if isSympy(val):
         return len(val.free_symbols) > 0
     else:
         return False
+
+def hasSymbols(val):
+    if isIndexable(val):
+        trues = [_hasSymbols(v) for v in val]
+    else:
+        trues = [_hasSymbols(val)]
+    return any(trues)
 
 def isSympy(val):
     """
@@ -478,7 +496,9 @@ def recursiveEquals(obj1, obj2, **kwargs):
                 return False
         return True
     # Do the numeric evaluation
-    return np.isclose(evaluate(obj1, **kwargs), evaluate(obj2, **kwargs))
+    num1 = expressionToNumber(evaluate(obj1, **kwargs))
+    num2 = expressionToNumber(evaluate(obj2, **kwargs))
+    return np.isclose(num1, num2)
 
 def vectorAsRealImag(vec):
     """
