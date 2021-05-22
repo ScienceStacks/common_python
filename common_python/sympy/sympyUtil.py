@@ -356,6 +356,9 @@ def isReal(val):
         return val.is_real
     return np.isreal(val)
 
+def isComplex(val):
+    return isNumber(val) and (not isReal(val))
+
 def isZero(val):
     """
     Tests if a scalar, number or symbol, is 0.

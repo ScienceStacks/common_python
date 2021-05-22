@@ -146,6 +146,20 @@ class TestODEModel(unittest.TestCase):
         trues = [isinstance(v, float) for v in fixedPointValue.values()]
         self.assertTrue(all(trues))
 
+    def testBug1(self):
+        if IGNORE_TEST:
+            return
+        symbols = "A K_AN K_AM N K_PA K_MP rd_A"
+        symbols += " Kd_A Kd_M Kd_P K_Mp A M"
+        symbols += " P k_0 M rd_M"
+        su.addSymbols(symbols)
+        stateDct = {
+             A: K_AN * N - Kd_A * A * M,
+             P: K_PA * A - k_0,
+             M: K_MP * P - Kd_M * M,
+        }
+        modelA = ODEModel(STATE_DCT, isEigenvecs=False)
+
 
 
 if __name__ == '__main__':

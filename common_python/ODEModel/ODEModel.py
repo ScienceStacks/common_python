@@ -89,7 +89,7 @@ class FixedPoint():
             entries = su.eigenvects(self.jacobianMat)
             for entry in entries:
                 eigenvalue= entry[0]
-                if not su.isReal(eigenvalue):
+                if su.isComplex(eigenvalue):
                     _, imag = su.asRealImag(eigenvalue)
                     if imag < 0:
                         continue
