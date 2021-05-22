@@ -159,6 +159,7 @@ class TestODEModel(unittest.TestCase):
              M: K_MP * P - Kd_M * M,
         }
         modelA = ODEModel(STATE_DCT, isEigenvecs=False)
+        fps = modelA.getFixedPointValues()
 
 
 

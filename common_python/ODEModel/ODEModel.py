@@ -98,7 +98,7 @@ class FixedPoint():
                 self.eigenEntries.append(EigenEntry(eigenvalue, mul, vectors))
         else:
             # Ignore the eigenvectors
-            for eigenvalue, mul in self.jacobianMat.eigenvals().iteritems():
+            for eigenvalue, mul in self.jacobianMat.eigenvals().items():
                 self.eigenEntries.append(EigenEntry(eigenvalue, mul, None))
 
     def getJacobian(self, subs=None):
@@ -191,5 +191,5 @@ class ODEModel():
         """
         if subs is None:
             subs = {}
-        return [{k: su.evaluate(v, subs=subs) for k, v in f.valueDct.iteritems()}
+        return [{k: su.evaluate(v, subs=subs) for k, v in f.valueDct.items()}
               for f in self.fixedPoints]
