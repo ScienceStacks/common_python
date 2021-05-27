@@ -95,11 +95,21 @@ class FixedPoint():
                         continue
                 mul = entry[1]
                 vectors = entry[2]
+                try:
+                    eigenvalue = su.expressionToNumber(eigenvalue)
+                except TypeError:
+                    pass
                 self.eigenEntries.append(EigenEntry(eigenvalue, mul, vectors))
         else:
             # Ignore the eigenvectors
             for eigenvalue, mul in self.jacobianMat.eigenvals().items():
-                self.eigenEntries.append(EigenEntry(eigenvalue, mul, None))
+                try:
+                    newEigenvalue = su.expressionToNumber(eigenvalue)
+                except TypeError:
+                    newEigenvalue = eigenvalue
+                    pass
+                self.eigenEntries.append(EigenEntry(newEigenvalue, mul, None))
+
 
     def getJacobian(self, subs=None):
         """
@@ -144,7 +154,7 @@ class FixedPoint():
 
 class ODEModel():
 
-    def __init__(self, stateDct, initialDct=None, isEigenvecs=True):
+    def __init__(self, stateDct, initialDct=None, isEigenvecs=True, isFixedPoints=True, subs=None):
         """
         Parameters
         ----------
@@ -155,11 +165,16 @@ class ODEModel():
             key: state Symbol
             value: initial values
         """
+        if subs is None:
+            subs = {}
+        self.isFixedPoints = isFixedPoints
         self.stateDct = stateDct
         self.initialDct = initialDct
         self.isEigenvecs = isEigenvecs
         self.stateSymVec = sympy.Matrix(list(stateDct.keys()))
-        self.stateEprVec = sympy.Matrix([self.stateDct[s] for s in self.stateSymVec])
+        self.stateEprVec = sympy.Matrix([self.stateDct[s]
+              for s in self.stateSymVec])
+        self.stateEprVec = su.evaluate(self.stateEprVec, subs=subs, isNumpy=False)
         self.jacobianMat = self.stateEprVec.jacobian(self.stateSymVec)
         self.fixedPoints = self._calcFixedPoints()
 
@@ -172,6 +187,8 @@ class ODEModel():
         -------
         list-FixedPoint
         """
+        if not self.isFixedPoints:
+            return None
         def mkFixedDcts(fixedPoints):
             def mkDct(points):
                 if isinstance(points, dict):

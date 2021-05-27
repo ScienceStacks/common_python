@@ -113,7 +113,8 @@ class TestFixedPoint(unittest.TestCase):
             return
         self.init(STATE2_DCT, VALUE_DCT, subs=SUBS, isEigenvecs=False)
         self.assertTrue("Matrix" in str(type(self.fixedPoint.jacobianMat)))
-        numReal = sum([1 for e in self.fixedPoint.eigenEntries if e.value.is_real])
+        numReal = sum([1 for e in self.fixedPoint.eigenEntries
+              if np.abs(np.imag(e.value)) < 0.001])
         self.assertEqual(numReal, 1)
 
     def testGetJacobian(self):
