@@ -2,6 +2,7 @@ from common_python.sympy.symbolSystem import SymbolSystem
 import common_python.sympy.sympyUtil as su
 import common_python.sympy.constants as cn
 
+import numpy as np
 import sympy
 import unittest
 
@@ -41,6 +42,16 @@ class TestSymbolSystem(unittest.TestCase):
         if IGNORE_TEST:
             return
         self.assertGreater(len(self.system.symbols), 0)
+
+    def testCombineLists(self):
+        if IGNORE_TEST:
+            return
+        lsts = [ [1, 2, 3], [20], [30, 40]]
+        resultLsts = self.system._combineLists(lsts)
+        size = np.prod([len(l) for l in lsts])
+        self.assertEqual(size, len(resultLsts))
+        trues = [len(l) == len(lsts) for l in resultLsts]
+        self.assertTrue(all(trues))
 
 
 
