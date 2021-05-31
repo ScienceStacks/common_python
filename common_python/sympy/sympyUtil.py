@@ -539,3 +539,118 @@ def eigenvects(mat):
     # Purely numeric matrix
     newMat = recursiveEvaluate(mat.as_mutable())
     return newMat.eigenvects()
+
+def countNodes(epr):
+        """
+        Counts the number of nodes in the expression tree.
+
+        Parameters
+        ----------
+        epr: sympy.expression
+        
+        Returns
+        -------
+        int
+        """
+        result = 1
+        argLst = epr.args
+        for arg in argLst:
+            result += countNodes(arg)
+        return result
+
+def countSymbols(epr, symbols):
+        """
+        Counts the symbols that are present in the expression.
+
+        Parameters
+        ----------
+        epr: expression
+        symbols: list-Symbol
+        
+        Returns
+        -------
+        int
+        """
+        freeSymbols = epr.free_symbols
+        return len(set(freeSymbols).intersection(symbols))
+
+def countDctSymbols(dct, excludes=None):
+        """
+        Counts the symbols present in each expression in the dictionary.
+ 
+        Parameters
+        ----------
+        dct: dict
+            key: Symbol
+            value: Expression
+        excludes: list-symbol
+        
+        Returns
+        -------
+        dict
+            key: Symbol
+            value: int
+        """
+        symbols = list(dct.keys())
+        if excludes is not None:
+            symbols = list(set(symbols).difference(excludes))
+        return {s: countSymbols(dct[s], symbols) for s in symbols}
+
+def getDctSymbols(dct, symbols=None, excludes=None):
+        """
+        Lists the free symbols present in each expression in the dictionary.
+ 
+        Parameters
+        ----------
+        dct: dict
+            key: Symbol
+            value: Expression
+        excludes: list-symbol
+        symbols: list-Symbol
+        
+        Returns
+        -------
+        dict
+            key: Symbol
+            value: int
+        """
+        if symbols is None:
+            symbols = list(dct.keys())
+        if excludes is not None:
+            symbols = list(set(symbols).difference(excludes))
+        else:
+            excludes = []
+        #
+        result = {}
+        for sym, epr in dct.items():
+            if sym in excludes:
+                continue
+            lst = list(set(symbols).intersection(epr.free_symbols))
+            result[sym] = sorted(lst, key=lambda s: s.name)
+        #
+        return result
+
+def getDistinctSymbols(eqnDct, symbols=None, excludes=None):
+    """
+    Finds the distinct symbols on the expressions.
+
+    Parameters
+    ----------
+    eqnDct: dict
+    symbols: list-Symbol
+        Defaults to eqnDct.keys()
+    excludes: list-Symbol
+    
+    Returns
+    -------
+    list-symbol
+    """
+    if excludes is None:
+        excludes = []
+    dct = getDctSymbols(eqnDct, symbols)
+    rhsSymbols = []
+    [rhsSymbols.extend(v) for v in dct.values()]
+    newRhsSymbols = [s for s in rhsSymbols if not s in excludes]
+    lst = list(set(newRhsSymbols))
+    lst = sorted(lst, key=lambda s: s.name)
+    return lst

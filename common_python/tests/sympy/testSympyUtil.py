@@ -229,9 +229,23 @@ class TestFunctions(unittest.TestCase):
         self.assertFalse(su.hasSymbols(3))
         self.assertTrue(su.hasSymbols([X, 3]))
         self.assertFalse(su.hasSymbols([3, 3]))
-        
-     
-   
+
+    def testGetDistinctSymbols(self):
+        if IGNORE_TEST:
+            return
+        dct = {
+            X: 3 * Y,
+            Y: 3 * Z,
+            Z: 4 + Y,
+            }
+        distinctSymbols = su.getDistinctSymbols(dct)
+        diff = set(distinctSymbols).symmetric_difference([Y, Z])
+        self.assertEqual(len(diff), 0)
+        #
+        symbols = [Y]
+        distinctSymbols = su.getDistinctSymbols(dct, symbols=symbols)
+        self.assertEqual(distinctSymbols[0], Y)
+        self.assertEqual(len(distinctSymbols), 1)
 
 
 if __name__ == '__main__':
