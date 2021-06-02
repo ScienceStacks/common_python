@@ -38,7 +38,7 @@ class SymbolSystem():
         freeSymbols = epr.free_symbols
         return [s for s in set(freeSymbols).intersection(self.symbols)]
 
-    def substitute(self, maxNode=50, sequence=None):
+    def substitute(self, maxNode=100, sequence=None):
         """
         Attempts to simplify the expression by substitution.
         Substitutions are made only if the result is fewer free symbols.
@@ -72,10 +72,16 @@ class SymbolSystem():
             # Avoid creating overly complicated expressions
             if isComplexExpression(sym1) or isComplexExpression(sym2):
                 return
-            # Don't put the symbol in its own expression
+            # Don't put the symbol in its own expression unless
+            # we can solve for the symbol
             if sym1 in systemDct[sym2].free_symbols:
+                newExpression = systemDct[sym1].subs(sym2, systemDct[sym2]) - sym1
+                solutions = sympy.solve(newExpression, sym1)
+                if len(solutions) == 1:
+                    systemDct[sym1] = solutions[0]
                 return
-            systemDct[sym2] = systemDct[sym2].subs(sym1, systemDct[sym1])
+            #
+            systemDct[sym1] = systemDct[sym1].subs(sym2, systemDct[sym2])
         #
         systemDct = dict(self.systemDct)
         # Set the order in which symbols are used for substitutions

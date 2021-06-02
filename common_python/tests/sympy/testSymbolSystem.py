@@ -118,7 +118,7 @@ class TestSymbolSystem(unittest.TestCase):
         systemDct = self.mkComplicatedSystemDct()
         system = SymbolSystem.mkSymbolSystem(systemDct)[0]
         sequence = [Pyr, Glu, Fru, Ach, Nad, Gt3p, Nadh, Ghp]
-        # sequence.extend([(Ghp, Fru), (Nadh, Nad)])
+        sequence.extend([(Ach, Pyr)])
         newSystemDct = system.substitute(sequence=sequence)
         report3 = su.getDctSymbols(newSystemDct)
         distinctSymbols = su.getDistinctSymbols(newSystemDct)
