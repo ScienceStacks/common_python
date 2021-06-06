@@ -140,7 +140,7 @@ class TestODEModel(unittest.TestCase):
             return
         self.assertEqual(len(self.model.fixedPoints), 1)
         self.assertGreater(len(self.model.jacobianMat.free_symbols), 0)
-    
+   
     def testGetFixedPointValues(self):
         if IGNORE_TEST:
             return

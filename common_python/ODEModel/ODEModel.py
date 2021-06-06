@@ -168,8 +168,9 @@ class ODEModel():
         if subs is None:
             subs = {}
         self.isFixedPoints = isFixedPoints
-        self.stateDct = stateDct
-        self.initialDct = initialDct
+        self.stateDct = {s: e.subs(subs) for s, e in stateDct.items()}
+        if initialDct is not None:
+            self.initialDct = {s: e.subs(subs) for s, e in initialDct.items()}
         self.isEigenvecs = isEigenvecs
         self.stateSymVec = sympy.Matrix(list(stateDct.keys()))
         self.stateEprVec = sympy.Matrix([self.stateDct[s]
@@ -235,6 +236,25 @@ class ODEModel():
                 elif len(expressions) == 1:
                     expr = expressions[0]
                     subDct[sym] = [e.subs(key, expr) for e in subDct[sym]]
+        
+    def getFixedPointValues(self, subs=None):
+        """
+        Returns of values of all fixed points.
+
+        Parameters
+        ----------
+        subs: dict
+        
+        Returns
+        -------
+        list-dict
+            key: sympy.Symbol (state variable)
+            value: float/expression
+        """
+        if subs is None:
+            subs = {}
+        return [{k: su.evaluate(v, subs=subs) for k, v in f.valueDct.items()}
+              for f in self.fixedPoints]
                 
             
         # FIXME: Only using the first solution in the fixed point
@@ -276,23 +296,3 @@ class ODEModel():
             [addSym(s, fixedPointDct, dstateDct) for s in syms]
             #[substituteNonSym(s, fixedPointDct) for s in syms]
             return fixedPointDct
-        
-        
-            def getFixedPointValues(self, subs=None):
-                """
-                Returns of values of all fixed points.
-        
-                Parameters
-                ----------
-                subs: dict
-                
-                Returns
-                -------
-                list-dict
-                    key: sympy.Symbol (state variable)
-                    value: float/expression
-                """
-                if subs is None:
-                    subs = {}
-                return [{k: su.evaluate(v, subs=subs) for k, v in f.valueDct.items()}
-                      for f in self.fixedPoints]
