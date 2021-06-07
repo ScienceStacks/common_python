@@ -182,7 +182,7 @@ class ODEModel():
 
     def _calcFixedPoints(self):
         """
-        Calculates the fixed points for the model.
+        Symbolically solves for fixed points for the model.
         
         Returns
         -------
@@ -208,34 +208,6 @@ class ODEModel():
         fixedDcts = mkFixedDcts(fixedPoints)
         return [FixedPoint(f, self.jacobianMat, isEigenvecs=self.isEigenvecs)
               for f in fixedDcts]
-
-    def _approximateFixedPoints(self):
-        """
-        Approximates fixed points by using both symbolic and numerical techniques
-        to avoid computationally intractible purely symbolic approaches.
-
-        Returns
-        -------
-        list-FixedPoint
-        """
-        #fixedPointDct = findFixedPoints([Pyr, Glu, Fru, Ach, Nad, Gt3p, Nadh, Ghp, Adp, Atp], stateDct)
-        def substituteNonSym(sym, subDct):
-            # Substitutes the non-symbols for the symbol
-            # The i-th substitution is the i-th value for each symbol
-            dct = {}
-            for key, expressions in subDct.items():
-                if key == sym:
-                    continue
-                if len(expressions) > 1:
-                    values = subDct[sym]
-                    for idx, expr in enumerate(expressions):
-                        if idx >= len(subDct[sym]):
-                            break
-                        values[idx] = subDct[sym][idx].subs(key, expr)
-                    subDct[sym] = values
-                elif len(expressions) == 1:
-                    expr = expressions[0]
-                    subDct[sym] = [e.subs(key, expr) for e in subDct[sym]]
         
     def getFixedPointValues(self, subs=None):
         """
@@ -255,44 +227,3 @@ class ODEModel():
             subs = {}
         return [{k: su.evaluate(v, subs=subs) for k, v in f.valueDct.items()}
               for f in self.fixedPoints]
-                
-            
-        # FIXME: Only using the first solution in the fixed point
-        def addSym(sym, fixedPointDct, dstateDct):
-            """
-            Adds to the set of fixed points for the expressions of the derivative of state.
-            
-            Parameters
-            ----------
-            sym: sympy.Symbol
-            fixedPointDct: dict
-                key: symbol
-                value: list-expression
-            dstateDct: dict
-                key: symbol
-                value: expression
-            """
-            def substituteAndSolve(syms):
-                # Do the substitutions for the specified symbols
-                subSyms = [s for s in fixedPointDct.keys() if len(fixedPointDct[s]) > 0]
-                dct = {k: fixedPointDct[k][0] for k in subSyms}
-                results = sympy.solve(dstateDct[sym].subs(dct), [sym])
-                if not isinstance(results, list):
-                    results = [results]
-                if len(results) == 0:
-                    results = [dstateDct[sym].subs(dct)]
-                return results
-            # First substitute do all fixed points at 0
-            zeroSyms = [s for s in fixedPointDct.keys() if fixedPointDct[s] == 0]
-            fixedPointDct[sym] = substituteAndSolve(zeroSyms)
-            if not isinstance(fixedPointDct[sym], list):
-                results = [results]
-            # Do the others
-            otherSyms = set(fixedPointDct.keys()).difference(zeroSyms)
-            fixedPointDct[sym] = substituteAndSolve(otherSyms)
-        #
-        def findFixedPoints(syms, dstateDct):
-            fixedPointDct = {}
-            [addSym(s, fixedPointDct, dstateDct) for s in syms]
-            #[substituteNonSym(s, fixedPointDct) for s in syms]
-            return fixedPointDct
