@@ -10,12 +10,15 @@ and one or more eigenvectors.
 import common_python.ODEModel.constants as cn
 from common_python.sympy import sympyUtil as su
 
+import copy
 import numpy as np
+import scipy
 import sympy
 
 X = "x"
 t = sympy.Symbol("t")
 IS_TIMER = False
+LARGE_REAL = 10e6
 
 
 class EigenEntry():
@@ -36,6 +39,28 @@ class EigenEntry():
         self.algebraicMultiplicity = algebraicMultiplicity
         self.vectors = vectors
         self.isReal = su.isReal(self.value)
+
+    def equals(self, other):
+        """
+        Checks for same values in both EigenEntry.
+
+        Parameters
+        ----------
+        other: EigenEntry
+        
+        Returns
+        -------
+        bool
+        """
+        if len(self.vectors) != len(other.vectors):
+            return False
+        isSame = self.isReal == other.isReal
+        isSame = isSame and (self.value == other.value)
+        isSame = isSame  \
+              and (self.algebraicMultiplicity == other.algebraicMultiplicity)
+        for vec, otherVec in zip(self.vectors, other.vectors):
+            isSame = isSame and (vec.equals(otherVec))
+        return isSame
 
     def getEigenvalues(self, subs=None):
         """
@@ -79,13 +104,15 @@ class FixedPoint():
         """
         if subs is None:
             subs = {}
-        self.valueDct = su.evaluate(valueDct, subs=subs)  # state at fixed point
+        self.isEigenvecs = isEigenvecs
+        # State at fixed point
+        self.valueDct = {s: su.evaluate(valueDct[s], subs=subs) for s in valueDct.keys()}
         self.stateSymVec = sympy.Matrix(list(valueDct.keys()))
         self.jacobianMat = su.evaluate(jacobianMat, subs=valueDct, isNumpy=False)
         self.jacobianMat = su.evaluate(self.jacobianMat, subs=subs, isNumpy=False)
         # Create the EigenEntry objects. Use only 1 eigenvalue for a conjugage pair
         self.eigenEntries = []
-        if isEigenvecs:
+        if self.isEigenvecs:
             entries = su.eigenvects(self.jacobianMat)
             for entry in entries:
                 eigenvalue= entry[0]
@@ -110,6 +137,51 @@ class FixedPoint():
                     pass
                 self.eigenEntries.append(EigenEntry(newEigenvalue, mul, None))
 
+    def equals(self, other):
+        """
+        Determines if both fixed point have the same state.
+
+        Parameters
+        ----------
+        other: FixedPoint
+        
+        Returns
+        -------
+        bool
+        """
+        if len(self.eigenEntries) != len(other.eigenEntries):
+            return False
+        #
+        isSame = self.isEigenvecs == other.isEigenvecs
+        trues = [self.valueDct[s] == other.valueDct[s]
+              for s in self.stateSymVec]
+        isSame = isSame and all(trues)
+        isSame = isSame and self.stateSymVec.equals(other.stateSymVec)
+        isSame = isSame and self.jacobianMat.equals(other.jacobianMat)
+        for entry1, entry2 in zip(self.eigenEntries, other.eigenEntries):
+            isSame = isSame and entry1.equals(entry2)
+        return isSame
+
+    def copy(self, subs=None):
+        """
+        Copies the fixed point, making optional substitutions.
+
+        Parameters
+        ----------
+        subs: dict
+        
+        Returns
+        -------
+        FixedPoint
+        """
+        if subs is None:
+            subs = {}
+        valueDct = copy.deepcopy(self.valueDct)
+        jacobianMat = copy.deepcopy(self.jacobianMat)
+        newFixedPoint = self.__class__(valueDct, jacobianMat, subs=subs,
+              isEigenvecs=self.isEigenvecs)
+        return newFixedPoint
+        
 
     def getJacobian(self, subs=None):
         """
@@ -177,19 +249,29 @@ class ODEModel():
               for s in self.stateSymVec])
         self.stateEprVec = su.evaluate(self.stateEprVec, subs=subs, isNumpy=False)
         self.jacobianMat = self.stateEprVec.jacobian(self.stateSymVec)
-        self.fixedPoints = self._calcFixedPoints()
+        self.fixedPoints = None
+        if self.isFixedPoints:
+            self.fixedPoints = self._calcFixedPoints(isEigenvecs=self.isEigenvecs)
+        # Internal only
+        self._bestFixedPoint = None
+        self._bestParameters = None
+        self._minReal = LARGE_REAL
 
-
-    def _calcFixedPoints(self):
+    def _calcFixedPoints(self, subs={}, isEigenvecs=True):
         """
-        Symbolically solves for fixed points for the model.
-        
+        Symbolically solves for fixed points for the model using the
+        substitutions provided.
+
+        Parameters
+        ----------
+        subs: dict
+        isEigenvecs: bool
+            Calculate eigenvectors
+
         Returns
         -------
         list-FixedPoint
         """
-        if not self.isFixedPoints:
-            return None
         def mkFixedDcts(fixedPoints):
             def mkDct(points):
                 if isinstance(points, dict):
@@ -204,9 +286,11 @@ class ODEModel():
                     fixedDcts.append(mkDct(fixedPoint))
             return fixedDcts
         # Calculate the fixed points
-        fixedPoints = sympy.solve(self.stateEprVec, self.stateSymVec)
+        stateEprVec = sympy.Matrix([e.subs(subs) for e in self.stateEprVec])
+        jacobianMat = stateEprVec.jacobian(self.stateSymVec)
+        fixedPoints = sympy.solve(stateEprVec, self.stateSymVec)
         fixedDcts = mkFixedDcts(fixedPoints)
-        return [FixedPoint(f, self.jacobianMat, isEigenvecs=self.isEigenvecs)
+        return [FixedPoint(f, jacobianMat, isEigenvecs=isEigenvecs)
               for f in fixedDcts]
         
     def getFixedPointValues(self, subs=None):
@@ -227,3 +311,69 @@ class ODEModel():
             subs = {}
         return [{k: su.evaluate(v, subs=subs) for k, v in f.valueDct.items()}
               for f in self.fixedPoints]
+
+    def findOscillations(self, parameterSymbols, minImag=1.0,
+          method="nelder-mead"):
+        """
+        Finds values of model parameters that result in oscillations
+        using the optimization "Minimize the real part of the Eigenvalue
+        subject to a constraint on the imaginary part."
+
+        Parameters
+        ----------
+        parameters: list-str
+        minImag: minimum value of the imaginary part of the eigenvalue
+        method: str
+              'nelder-mead', 'powell', 'cg', 'bfgs', 'newton-cg', 'l-bfgs-b', 'tnc',
+               'cobyla', 'slsqp'
+        
+        Returns
+        -------
+        FixedPoint
+            FixedPoint that has an eigenvalue meeting the criteria
+        lmfit.Params
+            Parameter values used to obtain FixedPoint
+        """
+        self._minReal = LARGE_REAL
+        def _calcLoss(parameterValues):
+            """
+            Calculates eigenvalues for the parameter values provided.
+            Returns the squared real part of the eigenvalue with the largest
+            imaginary part.
+
+            Parameters
+            ----------
+            parameters: lmfit.Parameters
+            
+            Returns
+            -------
+            float
+            """
+            dct = {s: v for s, v in zip(parameterSymbols, parameterValues)}
+            minReal = LARGE_REAL
+            # Find the best possibility of an oscillating eigenvector
+            for fixedPoint in self.fixedPoints:
+                newFixedPoint = fixedPoint.copy(subs=dct)
+                for entry in newFixedPoint.eigenEntries:
+                    real, imag = su.asRealImag(entry.value)
+                    absReal = np.abs(real)
+                    if imag < minImag:
+                        continue
+                    if absReal < minReal:
+                        minReal = absReal
+            # Update best found if needed
+            if minReal < self._minReal:
+                self._minReal = minReal
+                self._bestParameters = parameters
+                self._bestFixedPoint = newFixedPoint
+            return minReal
+        #
+        initialValues = np.repeat(1, len(parameterSymbols))
+        if method in ('nelder-mead', 'powell', 'anneal', 'cobyla'):
+            jac = None
+        else:
+            jac = _calcLoss
+        solution = optimize.minimize(_calcLoss, initialValues, jac=jac,
+              tol=1e-5, method=method)
+        import pdb; pdb.set_trace()
+

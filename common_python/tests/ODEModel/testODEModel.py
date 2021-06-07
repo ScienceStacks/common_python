@@ -82,6 +82,15 @@ class TestEigenEntry(unittest.TestCase):
         vectors = self.entry.getEigenvectors()
         self.assertEqual(len(vectors), 1)
 
+    def testEquals(self):
+        if IGNORE_TEST:
+            return
+        self.assertTrue(self.entry.equals(self.entry))
+        entry = EigenEntry(self.entry.value+1,
+            self.entry.algebraicMultiplicity,
+            self.vectors)
+        self.assertFalse(entry.equals(self.entry))
+
 
 
 class TestFixedPoint(unittest.TestCase):
@@ -129,6 +138,15 @@ class TestFixedPoint(unittest.TestCase):
         eigenvalues = self.fixedPoint.getEigenvalues()
         self.assertEqual(len(eigenvalues), 3)
 
+    def testEquals(self):
+        if IGNORE_TEST:
+            return
+        self.assertTrue(self.fixedPoint.equals(self.fixedPoint))
+        fixedPoint = self.fixedPoint.copy()
+        sym = list(fixedPoint.valueDct.keys())[0]
+        fixedPoint.valueDct[sym] = 1
+        self.assertFalse(fixedPoint.equals(self.fixedPoint))
+
 
 class TestODEModel(unittest.TestCase):
 
@@ -156,21 +174,29 @@ class TestODEModel(unittest.TestCase):
     def testBug1(self):
         if IGNORE_TEST:
             return
-        symbols = "A K_AN K_AM N K_PA K_MP rd_A"
-        symbols += " Kd_A Kd_M Kd_P K_Mp A M"
-        symbols += " P k_0 M rd_M"
-        su.addSymbols(symbols)
-        stateDct = {
-             A: K_AN * N - Kd_A * A * M,
-             P: K_PA * A - k_0,
-             M: K_MP * P - Kd_M * M,
-        }
         modelA = ODEModel(STATE_DCT, isEigenvecs=False)
         fps = modelA.getFixedPointValues()
         for fp in modelA.fixedPoints:
             eigenvalues = fp.getEigenvalues(subs=SUBS)
         self.assertEqual(len(eigenvalues), 3)
 
+    def testCalcFixedPoints(self):
+        if IGNORE_TEST:
+            return
+        symbols = "A K_AN K_AM N K_PA K_MP rd_A"
+        symbols += " Kd_A Kd_M Kd_P K_Mp A M"
+        symbols += " P k_0 M rd_M"
+        su.addSymbols(symbols, dct=globals())
+        stateDct = {
+             A: K_AN * N - Kd_A * A * M,
+             P: K_PA * A - k_0,
+             M: K_MP * P - Kd_M * M,
+        }
+        subs = {k_0: 0.3, K_PA: 2, K_AN: 0.5}
+        model = ODEModel(stateDct)
+        fixedPointCopy = model.fixedPoints[0].copy(subs=subs)
+        newFixedPoint = self.model._calcFixedPoints(subs=subs)[0]
+        self.assertTrue(fixedPointCopy.equals(newFixedPoint))
 
 
 if __name__ == '__main__':
