@@ -198,6 +198,31 @@ class TestODEModel(unittest.TestCase):
         newFixedPoint = self.model._calcFixedPoints(subs=subs)[0]
         self.assertTrue(fixedPointCopy.equals(newFixedPoint))
 
+    def testFindOscillationsNonePresent(self):
+        if IGNORE_TEST:
+            return
+        parameterSymbols = "K_AN K_AM K_PA K_MP rd_A"
+        parameterSymbols += " Kd_A Kd_M Kd_P K_Mp"
+        parameterSymbols += " k_0 M rd_M"
+        stateSymbols = "A M P"
+        symbols = parameterSymbols + " " + stateSymbols
+        su.addSymbols(symbols, dct=globals())
+        stateDct = {
+             A: K_AN * N - Kd_A * A * M,
+             P: K_PA * A - k_0,
+             M: K_MP * P - Kd_M * M,
+        }
+        stateDct = {s: e.subs(N, 1) for s, e in stateDct.items()}
+        model = ODEModel(stateDct)
+        parameterSyms = [eval(n) for n in parameterSymbols.split(" ")]
+        fixedPoint, valueDct = model.findOscillations(parameterSyms)
+        self.assertIsNone(fixedPoint)
+        self.assertIsNone(valueDct)
+
+    def testFindOscillationsPresent(self):
+        if IGNORE_TEST:
+            return
+
 
 if __name__ == '__main__':
   unittest.main()

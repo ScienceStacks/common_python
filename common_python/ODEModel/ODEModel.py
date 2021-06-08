@@ -12,7 +12,7 @@ from common_python.sympy import sympyUtil as su
 
 import copy
 import numpy as np
-import scipy
+from scipy import optimize
 import sympy
 
 X = "x"
@@ -254,7 +254,7 @@ class ODEModel():
             self.fixedPoints = self._calcFixedPoints(isEigenvecs=self.isEigenvecs)
         # Internal only
         self._bestFixedPoint = None
-        self._bestParameters = None
+        self._bestParameterDct = None
         self._minReal = LARGE_REAL
 
     def _calcFixedPoints(self, subs={}, isEigenvecs=True):
@@ -312,30 +312,41 @@ class ODEModel():
         return [{k: su.evaluate(v, subs=subs) for k, v in f.valueDct.items()}
               for f in self.fixedPoints]
 
-    def findOscillations(self, parameterSymbols, minImag=1.0,
-          method="nelder-mead"):
+    def findOscillations(self, parameterSyms, minImag=1.0, **kwargs):
         """
         Finds values of model parameters that result in oscillations
         using the optimization "Minimize the real part of the Eigenvalue
         subject to a constraint on the imaginary part."
+        Methods are:
+          'nelder-mead', 'powell', 'cg', 'bfgs', 'newton-cg', 'l-bfgs-b', 'tnc',
+           'cobyla', 'slsqp'
 
         Parameters
         ----------
         parameters: list-str
         minImag: minimum value of the imaginary part of the eigenvalue
-        method: str
-              'nelder-mead', 'powell', 'cg', 'bfgs', 'newton-cg', 'l-bfgs-b', 'tnc',
-               'cobyla', 'slsqp'
+        kwargs: dict
+            optional arguments to scipy.optimize
+            default: method="nelder-mead"
         
         Returns
         -------
         FixedPoint
             FixedPoint that has an eigenvalue meeting the criteria
-        lmfit.Params
-            Parameter values used to obtain FixedPoint
+        dict
+            Dictionary of parameter values used to calculate FixedPoint
         """
+        if len(kwargs) == 0:
+            kwargs["method"] = "nelder-mead"
+        method = kwargs["method"]
         self._minReal = LARGE_REAL
-        def _calcLoss(parameterValues):
+        self._bestFixedPoint = None
+        self._bestParameterDct = None
+        #
+        def mkValueDct(values):
+            return {s: v for s, v in zip(parameterSyms, values)}
+        #
+        def calcLoss(values):
             """
             Calculates eigenvalues for the parameter values provided.
             Returns the squared real part of the eigenvalue with the largest
@@ -343,13 +354,14 @@ class ODEModel():
 
             Parameters
             ----------
-            parameters: lmfit.Parameters
+            values: list-float
+                values that correspond to the parameters parameterSyms
             
             Returns
             -------
             float
             """
-            dct = {s: v for s, v in zip(parameterSymbols, parameterValues)}
+            dct = mkValueDct(values)
             minReal = LARGE_REAL
             # Find the best possibility of an oscillating eigenvector
             for fixedPoint in self.fixedPoints:
@@ -364,16 +376,17 @@ class ODEModel():
             # Update best found if needed
             if minReal < self._minReal:
                 self._minReal = minReal
-                self._bestParameters = parameters
+                self._bestParameterDct = mkValueDct(values)
                 self._bestFixedPoint = newFixedPoint
             return minReal
         #
-        initialValues = np.repeat(1, len(parameterSymbols))
+        initialValues = np.repeat(1, len(parameterSyms))
         if method in ('nelder-mead', 'powell', 'anneal', 'cobyla'):
             jac = None
         else:
-            jac = _calcLoss
-        solution = optimize.minimize(_calcLoss, initialValues, jac=jac,
-              tol=1e-5, method=method)
-        import pdb; pdb.set_trace()
+            jac = calcLoss
+        solution = optimize.minimize(calcLoss, initialValues, jac=jac,
+              tol=1e-5, **kwargs)
+        valueDct = mkValueDct(solution.x)
+        return self._bestFixedPoint, self._bestParameterDct
 
