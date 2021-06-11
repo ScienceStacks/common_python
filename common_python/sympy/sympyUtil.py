@@ -21,7 +21,6 @@ import numpy as np
 import sympy
 
 SMALL_VALUE = 1e-8
-DEFAULT_VALUE = 1.0  # Value substituted in parameterized expressions
 
 def _getDct(dct, frame):
     """
@@ -416,27 +415,29 @@ def isVecZero(vec):
     trues = [isZero(e) for e in vec]
     return all(trues)
 
-def solveLinearSingular(aMat, bVec, isParameterized=False):
+def solveLinearSingular(aMat, bVec, isParameterized=False, defaultValue=1):
     """
-    Solves a linear system where the matrix may be singular.
-    Parameter values are set to one if not isParameterized.
+    Finds a solution to a linear system where the linear
+    matrix may be singular.
+    Parameter values are set to 1 if not isParameterized.
 
     Parameters
     ----------
     aMat: sympy.Matrix N X N
     bVec: sympy.Matrix N X 1
+    isParameterized: bool
+          Return the parameterized result
 
     Returns
     -------
     sympy.Matrix N X 1
     """
-    # FIXME: find the symbols using free_symbols
     solution = aMat.gauss_jordan_solve(bVec)
     solutionVec = solution[0]
     if not isParameterized:
         parameterMat = solution[1]
         for parameter in parameterMat:
-            solutionVec = solutionVec.subs(parameter, DEFAULT_VALUE)
+            solutionVec = solutionVec.subs(parameter, defaultValue)
     solutionVec = solutionVec.evalf()
     return solutionVec
 

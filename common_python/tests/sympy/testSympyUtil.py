@@ -247,6 +247,19 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(distinctSymbols[0], Y)
         self.assertEqual(len(distinctSymbols), 1)
 
+    def testSolveLinearSingular(self):
+        if IGNORE_TEST:
+            return
+        aMat = sympy.Matrix([
+              [1, 0, 1],
+              [1, 1, 0],
+              ])
+        bVec = sympy.zeros(rows=aMat.rows, cols=1)
+        result = su.solveLinearSingular(aMat,bVec, isParameterized=True)
+        sym = result.free_symbols
+        newResult = aMat.multiply(result.subs(sym, 1))
+        self.assertTrue(newResult == bVec)
+
 
 if __name__ == '__main__':
   unittest.main()
