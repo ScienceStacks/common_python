@@ -390,3 +390,17 @@ class ODEModel():
         valueDct = mkValueDct(solution.x)
         return self._bestFixedPoint, self._bestParameterDct
 
+    @classmethod
+    def mkODEModel(cls, roadRunner):
+        """
+        Creates an ODEModel from a roadrunner instance.
+
+        Parameters
+        ----------
+        roadRunner: ExtendedRoadrunner
+        
+        Returns
+        -------
+        ODEModel
+        """
+
