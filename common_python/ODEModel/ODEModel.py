@@ -11,6 +11,7 @@ import common_python.ODEModel.constants as cn
 from common_python.sympy import sympyUtil as su
 from src.common.simple_sbml import SimpleSBML
 
+import collections
 import copy
 import numpy as np
 from scipy import optimize
@@ -404,8 +405,14 @@ class ODEModel():
         
         Returns
         -------
-        ODEModel
+        ModelInfo
         """
+        # mdl: ODEModel
+        # stm: stoichiometry matrix
+        # sre: species reaction expression dictionary
+        #      (species flux expressed in terms of reaction fluxes)
+        ModelInfo = collections.namedtuple("ModelInfo", "mdl stm sre")
+        #
         simple = SimpleSBML(roadrunner)
         # Add the required names
         names = [p.id for p in simple.parameters]
@@ -434,6 +441,8 @@ class ODEModel():
         #        using the reaction fluxes
         systemDct = {s: sympy.simplify(speciesReactionDct[s].subs(reactionEprDct))
             for s in speciesReactionDct.keys()}
-        return cls(systemDct, **kwargs)
+        model = cls(systemDct, **kwargs)
+        modelInfo = ModelInfo(mdl=model, stm=stoichiometryMat, sre=speciesReactionDct)
+        return modelInfo
 
 

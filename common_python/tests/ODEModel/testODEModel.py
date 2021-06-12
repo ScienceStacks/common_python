@@ -11,8 +11,8 @@ import tellurium as te
 import unittest
 
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 VARIABLES = "t A P M K_AN K_AM N Kd_A Kd_M K_MP K_PA k_0 K_MP kd_M X Y"
 su.addSymbols(VARIABLES, dct=globals())
 STATE_DCT = {
@@ -225,10 +225,11 @@ class TestODEModel(unittest.TestCase):
         self.assertIsNone(valueDct)
 
     def testMkODEModel(self):
-        # TESTING
+        if IGNORE_TEST:
+            return
         rr = te.loada(ANTIMONY_FILE)
-        odeModel = ODEModel.mkODEModel(rr, isEigenvecs=False, isFixedPoints=False)
-        import pdb; pdb.set_trace()
+        modelInfo = ODEModel.mkODEModel(rr, isEigenvecs=False, isFixedPoints=False)
+        self.assertTrue(isinstance(modelInfo.mdl, ODEModel))
         
 
     def testFindOscillationsPresent(self):
