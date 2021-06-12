@@ -4,13 +4,15 @@ from common_python.ODEModel.ODEModel import ODEModel, FixedPoint, EigenEntry
 
 import itertools
 import numpy as np
+import os
 import pandas as pd
 import sympy
+import tellurium as te
 import unittest
 
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 VARIABLES = "t A P M K_AN K_AM N Kd_A Kd_M K_MP K_PA k_0 K_MP kd_M X Y"
 su.addSymbols(VARIABLES, dct=globals())
 STATE_DCT = {
@@ -33,6 +35,9 @@ VALUE_DCT = {
       }
 SUBS = {Kd_A: 1, K_MP: 1, K_PA: 1, k_0: 2.0, Kd_M: 1, N: 1,
       K_AN: 1, Kd_M: 1, Kd_A: 1, K_AM: 1}
+ANTIMONY_FILE = "antimony.ant"
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+ANTIMONY_FILE = os.path.join(TEST_DIR, "antimony.ant")
 
 
 #############################
@@ -218,6 +223,13 @@ class TestODEModel(unittest.TestCase):
         fixedPoint, valueDct = model.findOscillations(parameterSyms)
         self.assertIsNone(fixedPoint)
         self.assertIsNone(valueDct)
+
+    def testMkODEModel(self):
+        # TESTING
+        rr = te.loada(ANTIMONY_FILE)
+        odeModel = ODEModel.mkODEModel(rr, isEigenvecs=False, isFixedPoints=False)
+        import pdb; pdb.set_trace()
+        
 
     def testFindOscillationsPresent(self):
         if IGNORE_TEST:

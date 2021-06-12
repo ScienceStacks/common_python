@@ -9,6 +9,7 @@ and one or more eigenvectors.
 
 import common_python.ODEModel.constants as cn
 from common_python.sympy import sympyUtil as su
+from src.common.simple_sbml import SimpleSBML
 
 import copy
 import numpy as np
@@ -391,16 +392,48 @@ class ODEModel():
         return self._bestFixedPoint, self._bestParameterDct
 
     @classmethod
-    def mkODEModel(cls, roadRunner):
+    def mkODEModel(cls, roadrunner, **kwargs):
         """
         Creates an ODEModel from a roadrunner instance.
 
         Parameters
         ----------
-        roadRunner: ExtendedRoadrunner
+        roadrunner: ExtendedRoadrunner
+        kwargs: dict
+              optional arguments for the constructor
         
         Returns
         -------
         ODEModel
         """
+        simple = SimpleSBML(roadrunner)
+        # Add the required names
+        names = [p.id for p in simple.parameters]
+        speciesNames = [s.id for s in simple.species]
+        names.extend(speciesNames)
+        for reaction in simple.reactions:
+            name = reaction.id
+            if name[0] == "_":
+                name = name[1:]
+            reaction.id = name
+        reactionNames = [r.id for r in simple.reactions]
+        names.extend(reactionNames)
+        nameStr = " ".join(names)
+        su.addSymbols(nameStr, dct=globals())
+        # Create sympy expressions for kinetic laws
+        reactionEprDct = {eval(r.id): eval(r.kinetic_law.formula)
+              for r in simple.reactions}
+        # Express species fluxes in terms of reaction fluxes
+        reactionVec = sympy.Matrix(list(reactionEprDct.keys()))
+        stoichiometryMat = sympy.Matrix(roadrunner.getFullStoichiometryMatrix())
+        speciesReactionVec = stoichiometryMat * reactionVec
+        speciesReactionDct = {eval(s): e for s, e in 
+              zip(speciesNames, speciesReactionVec)}
+        # FIXME: Need a better solver for fixed points, either
+        #        doing substitution within state equations or
+        #        using the reaction fluxes
+        systemDct = {s: sympy.simplify(speciesReactionDct[s].subs(reactionEprDct))
+            for s in speciesReactionDct.keys()}
+        return cls(systemDct, **kwargs)
+
 
