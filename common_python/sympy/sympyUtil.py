@@ -15,6 +15,7 @@ Notes
 
 """
 
+import collections
 import copy
 import inspect
 import numpy as np
@@ -655,3 +656,97 @@ def getDistinctSymbols(eqnDct, symbols=None, excludes=None):
     lst = list(set(newRhsSymbols))
     lst = sorted(lst, key=lambda s: s.name)
     return lst
+
+def getSymbols(epr):
+    """
+    Recursively extracts symbols from an expression.
+
+    Parameters
+    ----------
+    epr: expression
+    
+    Returns
+    -------
+    list-Symbol
+    """
+    result = []
+    for ele in epr.args:
+        if ele.is_symbol:
+            result.append(ele)
+        else:
+            result.extend(getSymbols(ele))
+    return list(set(result))
+     
+
+def mkQuadraticRelaxation(systemDct):
+    """
+    Relaxes a set of system equations to linear system for quadratic system,
+    a system consisting of terms of the form k*S or k*S*T or k*S**2.
+
+    Parameters
+    ----------
+    systemDct
+        key: Symbol
+        value: expression
+    
+    Returns
+    -------
+    RelaxationResult
+    """
+    # Relaxation result
+    # eqn: dict
+    #     key: state variable
+    #     value: expression
+    # sub: dict
+    #     key: new symbol
+    #     value: expression to rever to original
+    # mat: sympy.Matrix: matrix for linearized system (N X M)
+    #     row: original state variables
+    #     column: extended set of state variables
+    #     value: linearized expression
+    # vec: sympy.Matrix complete set of symbols in columns N X 1
+    #     row: extended symbol
+    RelaxationResult = collections.namedtuple("RelaxationResult",
+          "eqn sub mat vec")
+    # Add existing symbols
+    freeSymbols = []
+    [freeSymbols.extend(e.free_symbols) for e in systemDct.values()]
+    [addSymbols(f.name, dct=globals()) for f in freeSymbols]
+    # Add quadratic symbols
+    systemStr = " ".join([str(e) for  e in systemDct.values()])
+    stateSymbols = list(systemDct.keys())
+    subs = {}  # key: new symbol; value: quadratic expression
+    for sym1 in stateSymbols:
+        for sym2 in stateSymbols:
+            if sym1.name <= sym2.name:
+                name = "%s%s" % (sym1, sym2)
+                quadraticEpr = sym1 * sym2
+                quadraticEprStr = str(quadraticEpr)
+                if quadraticEprStr in systemStr:               
+                    addSymbols(name, dct=globals())
+                    subs[globals()[name]] = quadraticEpr
+    subsStr = {str(k): str(v) for k, v in subs.items()}
+    # Construct the vector of extended symbols
+    extendedStateSyms = list(stateSymbols)
+    extendedStateSyms.extend(list(subs.keys()))
+    extendedStateVec = sympy.Matrix(extendedStateSyms)
+    # Replace quadratic terms
+    eprStrDct = {}
+    linearizedDct = {}
+    for sym, epr in systemDct.items():
+        newEprStr = str(epr)
+        for k, v in subsStr.items():
+            newEprStr = newEprStr.replace(v, k)
+        linearizedDct[sym] = eval(newEprStr)
+    # Calculate Jacobian w.r.t. newSymbols to get matris
+    stateEprVec = sympy.Matrix(list(linearizedDct.values()))
+    mat = stateEprVec.jacobian(extendedStateVec)
+    #
+    return RelaxationResult(
+          eqn=linearizedDct,
+          sub=subs,
+          mat=mat,
+          vec=extendedStateVec,
+          )
+    return linearizedDct, subs
+    

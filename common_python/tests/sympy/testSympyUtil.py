@@ -260,6 +260,28 @@ class TestFunctions(unittest.TestCase):
         newResult = aMat.multiply(result.subs(sym, 1))
         self.assertTrue(newResult == bVec)
 
+    def testGetSymbols(self):
+        if IGNORE_TEST:
+            return
+        result = su.getSymbols(X**2*(Y + Z)*Z)
+        diff = set(result).symmetric_difference([X, Y, Z])
+        self.assertEqual(len(diff), 0)
+
+    def testmkQuadraticRelaxation(self):
+        if IGNORE_TEST:
+            return
+        su.addSymbols("S0 S1 S2 k1 k2 k3 k4 k5 k6", dct=globals())
+        systemDct = {
+              S0: -S0*k1 + S2*S1*k2 + S2*S2*k3,
+              S1: -S1*k4 + S1*S2*k5,
+              S2: k6*S2}
+        relaxationResult = su.mkQuadraticRelaxation(systemDct)
+        linearizedDct = relaxationResult.eqn
+        subs = relaxationResult.sub
+        result = {s: linearizedDct[s].subs(subs) for s in linearizedDct.keys()}
+        for sym, epr in systemDct.items():
+            self.assertEqual(result[sym], epr)
+
 
 if __name__ == '__main__':
   unittest.main()
