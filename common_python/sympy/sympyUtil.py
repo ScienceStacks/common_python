@@ -37,7 +37,8 @@ def _getDct(dct, frame):
     dict
     """
     if dct is None:
-        dct = frame.f_back.f_locals
+        #dct = frame.f_back.f_locals
+        dct = frame.f_back.f_globals
     return dct
 
 def addSymbols(symbolStr, dct=None, real=True, negative=False):

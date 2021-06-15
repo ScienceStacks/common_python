@@ -25,7 +25,7 @@ class TestFunctions(unittest.TestCase):
         if IGNORE_TEST:
             return
         names = ["xx", "yy"]
-        su.addSymbols(" ".join(names))
+        su.addSymbols(" ".join(names), dct=locals())
         for name in names:
             self.assertTrue(name in locals().keys())
             expr = "isinstance(%s, sympy.Symbol)" % name
@@ -88,7 +88,7 @@ class TestFunctions(unittest.TestCase):
             return
         nameRoot = "z"
         numRow = 5
-        vec = su.mkVector(nameRoot, numRow)
+        vec = su.mkVector(nameRoot, numRow, dct=locals())
         newNames = [n for n in locals().keys()
               if (n[0] == nameRoot) and (len(n) == 3)]
         self.assertEqual(len(newNames), numRow)
