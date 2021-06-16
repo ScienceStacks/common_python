@@ -54,10 +54,10 @@ class TestXDict(unittest.TestCase):
         dct[list(dct.keys())[0]] = -1.0
         self.assertFalse(self.kv.equals(dct))
 
-    def testmkParameter(self):
+    def testmkParameters(self):
         if IGNORE_TEST:
             return
-        parameterXD = self.kv.mkParameter(self.roadrunner)
+        parameterXD = self.kv.mkParameters(self.roadrunner)
         self.assertTrue("k1" in parameterXD.keys())
 
     def testmkSpecies(self):
@@ -82,7 +82,7 @@ class TestOscillationFinder(unittest.TestCase):
     def testMkParameterXD(self):
         if IGNORE_TEST:
             return
-        dct = self.finder.mkParameter()
+        dct = self.finder.mkParameters()
 
 class TestOscillationFinder(unittest.TestCase):
 
@@ -97,7 +97,7 @@ class TestOscillationFinder(unittest.TestCase):
         self.assertTrue(isinstance(self.finder.parameterXD, dict))
 
     def mkParameterXD(self, values):
-        parameterXD = XDict.mkParameter(self.roadrunner)
+        parameterXD = XDict.mkParameters(self.roadrunner)
         return XDict(parameterXD.keys(), values)
 
     def testSetSteadyState(self):
@@ -135,9 +135,12 @@ class TestOscillationFinder(unittest.TestCase):
             return
         # Initialize all parameters to 1
         initialParameterXD = self.mkParameterXD(1)
-        self.finder.setParameters(initialParameterXD)
         # Find a feasible solution
-        feasibleParameterXD = self.finder.find()
+        feasibleParameterXD = self.finder.find(
+              initialParameterXD=initialParameterXD)
+        if False:
+            self.finder.simulate(parameterXD=feasibleParameterXD)
+            self.finder.plot()
         self.assertFalse(initialParameterXD.equals(feasibleParameterXD))
 
     def testFindBig(self):

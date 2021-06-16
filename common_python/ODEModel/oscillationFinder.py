@@ -63,7 +63,7 @@ class XDict(dict):
             self.__setitem__(key, value)
 
     @classmethod
-    def mkParameter(cls, roadrunner):
+    def mkParameters(cls, roadrunner):
          """
          Creates a XDict for parameters in roadrunner.
  
@@ -127,7 +127,7 @@ class OscillationFinder():
         roadrunner: ExtendedRoadrunner
         """
         self.roadrunner = roadrunner
-        self.parameterXD = XDict.mkParameter(self.roadrunner)
+        self.parameterXD = XDict.mkParameters(self.roadrunner)
         self.parameterNames = list(self.parameterXD.keys())
         self.simulationArr = None  # Results from last setSteadyState
         # Internal only
@@ -168,7 +168,7 @@ class OscillationFinder():
         for name, value in parameterXD.items():
             self.roadrunner[name] = value
 
-    def simulate(self, parameterXD=None):
+    def simulate(self, parameterXD=None, endTime=10):
         """
         Runs a simulation for a set of parameter values.
 
@@ -180,13 +180,14 @@ class OscillationFinder():
         """
         self.roadrunner.reset()
         self.setParameters(parameterXD=parameterXD)
-        self.simulationArr = self.roadrunner.simulate()
+        self.simulationArr = self.roadrunner.simulate(0, endTime, 5*endTime)
 
     def _getEigenvalues(self, parameterXD=None):
         _ = self.setSteadyState(parameterXD=parameterXD)
         return np.linalg.eig(self.roadrunner.getFullJacobian())[0]
 
-    def find(self, minImag=1.0, minReal=0.1, **kwargs):
+    def find(self, initialParameterXD=None, lowerBound=0, upperBound=1e3,
+          minImag=1.0, minReal=0.1, **kwargs):
         """
         Finds values of model parameters that result in oscillations
         using the optimization "Minimize the real part of the Eigenvalue
@@ -197,6 +198,11 @@ class OscillationFinder():
 
         Parameters
         ----------
+        initialParameterXD: XDict
+        lowerBound: float
+              lower bound for parameter search
+        upperBound: float
+              upper bound for parameter search
         minImag: minimum value of the imaginary part of the eigenvalue
         minReal: minimum value of real for feasibility
         kwargs: dict
@@ -253,20 +259,14 @@ class OscillationFinder():
                 # Feasible imaginary part, but real is too small
                 return minReal - candidateReal
         #
-        if len(kwargs) == 0:
-            kwargs["method"] = "nelder-mead"
-        method = kwargs["method"]
         self._minReal = LARGE_REAL
         self._bestParameterXD = None
+        if initialParameterXD is None:
+            initialParameterXD = self.parameterXD
+        bounds = [(lowerBound, upperBound) for _ in range(len(initialParameterXD))]
         #
-        if method in ('nelder-mead', 'powell', 'anneal', 'cobyla'):
-            jac = None
-        else:
-            jac = _calcLoss
         try:
-            _ = optimize.minimize(_calcLoss, list(self.parameterXD.values()),
-                  jac=jac,
-                  tol=1e-5, **kwargs)
+            _ = optimize.differential_evolution(_calcLoss, bounds, **kwargs)
         except FeasibilityFoundException:
             pass
         return self._bestParameterXD
