@@ -445,4 +445,70 @@ class ODEModel():
         modelInfo = ModelInfo(mdl=model, stm=stoichiometryMat, sre=speciesReactionDct)
         return modelInfo
 
+    @classmethod
+    def findFixedPoints(cls, rr):
+        """
+        Finds the fixed points of the roadrunner model that only has mass action kinetics
+        and no more than two reactants. The approach uses relaxation by transforming the quadratic
+        equations to a higher dimension linear space.
+
+        This may run indefinitely depending on the structure of the equations.
+        
+        Parameteters
+        ------------
+        rr: ExtendedRoadRunner
+        
+        Returns
+        -------
+        list-dict
+            key: state variable symbol
+            value: expressions
+        """
+        def findIdx(sym):
+            return list(relaxationResult.vec).index(sym)
+        #
+        modelInfo = ODEModel.mkODEModel(rr, isFixedPoints=False, isEigenvecs=False)
+        relaxationResult = su.mkQuadraticRelaxation(modelInfo.mdl.stateDct)
+        mat = sympy.simplify(relaxationResult.mat)
+        nullVecs = mat.nullspace(relaxationResult.vec)
+        # Create solution for the nullspace
+        constantStrs = ["c%d" % n for n in range(len(nullVecs))]
+        su.addSymbols(" ".join(constantStrs), dct=globals())
+        constantSyms = [globals()[s] for s in constantStrs]
+        mat =  sympy.Matrix(nullVecs)
+        numRow = nullVecs[0].rows
+        numCol = len(nullVecs)
+        nullspaceLst = [list(v) for v in nullVecs]
+        mat = sympy.Matrix(nullspaceLst)
+        mat = mat.transpose()
+        constantVec = sympy.Matrix(constantSyms)
+        nullspaceVec = mat * constantVec
+        # Solve for the constraints
+        symEntryDct = {s: nullspaceVec[n] for n, s in enumerate(relaxationResult.vec)}
+        # Construct equality expressions and solve.
+        eprs = []
+        for quadSym, quadEpr in relaxationResult.sub.items():
+            quadIdx = findIdx(quadSym)
+            syms = list(quadEpr.args)
+            if syms[1] == 2:
+                syms[1] = syms[0]
+            symIdxs = [findIdx(s) for s in syms]
+            prodEpr = nullspaceVec[symIdxs[0]] * nullspaceVec[symIdxs[1]]
+            eprs.append(nullspaceVec[quadIdx] - prodEpr)
+        solutions = sympy.solve(eprs, constantSyms) # Values of constants to match constraints
+        # Calculate the fixed points
+        simpleSyms = set(relaxationResult.vec).symmetric_difference(relaxationResult.sub.keys())
+        simpleSyms = sorted(simpleSyms, key=lambda s: s.name)
+        fixedPointDcts = []
+        for solution in solutions:
+            # Calculate the vector for each solution
+            numVec = len(nullspaceLst)
+            vec = sympy.zeros(len(relaxationResult.vec), 1)
+            for idx in range(numVec):
+                vec += solution[idx] * sympy.Matrix(nullspaceLst[idx])
+            # Create the fixed point from the vector
+            fixedPointDcts.append({simpleSyms[n]: vec[n] for n in range(len(simpleSyms))})
+        return fixedPointDcts
+
+
 
