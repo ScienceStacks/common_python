@@ -198,7 +198,7 @@ class OscillationFinder():
         return np.linalg.eig(self.roadrunner.getFullJacobian())[0]
 
     def find(self, initialParameterXD=None, lowerBound=0, upperBound=1e3,
-          minImag=1.0, minReal=0.1, **kwargs):
+          minImag=1.0, minReal=0.0, **kwargs):
         """
         Finds values of model parameters that result in oscillations
         using the optimization "Minimize the real part of the Eigenvalue
@@ -243,34 +243,45 @@ class OscillationFinder():
             -------
             float
             """
+            def calcDeficiency(eigenvalue):
+                """
+                Scores the eigenvalue in terms of how far it is from
+                a feasible value.               
+
+                Parameters
+                ----------
+                eigenvalue: complex
+                
+                Returns
+                -------
+                float
+                """
+                real, imag = np.real(eigenvalue), np.imag(eigenvalue)
+                if (real > 0) and (np.isclose(imag, 0)):
+                    return LARGE_REAL
+                deficiency = max(minReal - real, minImag - imag)
+                return max(0, deficiency)
+            #
             parameterXD = XDict(names=self.parameterNames, values=values)
             eigenvalues = self._getEigenvalues(parameterXD=parameterXD)
             if eigenvalues is None:
                 return LARGE_REAL
             # See how close to meeting criteria
-            isDone = False
-            candidateImag = -LARGE_REAL
-            candidateReal = -LARGE_REAL
-            for entry in eigenvalues:
-                real, imag = np.real(entry), np.imag(entry)
-                if imag < minImag:
-                    continue
-                candidateImag = imag
-                candidateReal = real
-                if candidateReal < minReal:
-                    continue
-                isDone = True
-                break
+            bestEigenvalue = None
+            bestDeficiency = LARGE_REAL
+            for eigenvalue in eigenvalues:
+                deficiency = calcDeficiency(eigenvalue)
+                if deficiency < bestDeficiency:
+                    bestEigenvalue = eigenvalue
+                    bestDeficiency = deficiency
+                if deficiency == 0:
+                    break
             # Update best found if needed
-            if isDone:
+            if bestDeficiency == 0:
                 self._bestParameterXD = XDict(self.parameterNames, values)
                 raise FeasibilityFoundException
-            if candidateImag < minImag:
-                # Not feasible in terms of imaginary part
-                return LARGE_REAL
-            else:
-                # Feasible imaginary part, but real is too small
-                return minReal - candidateReal
+            #print(bestDeficiency)
+            return bestDeficiency
         #
         self._minReal = LARGE_REAL
         self._bestParameterXD = None
@@ -284,7 +295,7 @@ class OscillationFinder():
             pass
         return self._bestParameterXD
 
-    def plot(self, title="", isPlot=True):
+    def plot(self, title="", ylim=None, isPlot=True):
         """
         Plots the results of the last simulation.
 
@@ -299,5 +310,7 @@ class OscillationFinder():
         ax.legend(self.simulationArr.colnames[1:])
         ax.set_xlabel("time")
         ax.set_title(title)
+        if ylim is not None:
+            ax.set_ylim(ylim)
         if isPlot:
             plt.show()
