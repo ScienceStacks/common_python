@@ -136,8 +136,11 @@ class TestOscillationFinder(unittest.TestCase):
         # Initialize all parameters to 1
         initialParameterXD = self.mkParameterXD(1)
         # Find a feasible solution
-        feasibleParameterXD = self.finder.find(
-              initialParameterXD=initialParameterXD)
+        for _ in range(3):
+            feasibleParameterXD = self.finder.find(
+                  initialParameterXD=initialParameterXD)
+            if feasibleParameterXD is not None:
+                break
         if False:
             self.finder.simulate(parameterXD=feasibleParameterXD)
             self.finder.plot()

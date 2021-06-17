@@ -9,7 +9,6 @@ and one or more eigenvectors.
 
 import common_python.ODEModel.constants as cn
 from common_python.sympy import sympyUtil as su
-from src.common.simple_sbml import SimpleSBML
 
 import collections
 import copy
@@ -394,6 +393,7 @@ class ODEModel():
 
     @classmethod
     def mkODEModel(cls, roadrunner, **kwargs):
+        from src.common.simple_sbml import SimpleSBML
         """
         Creates an ODEModel from a roadrunner instance.
 
@@ -448,8 +448,9 @@ class ODEModel():
     @classmethod
     def findFixedPoints(cls, rr):
         """
-        Finds the fixed points of the roadrunner model that only has mass action kinetics
-        and no more than two reactants. The approach uses relaxation by transforming the quadratic
+        Finds the fixed points of the roadrunner model that only has mass
+        action kinetics and no more than two reactants. 
+        The approach uses relaxation by transforming the quadratic
         equations to a higher dimension linear space.
 
         This may run indefinitely depending on the structure of the equations.
@@ -495,9 +496,11 @@ class ODEModel():
             symIdxs = [findIdx(s) for s in syms]
             prodEpr = nullspaceVec[symIdxs[0]] * nullspaceVec[symIdxs[1]]
             eprs.append(nullspaceVec[quadIdx] - prodEpr)
-        solutions = sympy.solve(eprs, constantSyms) # Values of constants to match constraints
+        # Values of constants to match constraints
+        solutions = sympy.solve(eprs, constantSyms)
         # Calculate the fixed points
-        simpleSyms = set(relaxationResult.vec).symmetric_difference(relaxationResult.sub.keys())
+        simpleSyms = set(relaxationResult.vec).symmetric_difference(
+               relaxationResult.sub.keys())
         simpleSyms = sorted(simpleSyms, key=lambda s: s.name)
         fixedPointDcts = []
         for solution in solutions:
