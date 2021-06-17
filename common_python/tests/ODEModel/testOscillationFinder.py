@@ -110,7 +110,7 @@ class TestOscillationFinder(unittest.TestCase):
         self.assertFalse(speciesXD.equals(fp))
         self.assertGreater(fp["S1"], fp["S0"])
         self.assertGreater(fp["S2"], fp["S1"])
-        self.finder.plot(isPlot=IS_PLOT)
+        self.finder.plot(title="title", isPlot=IS_PLOT)
 
     def testSimulate(self):
         if IGNORE_TEST:

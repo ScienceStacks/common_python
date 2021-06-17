@@ -150,7 +150,12 @@ class OscillationFinder():
         XDict: fixed point
         """
         self.simulate(parameterXD=parameterXD)
-        self.roadrunner.getSteadyStateValues()
+        if self.simulationArr is None:
+            return None
+        try:
+            self.roadrunner.getSteadyStateValues()
+        except RuntimeError:
+            return None
         return XDict.mkSpecies(self.roadrunner)
 
     def setParameters(self, parameterXD=None):
@@ -180,10 +185,16 @@ class OscillationFinder():
         """
         self.roadrunner.reset()
         self.setParameters(parameterXD=parameterXD)
-        self.simulationArr = self.roadrunner.simulate(0, endTime, 5*endTime)
+        try:
+            self.simulationArr = self.roadrunner.simulate(0, endTime, 5*endTime)
+        except RuntimeError:
+            self.simulationArr = None
+            
 
     def _getEigenvalues(self, parameterXD=None):
         _ = self.setSteadyState(parameterXD=parameterXD)
+        if self.simulationArr is None:
+            return None
         return np.linalg.eig(self.roadrunner.getFullJacobian())[0]
 
     def find(self, initialParameterXD=None, lowerBound=0, upperBound=1e3,
@@ -234,6 +245,8 @@ class OscillationFinder():
             """
             parameterXD = XDict(names=self.parameterNames, values=values)
             eigenvalues = self._getEigenvalues(parameterXD=parameterXD)
+            if eigenvalues is None:
+                return LARGE_REAL
             # See how close to meeting criteria
             isDone = False
             candidateImag = -LARGE_REAL
@@ -271,7 +284,7 @@ class OscillationFinder():
             pass
         return self._bestParameterXD
 
-    def plot(self, isPlot=True):
+    def plot(self, title="", isPlot=True):
         """
         Plots the results of the last simulation.
 
@@ -285,5 +298,6 @@ class OscillationFinder():
             ax.plot(self.simulationArr[:, 0], self.simulationArr[:, idx+1])
         ax.legend(self.simulationArr.colnames[1:])
         ax.set_xlabel("time")
+        ax.set_title(title)
         if isPlot:
             plt.show()
