@@ -13,6 +13,7 @@ from scipy import optimize
 
 
 LARGE_REAL = 1e6
+MAX_ENDTIME = 1000
 
 
 class FeasibilityFoundException(Exception):
@@ -226,8 +227,6 @@ class OscillationFinder():
             key: parameter name
             value: value of the parameter
         """
-        # TODO: Stop if encounter a feasible solution
-        #       Generalize to feasibility search?
         def _calcLoss(values):
             """
             Calculates eigenvalues for the parameter values provided.
@@ -272,8 +271,11 @@ class OscillationFinder():
             for eigenvalue in eigenvalues:
                 deficiency = calcDeficiency(eigenvalue)
                 if deficiency < bestDeficiency:
-                    bestEigenvalue = eigenvalue
-                    bestDeficiency = deficiency
+                    # Verify that these are simulateable parameters
+                    self.simulate(parameterXD=parameterXD, endTime=MAX_ENDTIME)
+                    if self.simulationArr is not None:
+                        bestEigenvalue = eigenvalue
+                        bestDeficiency = deficiency
                 if deficiency == 0:
                     break
             # Update best found if needed
@@ -314,3 +316,80 @@ class OscillationFinder():
             ax.set_ylim(ylim)
         if isPlot:
             plt.show()
+    
+    @classmethod
+    def analyzeFile(cls, modelPath, outPath="analyzeFile.csv", numRestart=2, isPlot=True, **kwargs):
+        """
+        Finds parameters with oscillations for a single file.
+        Plots simulations for the initial and optimized parameters.
+        
+        Parameters
+        ----------
+        modelPath: str
+        numRestart: int
+            Number of times a search is redone if unsuccessful
+        isPlot: bool
+        outPath: str
+            Saves results with file structured as:
+                modelID, originalParameterDct, newParameterDct, foundOscillations
+        kwargs: dict
+            parameters passed to plot
+        
+        Returns
+        -------
+        XDict
+            feasible parameters found
+        bool
+            verified oscillations
+        """
+        # Construct the model ID
+        start = modelPath.index("Model_") + len("Model_")
+        end = modelPath.index(".ant")
+        modelId = modelPath[start:end]
+        #
+        def mkTitle(string):
+            return "%s: %s" % (modelId, string)
+        #
+        def writeResults(originalParameterXD, feasibleParameterXD,
+              foundOscillations):
+            line = "%s, %s, %s, %s" % (
+                  modelId, str(originalParameterXD), 
+                        str(feasibleParameterXD), sr(foundOscillations))
+            with open(outPath, "a") as fd:
+                fd.writeline(line)
+        #
+        def plot(finder, parameterXD, title):
+            if not isPlot:
+                return
+            isPlotted = False
+            if parameterXD is not None:
+                finder.simulate(parameterXD=parameterXD, endTime=100)
+                if finder.simulationArr is not None:
+                    finder.plot(title=mkTitle(title), isPlot=isPlot)
+                    isPlotted = True
+            if not isPlotted:
+                msg = "No simulation produced for parameters of %s!" % title
+                print(mkTitle(msg))
+            return isPlotted
+        # 
+        for idx in range(numRestart + 1):
+            rr = te.loada(modelPath)
+            finder = OscillationFinder(rr)
+            if idx == 0:
+                # Plot simulation of the original parameters
+                finder.simulate()
+                originalParameterXD = XDict.mkParameters(finder.roadrunner)
+                plot(finder, originalParameterXD, "Original Algorithm")
+                # Change the parameter values
+                initialParameterXD = XDict.mkParameters(rr)
+                initialParameterXD = XDict(initialParameterXD.keys(), 1)
+                # finder.setParameters(initialParameterXD)
+                plot(finder, initialParameterXD, "Initial Parameters")
+            # Find the parameters
+            feasibleParameterXD = finder.find()
+            if feasibleParameterXD is not None:
+                break
+        foundOscillations = plot(finder, feasibleParameterXD, "Initial Parameters")
+        writeResults(originalParameterXD, feasibleParameterXD)
+        #
+        return feasibleParameterXD, foundOscillations

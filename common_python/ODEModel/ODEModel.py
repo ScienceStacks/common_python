@@ -12,8 +12,11 @@ from common_python.sympy import sympyUtil as su
 
 import collections
 import copy
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from scipy import optimize
+import seaborn as sns
 import sympy
 
 X = "x"
@@ -227,7 +230,8 @@ class FixedPoint():
 
 class ODEModel():
 
-    def __init__(self, stateDct, initialDct=None, isEigenvecs=True, isFixedPoints=True, subs=None):
+    def __init__(self, stateDct, initialDct=None,
+          isEigenvecs=True, isFixedPoints=True, subs=None):
         """
         Parameters
         ----------
@@ -312,84 +316,6 @@ class ODEModel():
             subs = {}
         return [{k: su.evaluate(v, subs=subs) for k, v in f.valueDct.items()}
               for f in self.fixedPoints]
-
-    def findOscillations(self, parameterSyms, minImag=1.0, **kwargs):
-        """
-        Finds values of model parameters that result in oscillations
-        using the optimization "Minimize the real part of the Eigenvalue
-        subject to a constraint on the imaginary part."
-        Methods are:
-          'nelder-mead', 'powell', 'cg', 'bfgs', 'newton-cg', 'l-bfgs-b', 'tnc',
-           'cobyla', 'slsqp'
-
-        Parameters
-        ----------
-        parameters: list-str
-        minImag: minimum value of the imaginary part of the eigenvalue
-        kwargs: dict
-            optional arguments to scipy.optimize
-            default: method="nelder-mead"
-        
-        Returns
-        -------
-        FixedPoint
-            FixedPoint that has an eigenvalue meeting the criteria
-        dict
-            Dictionary of parameter values used to calculate FixedPoint
-        """
-        if len(kwargs) == 0:
-            kwargs["method"] = "nelder-mead"
-        method = kwargs["method"]
-        self._minReal = LARGE_REAL
-        self._bestFixedPoint = None
-        self._bestParameterDct = None
-        #
-        def mkValueDct(values):
-            return {s: v for s, v in zip(parameterSyms, values)}
-        #
-        def calcLoss(values):
-            """
-            Calculates eigenvalues for the parameter values provided.
-            Returns the squared real part of the eigenvalue with the largest
-            imaginary part.
-
-            Parameters
-            ----------
-            values: list-float
-                values that correspond to the parameters parameterSyms
-            
-            Returns
-            -------
-            float
-            """
-            dct = mkValueDct(values)
-            minReal = LARGE_REAL
-            # Find the best possibility of an oscillating eigenvector
-            for fixedPoint in self.fixedPoints:
-                newFixedPoint = fixedPoint.copy(subs=dct)
-                for entry in newFixedPoint.eigenEntries:
-                    real, imag = su.asRealImag(entry.value)
-                    absReal = np.abs(real)
-                    if imag < minImag:
-                        continue
-                    if absReal < minReal:
-                        minReal = absReal
-            # Update best found if needed
-            if minReal < self._minReal:
-                self._minReal = minReal
-                self._bestParameterDct = mkValueDct(values)
-                self._bestFixedPoint = newFixedPoint
-            return minReal
-        #
-        initialValues = np.repeat(1, len(parameterSyms))
-        if method in ('nelder-mead', 'powell', 'anneal', 'cobyla'):
-            jac = None
-        else:
-            jac = calcLoss
-        solution = optimize.minimize(calcLoss, initialValues, jac=jac,
-              tol=1e-5, **kwargs)
-        valueDct = mkValueDct(solution.x)
-        return self._bestFixedPoint, self._bestParameterDct
 
     @classmethod
     def mkODEModel(cls, roadrunner, **kwargs):
@@ -510,8 +436,36 @@ class ODEModel():
             for idx in range(numVec):
                 vec += solution[idx] * sympy.Matrix(nullspaceLst[idx])
             # Create the fixed point from the vector
-            fixedPointDcts.append({simpleSyms[n]: vec[n] for n in range(len(simpleSyms))})
+            fixedPointDcts.append({simpleSyms[n]: vec[n]
+                  for n in range(len(simpleSyms))})
         return fixedPointDcts
 
+    def plotJacobian(self, isPlot=True, subs={}):
+        """
+        Constructs a hetmap for the jacobian. The Jacobian must be purely
+        sumeric.
 
-
+        Parameters
+        ----------
+        """
+        mat = self.jacobianMat.subs(subs)
+        newMat = mat.subs(subs)
+        if len(newMat.free_symbols) != 0:
+            raise ValueError("Jacobian cannot have symbols.")
+        df = pd.DataFrame(newMat.tolist())
+        df.columns = [s.name for s in self.stateSymVec]
+        df.index = df.columns
+        df = df.applymap(lambda v: float(v))
+        # Scale the entries in the matrix
+        maxval = np.abs(df.max().max())
+        minval = df.min().min()
+        scale = max(maxval, np.abs(minval))
+        scaledDf = df / scale  # scale into [-1, 1]
+        # Plot
+        sns.heatmap(scaledDf)
+        plt.show()
+        
+        
+        
+        
+        import pdb; pdb.set_trace()

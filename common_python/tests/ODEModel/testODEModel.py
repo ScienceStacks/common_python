@@ -3,6 +3,7 @@ import common_python.ODEModel.constants as cn
 from common_python.ODEModel.ODEModel import ODEModel, FixedPoint, EigenEntry
 
 import itertools
+import matplotlib
 import numpy as np
 import os
 import pandas as pd
@@ -11,8 +12,8 @@ import tellurium as te
 import unittest
 
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 VARIABLES = "t A P M K_AN K_AM N Kd_A Kd_M K_MP K_PA k_0 K_MP kd_M X Y"
 su.addSymbols(VARIABLES, dct=globals())
 STATE_DCT = {
@@ -203,27 +204,6 @@ class TestODEModel(unittest.TestCase):
         newFixedPoint = self.model._calcFixedPoints(subs=subs)[0]
         self.assertTrue(fixedPointCopy.equals(newFixedPoint))
 
-    def testFindOscillationsNonePresent(self):
-        if IGNORE_TEST:
-            return
-        parameterSymbols = "K_AN K_AM K_PA K_MP rd_A"
-        parameterSymbols += " Kd_A Kd_M Kd_P K_Mp"
-        parameterSymbols += " k_0 M rd_M"
-        stateSymbols = "A M P"
-        symbols = parameterSymbols + " " + stateSymbols
-        su.addSymbols(symbols, dct=globals())
-        stateDct = {
-             A: K_AN * N - Kd_A * A * M,
-             P: K_PA * A - k_0,
-             M: K_MP * P - Kd_M * M,
-        }
-        stateDct = {s: e.subs(N, 1) for s, e in stateDct.items()}
-        model = ODEModel(stateDct)
-        parameterSyms = [eval(n) for n in parameterSymbols.split(" ")]
-        fixedPoint, valueDct = model.findOscillations(parameterSyms)
-        self.assertIsNone(fixedPoint)
-        self.assertIsNone(valueDct)
-
     def testMkODEModel(self):
         if IGNORE_TEST:
             return
@@ -231,11 +211,15 @@ class TestODEModel(unittest.TestCase):
         modelInfo = ODEModel.mkODEModel(rr, isEigenvecs=False, isFixedPoints=False)
         self.assertTrue(isinstance(modelInfo.mdl, ODEModel))
         
-
-    def testFindOscillationsPresent(self):
-        if IGNORE_TEST:
-            return
+    def testPlotJacobian(self):
+        # TESTING
+        subs = dict(SUBS)
+        subs[M] = 0.5
+        subs[A] = 2
+        self.model.plotJacobian(isPlot=IS_PLOT, subs=subs)
 
 
 if __name__ == '__main__':
+  if IS_PLOT:
+    matplotlib.use('TkAgg')
   unittest.main()
