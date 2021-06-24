@@ -8,8 +8,11 @@ from src.common.simple_sbml import SimpleSBML
 import collections
 import copy
 import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
 from scipy import optimize
+import seaborn as sns
+import tellurium as te
 
 
 LARGE_REAL = 1e6
@@ -132,8 +135,8 @@ class OscillationFinder():
         self.parameterNames = list(self.parameterXD.keys())
         self.simulationArr = None  # Results from last setSteadyState
         # Internal only
-        self._bestFixedPoint = None
         self._bestParameterXD = None
+        self.bestEigenvalue = None
         self._minReal = LARGE_REAL
 
     def setSteadyState(self, parameterXD=None):
@@ -199,7 +202,7 @@ class OscillationFinder():
         return np.linalg.eig(self.roadrunner.getFullJacobian())[0]
 
     def find(self, initialParameterXD=None, lowerBound=0, upperBound=1e3,
-          minImag=1.0, minReal=0.0, **kwargs):
+          minImag=0.1, minReal=0.0, maxReal=0.1, maxDeficiency=0.2, **kwargs):
         """
         Finds values of model parameters that result in oscillations
         using the optimization "Minimize the real part of the Eigenvalue
@@ -215,8 +218,17 @@ class OscillationFinder():
               lower bound for parameter search
         upperBound: float
               upper bound for parameter search
-        minImag: minimum value of the imaginary part of the eigenvalue
-        minReal: minimum value of real for feasibility
+        minImag: float
+             minimum value of the imaginary part of the eigenvalue
+             hard constraint
+        minReal: Float
+             minimum value of real for feasibility
+             soft constraint
+        maxReal: Float
+             maximum value of real for feasibility
+             soft constraint
+        maxDeficiency: Float
+             maximum deficiency to be acceptable
         kwargs: dict
             optional arguments to scipy.optimize
             default: method="nelder-mead"
@@ -256,9 +268,9 @@ class OscillationFinder():
                 float
                 """
                 real, imag = np.real(eigenvalue), np.imag(eigenvalue)
-                if (real > 0) and (np.isclose(imag, 0)):
+                if (imag < minImag):
                     return LARGE_REAL
-                deficiency = max(minReal - real, minImag - imag)
+                deficiency = max(minReal - real, real - maxReal)
                 return max(0, deficiency)
             #
             parameterXD = XDict(names=self.parameterNames, values=values)
@@ -266,7 +278,7 @@ class OscillationFinder():
             if eigenvalues is None:
                 return LARGE_REAL
             # See how close to meeting criteria
-            bestEigenvalue = None
+            self.bestEigenvalue = None
             bestDeficiency = LARGE_REAL
             for eigenvalue in eigenvalues:
                 deficiency = calcDeficiency(eigenvalue)
@@ -274,15 +286,14 @@ class OscillationFinder():
                     # Verify that these are simulateable parameters
                     self.simulate(parameterXD=parameterXD, endTime=MAX_ENDTIME)
                     if self.simulationArr is not None:
-                        bestEigenvalue = eigenvalue
+                        self.bestEigenvalue = eigenvalue
                         bestDeficiency = deficiency
                 if deficiency == 0:
                     break
             # Update best found if needed
-            if bestDeficiency == 0:
+            if bestDeficiency <= maxDeficiency:
                 self._bestParameterXD = XDict(self.parameterNames, values)
                 raise FeasibilityFoundException
-            #print(bestDeficiency)
             return bestDeficiency
         #
         self._minReal = LARGE_REAL
@@ -295,9 +306,11 @@ class OscillationFinder():
             _ = optimize.differential_evolution(_calcLoss, bounds, **kwargs)
         except FeasibilityFoundException:
             pass
+        # Determine if search was successful
         return self._bestParameterXD
 
-    def plot(self, title="", ylim=None, isPlot=True):
+    def plotTime(self, title="", ylim=None, isPlot=True,
+          startTime=0, endTime=None):
         """
         Plots the results of the last simulation.
 
@@ -305,10 +318,21 @@ class OscillationFinder():
         ----------
         isPlot: bool
         """
+        def findTimeIdx(value):
+            arr = (self.simulationArr[:, 0] - value)**2
+            minDiff = min(arr)
+            return arr.tolist().index(minDiff)
+        #
+        if endTime is None:
+            endTime = self.simulationArr[0, -1]
+        startIdx = findTimeIdx(startTime)
+        endIdx = findTimeIdx(endTime)
+        #
         _, ax = plt.subplots(1)
         numSpecies = len(self.simulationArr.colnames) - 1
         for idx in range(numSpecies):
-            ax.plot(self.simulationArr[:, 0], self.simulationArr[:, idx+1])
+            ax.plot(self.simulationArr[startIdx:endIdx, 0],
+                  self.simulationArr[startIdx:endIdx, idx+1])
         ax.legend(self.simulationArr.colnames[1:])
         ax.set_xlabel("time")
         ax.set_title(title)
@@ -318,10 +342,11 @@ class OscillationFinder():
             plt.show()
     
     @classmethod
-    def analyzeFile(cls, modelPath, outPath="analyzeFile.csv", numRestart=2, isPlot=True, **kwargs):
+    def analyzeFile(cls, modelPath, outPath="analyzeFile.csv",
+          numRestart=2, isPlot=True, **kwargs):
         """
         Finds parameters with oscillations for a single file.
-        Plots simulations for the initial and optimized parameters.
+        Plots simulations for the optimized parameters.
         
         Parameters
         ----------
@@ -331,7 +356,11 @@ class OscillationFinder():
         isPlot: bool
         outPath: str
             Saves results with file structured as:
-                modelID, originalParameterDct, newParameterDct, foundOscillations
+                modelID: str
+                originalParameterDct: dict as str
+                newParameterDct: dict as str
+                eigenvalue: complex
+                foundOscillations: bool
         kwargs: dict
             parameters passed to plot
         
@@ -351,12 +380,15 @@ class OscillationFinder():
             return "%s: %s" % (modelId, string)
         #
         def writeResults(originalParameterXD, feasibleParameterXD,
-              foundOscillations):
-            line = "%s, %s, %s, %s" % (
+              eigenvalue, foundOscillations):
+            real, imag = eigenvalue.real, eigenvalue.imag
+            line = "\n%s, '%s', '%s', %3.2f + %3.2fj %s" % (
                   modelId, str(originalParameterXD), 
-                        str(feasibleParameterXD), sr(foundOscillations))
+                        str(feasibleParameterXD),
+                        real, imag,
+                        str(foundOscillations))
             with open(outPath, "a") as fd:
-                fd.writeline(line)
+                fd.writelines(line)
         #
         def plot(finder, parameterXD, title):
             if not isPlot:
@@ -365,7 +397,7 @@ class OscillationFinder():
             if parameterXD is not None:
                 finder.simulate(parameterXD=parameterXD, endTime=100)
                 if finder.simulationArr is not None:
-                    finder.plot(title=mkTitle(title), isPlot=isPlot)
+                    finder.plotTime(title=mkTitle(title), isPlot=isPlot)
                     isPlotted = True
             if not isPlotted:
                 msg = "No simulation produced for parameters of %s!" % title
@@ -380,16 +412,132 @@ class OscillationFinder():
                 finder.simulate()
                 originalParameterXD = XDict.mkParameters(finder.roadrunner)
                 plot(finder, originalParameterXD, "Original Algorithm")
-                # Change the parameter values
-                initialParameterXD = XDict.mkParameters(rr)
-                initialParameterXD = XDict(initialParameterXD.keys(), 1)
-                # finder.setParameters(initialParameterXD)
-                plot(finder, initialParameterXD, "Initial Parameters")
+                if False:
+                    # Change the parameter values
+                    initialParameterXD = XDict.mkParameters(rr)
+                    initialParameterXD = XDict(initialParameterXD.keys(), 1)
+                    # finder.setParameters(initialParameterXD)
+                    plot(finder, initialParameterXD, "Initial Parameters")
             # Find the parameters
-            feasibleParameterXD = finder.find()
+            feasibleParameterXD = finder.find(minReal=0.0)
             if feasibleParameterXD is not None:
                 break
-        foundOscillations = plot(finder, feasibleParameterXD, "Initial Parameters")
-        writeResults(originalParameterXD, feasibleParameterXD)
+        foundOscillations = plot(finder, feasibleParameterXD,
+              "Optimized Parameters")
+        writeResults(originalParameterXD, feasibleParameterXD,
+              finder.bestEigenvalue,
+              foundOscillations is not None)
         #
         return feasibleParameterXD, foundOscillations
+
+    def plotJacobian(self, fig=None, ax=None, isPlot=True, isLabel=True, title="",
+        **kwargs):
+        """
+        Constructs a hetmap for the jacobian. The Jacobian must be purely
+        sumeric.
+
+        Parameters
+        ----------
+        isPlot: bool
+        ax: Matplotlib.axes
+        isLabel: bool
+            include labels
+        kwargs: dict
+            optional keywords for heatmap
+        """
+        try:
+            self.roadrunner.getSteadyStateValues()
+            mat = self.roadrunner.getFullJacobian()
+        except RuntimeError:
+            return
+        colnames = mat.colnames
+        rownames = list(colnames)
+        df = pd.DataFrame(mat)
+        if isLabel:
+            df.columns = colnames
+            df.index = rownames
+        else:
+            df.columns = np.repeat("", len(df.columns))
+            df.index = np.repeat("", len(df.columns))
+        df = df.applymap(lambda v: float(v))
+        # Scale the entries in the matrix
+        maxval = df.max().max()
+        minval = df.min().min()
+        maxabs = max(np.abs(maxval), np.abs(minval))
+        # Plot
+        if ax is None:
+            fig, ax = plt.subplots(1)
+        sns.heatmap(df, cmap='seismic', ax=ax, vmin=-maxabs, vmax=maxabs,
+              **kwargs)
+        #ax.text(0.9, 0.5, title)
+        ax.set_title(title)
+        if isPlot:
+            plt.show()
+
+    @classmethod
+    def plotJacobians(cls, antimonyPaths, isPlot=True, numRowCol=None,
+          figsize=(12, 10), **kwargs):
+        """
+        Constructs heatmaps for the Jacobians for a list of files.
+
+        Parameters
+        ----------
+        antimonyPaths: list-str
+            Each path name has the form *Model_<id>.ant.
+        numRowCol: (int, int)
+        kwargs: dict
+            Passed to plotter for each file
+        """
+        if "isPlot" in kwargs:
+            del kwargs["isPlot"]
+        def mkTitle(path, string):
+            start = path.index("Model_") + len("Model_")
+            end = path.index(".ant")
+            prefix = path[start:end]
+            if len(string) == 0:
+                title = "%s" % prefix
+            else:
+                title = "%s: %s" % (prefix, string)
+            return title
+        #
+        numPlot = len(antimonyPaths)
+        if numRowCol is None:
+            numRow = np.sqrt(numPlot)
+            if int(numRow) < numRow:
+                numRow = int(numRow) + 1
+            else:
+                numRow = int(numRow)
+            numCol = numRow
+        else:
+            numRow = numRowCol[0]
+            numCol = numRowCol[1]
+        fig, axes = plt.subplots(numRow, numCol, figsize=figsize)
+        countPlot = 1
+        for irow in range(numRow):
+            for icol in range(numCol):
+                if countPlot > numPlot:
+                    break
+                # Colorbar
+                if (irow == 0) and (icol == numCol - 1):
+                    cbar = True
+                else:
+                    cbar = False
+                # Labels
+                if (irow == numRow - 1)  and (icol == 0):
+                    isLabel = True
+                else:
+                    isLabel = False
+                # Construct plot
+                antimonyPath = antimonyPaths[countPlot-1]
+                roadrunner = te.loada(str(antimonyPath))
+                #title = mkTitle(antimonyPath, "")
+                title = str(countPlot - 1)
+                # Construct the ODEModel and do the plot
+                finder = cls(roadrunner)
+                finder.plotJacobian(isPlot=False, ax=axes[irow, icol],
+                      isLabel=isLabel, title=title, cbar=cbar,  fig=fig,
+                      cbar_kws=dict(use_gridspec=False,location="top"),
+                      **kwargs)
+                countPlot += 1
+        if isPlot:
+            plt.show()

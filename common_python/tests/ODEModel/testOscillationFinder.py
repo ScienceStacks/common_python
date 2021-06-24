@@ -10,7 +10,7 @@ import unittest
 IGNORE_TEST = False
 IS_PLOT = False
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
-ANTIMONY_FILE = os.path.join(TEST_DIR, "antimony.ant")
+ANTIMONY_FILE = os.path.join(TEST_DIR, "Model_antimony.ant")
 BIG_ANTIMONY_FILE = os.path.join(TEST_DIR, "bigAntimony.ant")
 DCT = {'a': 1, 'b': 2}
 
@@ -110,13 +110,13 @@ class TestOscillationFinder(unittest.TestCase):
         self.assertFalse(speciesXD.equals(fp))
         self.assertGreater(fp["S1"], fp["S0"])
         self.assertGreater(fp["S2"], fp["S1"])
-        self.finder.plot(title="title", isPlot=IS_PLOT, ylim=[0, 10])
+        self.finder.plotTime(title="title", isPlot=IS_PLOT, ylim=[0, 10])
 
     def testSimulate(self):
         if IGNORE_TEST:
             return
         self.finder.simulate()
-        self.finder.plot(isPlot=IS_PLOT)
+        self.finder.plotTime(isPlot=IS_PLOT)
         #
         parameterXD = self.mkParameterXD(1)
         self.finder.simulate(parameterXD=parameterXD)
@@ -146,6 +146,13 @@ class TestOscillationFinder(unittest.TestCase):
             self.finder.plot()
         self.assertFalse(initialParameterXD.equals(feasibleParameterXD))
 
+    def testPlotTime(self):
+        if IGNORE_TEST:
+            return
+        self.finder.simulate(endTime=200)
+        self.finder.plotTime(startTime=1, endTime=5, isPlot=IS_PLOT)
+        self.finder.plotTime(startTime=90, endTime=100, isPlot=IS_PLOT)
+
     def testFindBig(self):
         if IGNORE_TEST:
             return
@@ -156,7 +163,25 @@ class TestOscillationFinder(unittest.TestCase):
         finder.setParameters(initialParameterXD)
         # Find a feasible solution
         feasibleParameterXD = finder.find()
+        self.assertIsNotNone(feasibleParameterXD)
         self.assertFalse(initialParameterXD.equals(feasibleParameterXD))
+
+    def testPlotJacobian(self):
+        if IGNORE_TEST:
+            return
+        self.finder.plotJacobian(isPlot=IS_PLOT)
+        self.finder.plotJacobian(cbar=False, isPlot=IS_PLOT)
+
+    def testPlotJacobians(self):
+        if IGNORE_TEST:
+            return
+        files = np.repeat(ANTIMONY_FILE, 4)
+        self.finder.plotJacobians(files, isPlot=IS_PLOT)
+
+    def testAnalyzeFile(self):
+        if IGNORE_TEST:
+            return
+        OscillationFinder.analyzeFile(ANTIMONY_FILE, numRestart=0, isPlot=IS_PLOT)
 
 
 if __name__ == '__main__':

@@ -440,32 +440,83 @@ class ODEModel():
                   for n in range(len(simpleSyms))})
         return fixedPointDcts
 
-    def plotJacobian(self, isPlot=True, subs={}):
+    def plotJacobian(self, isPlot=True, ax=None, isLabel=True, title=""):
         """
         Constructs a hetmap for the jacobian. The Jacobian must be purely
         sumeric.
 
         Parameters
         ----------
+        isPlot: bool
+        ax: Matplotlib.axes
+        subs: dict
+        isLabel: bool
+            include labels
         """
         mat = self.jacobianMat.subs(subs)
         newMat = mat.subs(subs)
         if len(newMat.free_symbols) != 0:
             raise ValueError("Jacobian cannot have symbols.")
         df = pd.DataFrame(newMat.tolist())
-        df.columns = [s.name for s in self.stateSymVec]
-        df.index = df.columns
+        if isLabel:
+            df.columns = [s.name for s in self.stateSymVec]
+            df.index = df.columns
         df = df.applymap(lambda v: float(v))
         # Scale the entries in the matrix
-        maxval = np.abs(df.max().max())
+        maxval = df.max().max()
         minval = df.min().min()
-        scale = max(maxval, np.abs(minval))
-        scaledDf = df / scale  # scale into [-1, 1]
+        maxabs = max(np.abs(maxval), np.abs(minval))
         # Plot
-        sns.heatmap(scaledDf)
-        plt.show()
-        
-        
-        
-        
-        import pdb; pdb.set_trace()
+        if ax is None:
+            _, ax = plt.subplots(1)
+        sns.heatmap(df, cmap='seismic', ax=ax, vmin=-maxabs, vmax=maxabs)
+        ax.set_title(title)
+        if isPlot:
+            plt.show()
+
+    @classmethod
+    def plotJacobians(cls, antimonyPaths, **kwargs):
+        """
+        Constructs heatmaps for the Jacobians for a list of files.
+
+        Parameters
+        ----------
+        antimonyPaths: list-str
+            Each path name has the form *Model_<id>.ant.
+        kwargs: dict
+            Passed to plotter for each file
+        """
+        def mkTitle(string):
+            start = path.index("Model_") + len("Model_")
+            end = path.index(".ant")
+            prefix = path[start:end]
+            if len(string) == 0:
+                return "%s" % prefix
+            else:
+                return "%s: %s" % (prefix, string)
+            return "%s: %s" % (prefix, string)
+        #
+        numPlot = len(antimonyPaths)
+        numRow = np.sqrt(numPlot)
+        if int(numRow) < numRow:
+            numRow = int(numRow) + 1
+        else:
+            numRow = int(numRow)
+        fig, axes = plt.subplots(numRow, numRow)
+        countPlot = 1
+        for irow in range(numRow):
+            for icol in range(numcol):
+                if countPlot > numPlot:
+                    break
+                antimonyPath = antimonyPaths[countPlot]
+                roadrunner = te.loada(antimonyPath)
+                title = mkTitle("")
+                # Create the substitutions for floating species, fixed speceis, and parameters
+                # TODO:
+                # Construct the ODEModel and do the plot
+                odeModel = ODEModel.mkODEModel(roadrunner,
+                      isEigenvecs=False, isFixedPoints=False)
+                odeModel.plotJacobian(isPlot=True, ax=axes[irow, icol], subs=subs,
+                      isLabel=False, title=mkTitle(antimonyPath), **kwargs)
+                countPlot += 1
+                
