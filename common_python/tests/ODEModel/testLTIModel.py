@@ -26,6 +26,8 @@ IMG_MAT = sympy.Matrix([ [1, 2], [-10, 1]])
 class TestLTIModel(unittest.TestCase):
 
     def setUp(self):
+        if IGNORE_TEST:
+            return
         self.init()
         aMat = sympy.Matrix([ [   0,    0,          0,  0],
                               [   1,  -(k0 + k2),   0,  0], 
@@ -123,12 +125,24 @@ class TestLTIModel(unittest.TestCase):
         model = LTIModel(aMat, initialVec)
         model.plot(0, 5, 100, subs={k0:1, k1: 1, k2: 2, k3: 3}, isPlot=IS_PLOT)
 
-    def testPlot(self):
+    def testPlot1(self):
         if IGNORE_TEST:
             return
         subs = dict(SUBS)
         del subs[t]
         self.model.plot(0, 10, 100, subs, isPlot=IS_PLOT, ylabel="values")
+
+    def testPlot2(self):
+        if IGNORE_TEST:
+            return
+        su.addSymbols("X Y Z k1 k2")
+        aMat = sympy.Matrix([ [0, 0, 0, 0], [1, -(1 + k2), 0, 0],
+              [0, 1, -k1, 0], [0, k2, k1, -1]])
+        initialVec = sympy.Matrix([1, 0, 0, 0])
+        model = LTIModel(aMat, initialVec)
+        model.solve()
+        subs = {k0: 1, k1: 1, k2: 3}
+        model.plot(0, 10, 100, subs=subs, isPlot=IS_PLOT)
 
 
 

@@ -750,4 +750,36 @@ def mkQuadraticRelaxation(systemDct):
           vec=extendedStateVec,
           )
     return linearizedDct, subs
+
+def isIterable(obj):
+    try:
+        [_ for _ in obj]
+        return True
+    except TypeError:
+        return False
+
+def findRecursive(epr, sym):
+    """
+    Recursively looks for symbol in epression.
+
+    Parameters
+    ----------
+    epr: epression
+    sym: symbol
     
+    Returns
+    bool
+    -------
+    """
+    # Handle iterable
+    if isIterable(epr):
+        return any([findRecursive(a, sym) for a in epr])
+    # Handle an epression
+    if "args" in dir(epr):
+        if str(epr) == str(sym):
+            return True
+        if sym in epr.args:
+            return True
+        return any([findRecursive(a, sym) for a in epr.args])
+    # Handle other cases
+    return str(epr) == str(sym)

@@ -165,10 +165,15 @@ class LTIModel():
         # Plot the results
         labels = ["x_%d" % n for n in range(len(vec))]
         _, ax = plt.subplots(1)
+        legends = []
         for idx in range(len(vec)):
             yvals = [arr[idx] for arr in arrs]
-            ax.plot(tVals, yvals)
-        ax.legend(labels)
+            if not su.findRecursive(yvals, sympy.zoo):
+                legends.append(labels[idx])
+                ax.plot(tVals, yvals)
+            else:
+                print("Invalid value for %s" % labels[idx])
+        ax.legend(legends)
         ax.set_xlabel("time")
         ax.set_ylabel(ylabel)
         ax.set_title(title)

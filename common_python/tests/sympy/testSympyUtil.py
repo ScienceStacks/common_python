@@ -282,6 +282,19 @@ class TestFunctions(unittest.TestCase):
         for sym, epr in systemDct.items():
             self.assertEqual(result[sym], epr)
 
+    def testFindRecursive(self):
+        if IGNORE_TEST:
+            return
+        su.addSymbols("S0 k1")
+        self.assertTrue(su.findRecursive(sympy.Matrix([1, 2, sympy.zoo]), sympy.zoo))
+        self.assertTrue(su.findRecursive(S0 * k1, k1))
+        self.assertTrue(su.findRecursive([S0, S0 * k1], k1))
+        self.assertTrue(su.findRecursive(sympy.Matrix([S0, S0 * k1]), k1))
+        epr = sympy.Matrix([S0, S0 * k1])
+        epr = sympy.Matrix([epr, epr, epr])
+        self.assertTrue(su.findRecursive(epr, k1))
+        self.assertTrue(su.findRecursive(sympy.zoo * k1, sympy.zoo))
+
 
 if __name__ == '__main__':
   unittest.main()
