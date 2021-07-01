@@ -774,7 +774,7 @@ def findRecursive(epr, sym):
     # Handle iterable
     if isIterable(epr):
         return any([findRecursive(a, sym) for a in epr])
-    # Handle an epression
+    # Handle an expression
     if "args" in dir(epr):
         if str(epr) == str(sym):
             return True
