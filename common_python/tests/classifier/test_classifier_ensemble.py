@@ -18,8 +18,8 @@ from sklearn import svm
 import numpy as np
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 SIZE = 10
 ITERATIONS = 3
 values = list(range(SIZE))
@@ -280,6 +280,12 @@ class TestClassifierEnsemble(unittest.TestCase):
         self.df_X, self.ser_y)
     test(prob_short)
     self.assertGreater(prob_short, prob_long)
+
+  def testCrossValidate(self):
+    # TESTING
+    accuracy = crossValidate(cls, self, num_holdout=5, num_iter=10,
+        num_iter=20, filter_high_rank=15)
+    import pdb; pdb.set_trace()
      
 
 if __name__ == '__main__':

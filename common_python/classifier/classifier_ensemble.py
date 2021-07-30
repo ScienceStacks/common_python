@@ -416,3 +416,58 @@ class ClassifierEnsemble(ClassifierCollection):
     if not exporter.isExist():
       raise ValueError
     return exporter.get()
+
+  @classmethod
+  def crossValidate(cls, trinary_data, num_holdout=5, num_iter=10, **kwargs):
+    """
+    Cross validates with the specified number of holdouts. Returns
+    an overall accuracy calculation based on exact matches with
+    classes.
+    
+    Parameters
+    ----------
+    trinary_data: TrinaryData
+        df_X, ser_y
+    num_holdout: int
+    num_iter: int
+        number of cross validation iterations (folds)
+    kwargs: dict
+        arguments from constructor
+        
+    Returns
+    -------
+    float: accuracy
+    """
+    def dropIndices(df, indices):
+        """
+        Drops the indices from the dataframe or series.
+        """
+        df_result = df.copy()
+        sorted_indices = list(indices)
+        sorted_indices.sort()
+        sorted_indices.reverse()
+        for idx in sorted_indices:
+            df_result = df_result.drop(idx, axis=0)
+        return df_result
+    #
+    svm_ensemble = cls(ClassifierDescriptorSVM(), **kwargs)
+        #filter_high_rank=15, size=30
+    total_correct = 0
+    indices = list(trinary_data.df_X.index)
+    length = len(indices)
+    for _ in range(num_iter):
+        # Find the holdouts
+        random_positions = np.random.permutation(range(length))
+        holdout_idxs = [indices[n] for n in random_positions[:num_holdout]]
+        # Fit
+        #df_X.columns = data.features
+        df_X = dropIndices(trinary_data.df_X, holdout_idxs)
+        ser_y = dropIndices(trinary_data.ser_y, holdout_idxs)
+        svm_ensemble.fit(df_X, ser_y)
+        # Evaluate
+        df = pd.DataFrame(trinary_data.df_X.loc[holdout_idxs, :])
+        df_pred = svm_ensemble.predict(df)
+        for idx in holdout_idxs:
+            true_cls = trinary_data.ser_y.loc[idx]
+            total_correct += df_pred.loc[idx, true_cls]
+    return total_correct/(num_iter*num_holdout)
