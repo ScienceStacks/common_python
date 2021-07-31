@@ -429,6 +429,7 @@ class ClassifierEnsemble(ClassifierCollection):
     trinary_data: TrinaryData
         df_X, ser_y
     num_holdout: int
+        number of holdouts for each class
     num_iter: int
         number of cross validation iterations (folds)
     kwargs: dict
@@ -450,24 +451,39 @@ class ClassifierEnsemble(ClassifierCollection):
             df_result = df_result.drop(idx, axis=0)
         return df_result
     #
+    def getClasses(indices=None):
+      """
+      Returns the list of classes for the indices.
+      """
+      if indices is None:
+        indices = list(trinary_data.ser_y.index)
+      return list(set(trinary_data.ser_y.loc[indices]))
+    #
     svm_ensemble = cls(ClassifierDescriptorSVM(), **kwargs)
-        #filter_high_rank=15, size=30
+    all_classes = getClasses()
     total_correct = 0
-    indices = list(trinary_data.df_X.index)
-    length = len(indices)
     for _ in range(num_iter):
-        # Find the holdouts
-        random_positions = np.random.permutation(range(length))
-        holdout_idxs = [indices[n] for n in random_positions[:num_holdout]]
-        # Fit
-        #df_X.columns = data.features
-        df_X = dropIndices(trinary_data.df_X, holdout_idxs)
-        ser_y = dropIndices(trinary_data.ser_y, holdout_idxs)
-        svm_ensemble.fit(df_X, ser_y)
-        # Evaluate
-        df = pd.DataFrame(trinary_data.df_X.loc[holdout_idxs, :])
-        df_pred = svm_ensemble.predict(df)
-        for idx in holdout_idxs:
-            true_cls = trinary_data.ser_y.loc[idx]
-            total_correct += df_pred.loc[idx, true_cls]
-    return total_correct/(num_iter*num_holdout)
+      # Select holdouts for each class
+      holdout_idxs = []
+      for cls in all_classes:
+        cls_ser = trinary_data.ser_y[trinary_data.ser_y == cls]
+        cls_idxs = list(cls_ser.index)
+        if num_holdout >= len(cls_idxs):
+          raise ValueError("Not enough samples in class %s for %d holdouts!"
+              % (cls, num_holdout))
+        # Choose holdouts
+        random_positions = np.random.permutation(range(len(cls_idxs)))
+        [holdout_idxs.append(cls_idxs[n])
+            for n in random_positions[:num_holdout]]
+      # Fit
+      df_X = dropIndices(trinary_data.df_X, holdout_idxs)
+      ser_y = dropIndices(trinary_data.ser_y, holdout_idxs)
+      svm_ensemble.fit(df_X, ser_y)
+      # Evaluate
+      df = pd.DataFrame(trinary_data.df_X.loc[holdout_idxs, :])
+      df_pred = svm_ensemble.predict(df)
+      for idx in holdout_idxs:
+          true_cls = trinary_data.ser_y.loc[idx]
+          total_correct += df_pred.loc[idx, true_cls]
+    accuracy = total_correct/(num_holdout*num_iter*len(all_classes))
+    return accuracy

@@ -18,8 +18,8 @@ from sklearn import svm
 import numpy as np
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 SIZE = 10
 ITERATIONS = 3
 values = list(range(SIZE))
@@ -282,10 +282,16 @@ class TestClassifierEnsemble(unittest.TestCase):
     self.assertGreater(prob_short, prob_long)
 
   def testCrossValidate(self):
-    # TESTING
-    accuracy = crossValidate(cls, self, num_holdout=5, num_iter=10,
-        num_iter=20, filter_high_rank=15)
-    import pdb; pdb.set_trace()
+    if IGNORE_TEST:
+      return
+    self._init()
+    accuracies = []
+    for rank in [1, 3, 15]:
+      accuracy = self.svm_ensemble.crossValidate(self, num_holdout=1,
+          num_iter=10, filter_high_rank=rank)
+      accuracies.append(accuracy)
+    for idx in range(len(accuracies) - 1):
+      self.assertLessEqual(accuracies[idx], accuracies[idx+1])
      
 
 if __name__ == '__main__':
