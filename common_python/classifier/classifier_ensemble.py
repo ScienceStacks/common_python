@@ -216,7 +216,7 @@ class ClassifierEnsemble(ClassifierCollection):
     """
     Constructs a dataframe of feature ranks for importance,
     where the rank is the feature order of importance.
-    A more important feature has a lower rank (closer to 0)
+    A more important feature has a lower rank (closer to 1)
     :param int class_selection: restrict analysis to a single class
     :return pd.DataFrame: columns are cn.MEAN, cn.STD, cn.STERR
     """

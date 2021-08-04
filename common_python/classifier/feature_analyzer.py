@@ -614,10 +614,3 @@ if __name__ == '__main__':
       type=str)
   args = parser.parse_args()
   reserialize({1: args.path})
-
-
-
-
-
-
-

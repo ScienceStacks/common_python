@@ -18,8 +18,8 @@ from sklearn import svm
 import numpy as np
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 SIZE = 10
 ITERATIONS = 3
 values = list(range(SIZE))
@@ -98,7 +98,7 @@ class TestClassifierEnsemble(unittest.TestCase):
     holdouts = 1
     self.svm_ensemble = ClassifierEnsemble(
         ClassifierDescriptorSVM(),
-    #    filter_high_rank=15,
+        filter_high_rank=15,
         size=SIZE, holdouts=holdouts)
     self.classifier_ensemble_random = ClassifierEnsemble(
         ClassifierDescriptorRandom(),
@@ -140,9 +140,10 @@ class TestClassifierEnsemble(unittest.TestCase):
     test(10)
 
   def testOrderFeatures(self):
-    if IGNORE_TEST:
-      return
+    # TESTING
+    self._init()
     self.svm_ensemble.fit(self.df_X, self.ser_y)
+    import pdb; pdb.set_trace()
     clf = self.svm_ensemble.clfs[0]
     #
     def test(class_selection):

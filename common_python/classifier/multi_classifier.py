@@ -1,6 +1,7 @@
 """
 Classifier for data with multiple classes using
-a base classifier.
+a base classifier that is copied to instantiate
+a separate classifier for each class.
 The classifier is provided with features for
 each class.
 
@@ -62,6 +63,7 @@ class MultiClassifier(object):
     self.classes = ser_y.unique()
     columns = df_X.columns.tolist()
     if self._feature_dct is None:
+      # By default, all columns are used for the features of a class.
       self._feature_dct = {c: columns for c in self.classes}
     # Do fit for each class using class specific features
     for cls in self.classes:

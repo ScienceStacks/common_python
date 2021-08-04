@@ -480,7 +480,7 @@ class FeatureSetCollection(object):
       fset_selector:typing.Callable=lambda f: True,
       is_include_neg:bool=True, **kwargs):
     """
-    Plots the results of a feature vector evaluation.
+    Constructs metrics for a feature vector evaluation.
 
     Parameters
     ----------
