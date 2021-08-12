@@ -30,7 +30,7 @@ MAX_SL = 1
 ############ FUNCTIONS #################
 def disjointify(ser_fset, min_score=MIN_SCORE):
   """
-  Makes disjoint the feature sets disjoint by discarding
+  Makes the feature sets disjoint by discarding
   feature sets that have non-null intersection with a
   more accurate feature set.
 
@@ -200,6 +200,25 @@ class FeatureSetCollection(object):
     -------
     pd.Series
     """
+    if self._ser_comb is None:
+      self._ser_comb = _mkSerComb()
+    return self._ser_comb
+
+  def _mkSerComb(self, max_size=None, max_search=None):
+    """
+    Creates feature sets up to a maximum size.
+
+    Parameters
+    ----------
+    max_size: int
+        Maximum size of the feature set collection
+    max_search: int
+        Maximum number of feature sets searched
+
+    Returns
+    -------
+    pd.Series
+    """
     def update(fset):
       """
       Refines the feature set and updates data.
@@ -215,50 +234,64 @@ class FeatureSetCollection(object):
           process_dct[feature] = score
       return
     #
-    if self._ser_comb is None:
-      ser = self.disjointify(min_score=self._min_score)
-      process_dct = ser.to_dict()
-      result_dct = {}
-      #
-      def getScore(fset):
-        # Gets the score for an fset
-        return process_dct[fset.str]
-      # Iteratively consider combinations of fsets
-      while len(process_dct) > 0:
-        cur_fset = FeatureSet(list(process_dct.keys())[0])
-        cur_score = process_dct[cur_fset.str]
-        if len(process_dct) == 1:
-          if cur_score >= self._min_score:
-            update(cur_fset)
-          if len(process_dct) <= 2:
-            del process_dct[cur_fset.str]
-            break
-        #
-        del process_dct[cur_fset.str]
-        # Look for a high accuracy feature set
-        is_changed = False
-        for other_fset_stg in process_dct.keys():
-          other_fset = FeatureSet(other_fset_stg)
-          new_fset = FeatureSet(
-              cur_fset.set.union(other_fset.set))
-          new_score = self._analyzer.score(new_fset.set)
-          old_score =  max(cur_score, getScore(other_fset))
-          if new_score < old_score*MIN_FRAC_INCR:
-            continue
-          if new_score < self._min_score:
-            continue
-          # The new feature set improves the classifier
-          # Add the new feature; delete the old ones
-          process_dct[new_fset.str] = new_score
-          del process_dct[other_fset.str]
-          is_changed = True
-          break
-        if not is_changed:
+    def getScore(fset):
+      # Gets the score for an fset
+      return process_dct[fset.str]
+    #
+    if self._ser_comb is not None:
+      ser_comb = self._ser_comb.copy()
+    else:
+      ser_comb = pd.Series(dtype=float)
+    #
+    if max_size is not None:
+      if len(ser_comb) >= max_size:
+        return ser_comb
+    ser = self.disjointify(min_score=self._min_score)
+    process_dct = ser.to_dict()
+    result_dct = {}
+    #
+    # Iteratively consider combinations of fsets
+    while len(process_dct) > 0:
+      if len(result_dct) >= max_size:
+        break
+      cur_fset = FeatureSet(list(process_dct.keys())[0])
+      cur_score = process_dct[cur_fset.str]
+      if len(process_dct) == 1:
+        if cur_score >= self._min_score:
           update(cur_fset)
-      self._ser_comb = pd.Series(result_dct)
-      self._ser_comb = self._ser_comb.sort_values(
-          ascending=False)
-    return self._ser_comb
+        if len(process_dct) <= 2:
+          del process_dct[cur_fset.str]
+          break
+      #
+      del process_dct[cur_fset.str]
+      # Look for a high accuracy feature set
+      is_changed = False
+      if max_search is None:
+          max_search = len(process_dct)
+      for idx in range(max_search):
+        other_fset_stg = list(process_dct.keys())[idx]
+        other_fset = FeatureSet(other_fset_stg)
+        new_fset = FeatureSet(
+            cur_fset.set.union(other_fset.set))
+        new_score = self._analyzer.score(new_fset.set)
+        old_score =  max(cur_score, getScore(other_fset))
+        if new_score < old_score*MIN_FRAC_INCR:
+          continue
+        if new_score < self._min_score:
+          continue
+        # The new feature set improves the classifier
+        # Add the new feature; delete the old ones
+        process_dct[new_fset.str] = new_score
+        del process_dct[other_fset.str]
+        is_changed = True
+        break
+      if not is_changed:
+        update(cur_fset)
+    #
+    ser_comb = pd.Series(result_dct)
+    if len(ser_comb) < 0:
+      ser_comb = self._ser_comb.sort_values(ascending=False)
+    return ser_comb
 
   def disjointify(self, **kwargs):
     """

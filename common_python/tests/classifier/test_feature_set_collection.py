@@ -84,6 +84,17 @@ class TestFeatureSetCollection(unittest.TestCase):
         in f for f in ser.index]
     self.assertTrue(any(some_true))
 
+  def test_mkSerComb(self):
+    if IGNORE_TEST:
+      return
+    self.collection._ser_comb = None
+    self.collection._min_score = 0.6
+    max_size = 2
+    ser = self.collection._mkSerComb(max_size=max_size, max_search=10)
+    self.assertEqual(len(ser), max_size)
+    trues = [v >= 0.7 for v in ser.to_numpy()]
+    self.assertTrue(all(trues))
+
   def test_ser_sbfset(self):
     if IGNORE_TEST:
       return
