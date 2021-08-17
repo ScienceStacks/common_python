@@ -29,6 +29,7 @@ RANDOM_FOREST_DEFAULT_DCT = {
     "min_impurity_decrease": 0.01,
     "min_samples_leaf": 5,
     }
+TREE_UNDEFINED = -2
 
 FeatureVectorStatistic = collections.namedtuple("FeatureVectorStatistic",
     "sl cnt pos")
@@ -96,11 +97,11 @@ class CaseManager:
     self._forest = None  # Random forest used to construct cases
     self._df_case = None  # Dataframe representation of cases
     self._features = list(df_X.columns)
-    self._min_num_sample = np.log10(self._max_sl)/np.log10(binomial_prob)
     self.cases = None  # Cases constructed during by calling build
     total_sample = len(self._ser_y)
-    prior_prob = sum(self._ser_y) / total_sample
-    self._binom = BinomialDistribution(total_sample, prior_prob)
+    self._prior_prob = sum(self._ser_y) / total_sample
+    self._binom = BinomialDistribution(total_sample, self._prior_prob)
+    self._min_num_sample = np.log10(self._max_sl)/np.log10(self._prior_prob)
 
   def _getCompatibleFeatureValues(self, feature, value_ub=None):
     """
@@ -117,8 +118,11 @@ class CaseManager:
     -------
     list-float
     """
-    values = self._df_X.loc[:, feature]
-    value_sub = list(set([v for v in values if v <= value_ub]))
+    values = self._df_X.loc[:, feature].to_list()
+    if value_ub is None:
+      value_sub = values
+    else:
+      value_sub = list(set([v for v in values if v <= value_ub]))
     value_sub.sort()
     return value_sub
 
@@ -136,7 +140,7 @@ class CaseManager:
     """
     indices = set(self._df_X.index)
     for feature, value in feature_vector.dict.items():
-      these_indices = self._df_X[df_X[feature] == value].index
+      these_indices = self._df_X[self._df_X[feature] == value].index
       indices = indices.intersection(these_indices)
     return list(indices)
 
@@ -219,6 +223,7 @@ class CaseManager:
           fv_statistic = self._getFeatureVectorStatistic(new_feature_vector)
           if fv_statistic.cnt < self._min_num_sample:
             continue
+          import pdb; pdb.set_trace()
           if np.abs(fv_statistic.sl) < self._max_sl:
             # Statistically significant FeatureVector is a Case.
             new_cases.append(Case(new_feature_vector, fv_statistic,
@@ -230,7 +235,7 @@ class CaseManager:
         return new_cases
       #
       # Check for termination of this recursion
-      if dtree.tree_.feature[node] == _dtree.TREE_UNDEFINED:
+      if dtree.tree_.feature[node] == TREE_UNDEFINED:
         return []
       # Initialize this recursion
       feature_dct = {}
@@ -238,11 +243,11 @@ class CaseManager:
         feature_dct = feature_vector.dict
       # Process the node
       feature_name = self._features[dtree.tree_.feature[node]]
-      threshold = dtree.tree_.threshold_[node]
-      feature_values_all = [self._getCompatibleFeatureValues(feature_name,
-          value_ub=None)]
-      feature_values_left = [self._getCompatibleFeatureValues(feature_name,
-          value_ub=threshold)]
+      threshold = dtree.tree_.threshold[node]
+      feature_values_all = list(set(self._getCompatibleFeatureValues(
+          feature_name, value_ub=None)))
+      feature_values_left = list(set(self._getCompatibleFeatureValues(
+          feature_name, value_ub=threshold)))
       feature_values_right = list(set(feature_values_all).difference(
           feature_values_left))
       import pdb; pdb.set_trace()
