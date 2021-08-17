@@ -45,6 +45,7 @@ SEPARATORS = ["[", "]"]  # Separators for index values
 MIN_COUNT = 3  # Minimum number of cases selected to
                # consider the classification inferred
                # by a case index.
+MAX_INSTANCES = 100
 
 
 ############### CLASSES ####################
@@ -53,6 +54,7 @@ class FeatureVector(object):
   Representation of a feature vector for a feature set.
   Provides information about the features and their values.
   """
+
 
   def __init__(self, *pargs):
     """
@@ -80,8 +82,7 @@ class FeatureVector(object):
         values = descriptor.values()
       else:
         values = list(descriptor)
-      self.dict = {f: t for f, t in 
-          zip(fset.list, values)}
+      self.dict = {f: v for f, v in zip(fset.list, values)}
     #
     self.fset = FeatureSet(list(self.dict.keys()))
     self.list = [v for v in self.dict.values()]
@@ -135,7 +136,6 @@ class FeatureVector(object):
     result = all([this_dct[k] == other_dct[k]
         for k in keys])
     return result
-
 
   @classmethod
   def make(cls, stg: str):
@@ -234,14 +234,14 @@ class FeatureSet(object):
     """
     return set(fset_stg.split(cn.FEATURE_SEPARATOR))
 
-  def profileTrinary(self):
+  def profileTrinary(self, data=None, min_count=MIN_COUNT):
     """
     Profiles the FeatureSet by trinary value of features.
 
     Parameters
     ----------
-    sort_func: Function
-        single value; returns float
+    data: (df_X, ser_y)
+    min_count: int
 
     Returns
     -------
@@ -270,14 +270,20 @@ class FeatureSet(object):
       ser_count.index = ser_count.index.tolist()
       return ser_count[ser_count.columns.tolist()[0]]
     #
-    df_X = self._analyzer.df_X
+    if data is None:
+      data = (self._analyzer.df_X, self._analyzer.ser_y)
+    df_X, ser_y = data
     dct = {cn.PREDICTED: [], cn.VALUE: []}
     args = [cn.TRINARY_VALUES for _ in
         range(len(self.list))]
     iterator = itertools.product(*args)
     for feature_values in iterator:
-      value = np.array(feature_values).dot(
-          self.coefs) + self.intercept
+      if self.coefs is not None:
+        value = np.array(feature_values).dot(
+            self.coefs) + self.intercept
+      else:
+        # Didn't have a classifier
+        value = np.nan
       dct[cn.VALUE].append(feature_values)
       dct[cn.PREDICTED].append(
           util.makeBinaryClass(value))
@@ -287,9 +293,9 @@ class FeatureSet(object):
     ser_count = calc(df_X, is_mean=False)
     df[cn.COUNT] = ser_count
     # Mean class values
-    df_y = pd.DataFrame(self._analyzer.ser_y)
+    df_y = pd.DataFrame(ser_y)
     df_y = df_X[self.list].copy()
-    df_y[cn.CLASS] = self._analyzer.ser_y
+    df_y[cn.CLASS] = ser_y
     ser_fracpos = calc(df_y)
     df[cn.FRAC] = ser_fracpos
     # Nan counts are zeros
@@ -299,7 +305,7 @@ class FeatureSet(object):
     pos_list = []
     neg_list = []
     for _, row in df.iterrows():
-      if row[cn.COUNT] == 0:
+      if row[cn.COUNT] < min_count:
         siglvl_pos = np.nan
         siglvl_neg = np.nan
       else:
