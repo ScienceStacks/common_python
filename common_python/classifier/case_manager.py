@@ -11,9 +11,10 @@ The significance level of a case is calculaed based on the frequency of
 case occurrence for labels using a binomial null distribution with p=0.5.
 """
 
-from common_python.statistic.binomial_distribution import BinomialDistribution
+from common_python.statistics.binomial_distribution import BinomialDistribution
 from common_python.classifier.feature_set import FeatureVector
 
+import collections
 import matplotlib.pyplot as plt
 import numpy as np
 import sklearn
