@@ -14,7 +14,6 @@ case occurrence for labels using a binomial null distribution with p=0.5.
 from common_python.statistics.binomial_distribution import BinomialDistribution
 from common_python.classifier.feature_set import FeatureVector
 
-import collections
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -132,7 +131,7 @@ class CaseManager:
     Parameters
     ----------
     feature_vector: FeatureVector
-    
+
     Returns
     -------
     list-object
@@ -151,7 +150,7 @@ class CaseManager:
     Parameters
     ----------
     feature_vector: FeatureVector
-    
+
     Returns
     -------
     FeatureVectorStatistic
@@ -201,7 +200,7 @@ class CaseManager:
       def processBranch(feature_name, feature_values, feature_dct, branch_nodes):
         """
         Processes a branch in the tree for all possible feature values.
-   
+
         Parameters
         ----------
         feature_name: str
@@ -209,7 +208,7 @@ class CaseManager:
         feature_values: list-float
             child values to use
         branch_nodes: np.array
-        
+
         Returns
         -------
         list-Case
@@ -303,10 +302,10 @@ class CaseManager:
     stgs = list(self.case_dct.keys())
     stgs.sort()
     self.case_dct = {k: self.case_dct[k] for k in stgs}
-      
+
   def plotEvaluate(self, ser_X, max_sl=0.001, ax=None,
       title="", ylim=(-5, 5), label_xoffset=-0.2,
-      is_plot=True, **kwargs):
+      is_plot=True):
     """
     Plots the results of a feature vector evaluation.
 
@@ -321,8 +320,6 @@ class CaseManager:
     label_xoffset: int
         How much the text label is offset from the bar
         along the x-axis
-    kwargs: dict
-        optional arguments for constructing evaluation data
 
     Returns
     -------
@@ -335,12 +332,10 @@ class CaseManager:
     #
     def convert(v):
       if v < 0:
-        if -v < MIN_SL:
-          v = -MIN_SL
+        v = min(v, MIN_SL)
         v = np.log10(-v)
       elif v > 0:
-        if v < MIN_SL:
-          v = MIN_SL
+        v = max(v, MIN_SL)
         v = -np.log10(v)
       else:
         raise ValueError("Should not be 0.")
@@ -368,7 +363,7 @@ class CaseManager:
       # Bar plot
       width = 0.1
       if ax is None:
-        fig, ax = plt.subplots()
+        _, ax = plt.subplots()
         # ax = ser_plot.plot(kind="bar", width=width)
       ax.bar(labels, ser_plot, width=width)
       ax.set_ylabel("0s in SL")
@@ -398,7 +393,7 @@ class CaseManager:
     df_X: pd.DataFrame
     ser_y: pd.Series
     dict: keyword parameters for CaseManager
-    
+
     Returns
     -------
     dict
@@ -409,6 +404,6 @@ class CaseManager:
     classes = list(set(ser_y.values))
     for a_class in classes:
       new_ser_y = ser_y.apply(lambda v: 1 if v == a_class else 0)
-      manager_dct[a_class] = CaseManager(df_X, new_ser_y, **kwargs)
+      manager_dct[a_class] = cls(df_X, new_ser_y, **kwargs)
       manager_dct[a_class].build()
     return manager_dct

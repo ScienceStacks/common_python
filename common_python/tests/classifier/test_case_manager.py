@@ -3,7 +3,7 @@ from common_python.classifier.feature_set  \
 from common_python.classifier.case_manager  \
     import CaseManager, Case, FeatureVectorStatistic
 from common_python import constants as cn
-from common_python.tests.classifier import helpers as test_helpers
+from common.trinary_data import TrinaryData
 
 import copy
 import matplotlib.pyplot as plt
@@ -16,9 +16,9 @@ import unittest
 IGNORE_TEST = False
 IS_PLOT = False
 CLASS = 1
-ANALYZER = test_helpers.getFeatureAnalyzer()
-DF_X = ANALYZER.df_X
-SER_Y_ALL = ANALYZER.ser_y
+DATA = TrinaryData(is_regulator=True, is_averaged=False, is_dropT1=False)
+DF_X = DATA.df_X
+SER_Y_ALL = DATA.ser_y
 SER_Y = SER_Y_ALL.apply(lambda v: 1 if v == CLASS else 0)
 FEATURE_A = "Rv2009"
 FEATURE_B = "Rv3830c"
@@ -104,6 +104,15 @@ class TestCaseManager(unittest.TestCase):
     ser_X = DF_X.loc["T2.0", :]
     cases = manager.plotEvaluate(ser_X,
         title="State 1 evaluation for T2.0", is_plot=IS_PLOT)
+
+  def testMkCaseManagers(self):
+    if IGNORE_TEST:
+      return
+    num_tree = 10
+    manager_dct = CaseManager.mkCaseManagers(DF_X, SER_Y_ALL,
+        n_estimators=num_tree)
+    classes = set(SER_Y_ALL.values)
+    self.assertEqual(len(manager_dct), len(classes))
 
 
 if __name__ == '__main__':
