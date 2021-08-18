@@ -19,6 +19,9 @@ Key concepts are:
   
   An inferred classification is the majority class of cases
   selected by a feature vector for a feature set.
+
+#FIXME: BUG - sorted the keys but not the values!!!!
+
 """
 
 import common_python.constants as cn
@@ -85,7 +88,7 @@ class FeatureVector(object):
       self.dict = {f: v for f, v in zip(fset.list, values)}
     #
     self.fset = FeatureSet(list(self.dict.keys()))
-    self.list = [v for v in self.dict.values()]
+    self.list = [self.dict[f] for f in self.fset.list]
     self.tuple = tuple(self.list)
 
   def __repr__(self):

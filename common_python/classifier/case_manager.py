@@ -17,12 +17,14 @@ from common_python.classifier.feature_set import FeatureVector
 import collections
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import sklearn
 
 
 MAX_SL = 0.05
 # Random forest defaults
 RANDOM_FOREST_DEFAULT_DCT = {
+    "n_estimators": 200,  # Number of trees created
     "max_depth": 4,
     "random_state": 0,
     "bootstrap": False,
@@ -31,10 +33,21 @@ RANDOM_FOREST_DEFAULT_DCT = {
     }
 TREE_UNDEFINED = -2
 
-FeatureVectorStatistic = collections.namedtuple("FeatureVectorStatistic",
-    "sl cnt pos")
+
+##################################################################
+class FeatureVectorStatistic:
+
+  def __init__(self, num_sample, num_pos, siglvl):
+    self.siglvl = siglvl
+    self.num_sample = num_sample
+    self.num_pos = num_pos
+
+  def __repr__(self):
+    return "smp=%d, pos=%d, sl=%2.2f" % (self.num_sample,
+        self.num_pos, self.siglvl)
 
 
+##################################################################
 class Case:
   """Case for a binary classification."""
 
@@ -52,30 +65,13 @@ class Case:
     self.dtree = dtree
 
   def __repr__(self):
-    return "%s: %3.2f" % (str(self.feature_vector), self.fv_statistic.sl)
-
-  def displayTree(self, feature_names, is_display=True,
-      figsize=(12, 10), fontsize=18):
-    """
-    Creates a graph of the decision tree used to construct the Case.
-    Tree tests are the left branch; False is the right branch.
-
-    Parameters
-    ----------
-    feature_names: list-str
-        names of all features used in classification
-    """
-    # Creates plots in matplotlib
-    _ = plt.figure(figsize=figsize)
-    # the clf is Decision Tree object
-    if is_display:
-      _ = sklearn.tree.plot_tree(self.dtree, feature_names=feature_names,
-          fontsize=fontsize, filled=True)
+    return "%s: %s" % (str(self.feature_vector), str(self.fv_statistic))
 
 
+##################################################################
 class CaseManager:
 
-  def __init__(self, df_X, ser_y, max_sl=MAX_SL):
+  def __init__(self, df_X, ser_y, max_sl=MAX_SL, **kwargs):
     """
     Parameters
     ----------
@@ -90,14 +86,17 @@ class CaseManager:
         maximum significance level for a case
     binomial_prob: float
         prior probability of class 1
+    kwargs: dict
+        optional arguments used in random forest to find cases.
     """
     self._df_X = df_X
     self._ser_y = ser_y
     self._max_sl = max_sl
+    self._forest_kwargs = kwargs
     self._forest = None  # Random forest used to construct cases
     self._df_case = None  # Dataframe representation of cases
     self._features = list(df_X.columns)
-    self.cases = None  # Cases constructed during by calling build
+    self.case_dct = None  # key: str(FeatureSet), value: Case; sorted order
     total_sample = len(self._ser_y)
     self._prior_prob = sum(self._ser_y) / total_sample
     self._binom = BinomialDistribution(total_sample, self._prior_prob)
@@ -160,18 +159,14 @@ class CaseManager:
     indices = self._getIndices(feature_vector)
     num_sample = len(indices)
     num_pos = sum(self._ser_y.loc[indices])
-    return FeatureVectorStatistic(
-        sl=self._binom.getSL(num_sample, num_pos),
-        cnt=num_sample,
-        pos=num_pos,
-        )
+    return FeatureVectorStatistic(num_sample, num_pos,
+        self._binom.getSL(num_sample, num_pos))
 
   def _getCases(self, dtree):
     """
     Finds the feature vectors in the tree that meet the significance level
     requirement.
-    1. Once a feature vector is significant, no extension of it is explored.
-    2. Feature vectors must not exceed a maximum significance level.
+    Feature vectors must not exceed a maximum significance level.
 
     Parameters
     ----------
@@ -179,7 +174,9 @@ class CaseManager:
 
     Returns
     -------
-    list-FeatureVector
+    dict
+        key: str(FetureVector)
+        value: case
     """
     def processTree(node, feature_vector=None):
       """
@@ -197,7 +194,9 @@ class CaseManager:
 
       Returns
       -------
-      list-Case
+      dict
+          key: str(FetureVector)
+          value: case
       """
       def processBranch(feature_name, feature_values, feature_dct, branch_nodes):
         """
@@ -206,7 +205,9 @@ class CaseManager:
         Parameters
         ----------
         feature_name: str
+            child feature to process
         feature_values: list-float
+            child values to use
         branch_nodes: np.array
         
         Returns
@@ -221,17 +222,14 @@ class CaseManager:
           new_feature_vector = FeatureVector(dct)
           # Determine if it is a Case
           fv_statistic = self._getFeatureVectorStatistic(new_feature_vector)
-          if fv_statistic.cnt < self._min_num_sample:
+          if fv_statistic.num_sample < self._min_num_sample:
             continue
-          import pdb; pdb.set_trace()
-          if np.abs(fv_statistic.sl) < self._max_sl:
+          if np.abs(fv_statistic.siglvl) < self._max_sl:
             # Statistically significant FeatureVector is a Case.
             new_cases.append(Case(new_feature_vector, fv_statistic,
                 dtree=dtree))
-          else:
-            # feature_vector is not a Case, but maybe an extended vector will be
-            new_cases.extend(processTree(branch_nodes[node],
-                feature_vector=new_feature_vector))
+          child = branch_nodes[node]
+          new_cases.extend(processTree(child, feature_vector=new_feature_vector))
         return new_cases
       #
       # Check for termination of this recursion
@@ -250,30 +248,167 @@ class CaseManager:
           feature_name, value_ub=threshold)))
       feature_values_right = list(set(feature_values_all).difference(
           feature_values_left))
-      import pdb; pdb.set_trace()
       # Process each branch
       cases = processBranch(feature_name, feature_values_left,
           feature_dct, dtree.tree_.children_left)
-      cases.append(processBranch(feature_name, feature_values_right,
-          feature_dct, dtree.tree_.children_right))
+      right_cases = processBranch(feature_name, feature_values_right,
+          feature_dct, dtree.tree_.children_right)
+      cases.extend(right_cases)
       #
       return cases
     # Calculate the feature vectors beginning at the root
-    return processTree(0)
+    cases = processTree(0)
+    return {str(c.feature_vector): c for c in cases}
 
-  def build(self, **kwargs):
+  def displayCases(self, cases=None, is_display=True,
+      figsize=(12, 10), fontsize=14):
     """
-    Builds the cases and related internal data.
+    Creates a graph of the decision tree used to construct the Case.
+    Tree tests are the left branch; False is the right branch.
 
     Parameters
     ----------
-    kwargs: dict
-        optional arguments used in random forest to find cases.
+    feature_names: list-str
+        names of all features used in classification
+    """
+    if cases is None:
+      cases = list(self.case_dct.values())
+    for case in cases:
+      # Creates plots in matplotlib
+      _, ax = plt.subplots(1, figsize=figsize)
+      # the clf is Decision Tree object
+      if is_display:
+        _ = sklearn.tree.plot_tree(case.dtree, feature_names=self._df_X.columns,
+            fontsize=fontsize, filled=True, ax=ax)
+        ax.set_title(str(case), fontsize=fontsize)
+
+  def build(self):
+    """
+    Builds the cases and related internal data.
     """
     # Create arguments for random forest and run it
-    forest_kwargs = dict(kwargs)
+    forest_kwargs = dict(self._forest_kwargs)
     for key, value in RANDOM_FOREST_DEFAULT_DCT.items():
       if not key in forest_kwargs.keys():
         forest_kwargs[key] = value
     self._forest = sklearn.ensemble.RandomForestClassifier(**forest_kwargs)
-    self.cases = [self._getCases(t) for t in self._forest.estimators_]
+    self._forest.fit(self._df_X, self._ser_y)
+    # Aggregate cases across all decision trees
+    self.case_dct = {}
+    for dtree in self._forest.estimators_:
+        new_case_dct = self._getCases(dtree)
+        for key, value in new_case_dct.items():
+          self.case_dct[key] = value
+    # Sort the cases
+    stgs = list(self.case_dct.keys())
+    stgs.sort()
+    self.case_dct = {k: self.case_dct[k] for k in stgs}
+      
+  def plotEvaluate(self, ser_X, max_sl=0.001, ax=None,
+      title="", ylim=(-5, 5), label_xoffset=-0.2,
+      is_plot=True, **kwargs):
+    """
+    Plots the results of a feature vector evaluation.
+
+    Parameters
+    ----------
+    ser_X: pd.DataFrame
+        Feature vector to be evaluated
+    max_sl: float
+        Maximum significance level to plot
+    ax: Axis for plot
+    is_plot: bool
+    label_xoffset: int
+        How much the text label is offset from the bar
+        along the x-axis
+    kwargs: dict
+        optional arguments for constructing evaluation data
+
+    Returns
+    -------
+    list-case
+        cases plotted
+    """
+    if self.case_dct is None:
+      raise ValueError("Must do `build` first!")
+    MIN_SL = 1e-5
+    #
+    def convert(v):
+      if v < 0:
+        if -v < MIN_SL:
+          v = -MIN_SL
+        v = np.log10(-v)
+      elif v > 0:
+        if v < MIN_SL:
+          v = MIN_SL
+        v = -np.log10(v)
+      else:
+        raise ValueError("Should not be 0.")
+      return v
+    #
+    feature_vector = FeatureVector(ser_X.to_dict())
+    cases = [c for c in self.case_dct.values()
+         if feature_vector.isCompatible(c.feature_vector)
+         and np.abs(c.fv_statistic.siglvl) < max_sl]
+    # Select applicable cases
+    feature_vectors = [c.feature_vector for c in cases]
+    siglvls = [c.fv_statistic.siglvl for c in cases]
+    count = len(cases)
+    # Construct plot Series
+    if not is_plot:
+      return cases
+    # Do the plot
+    if count == 0:
+        print("***No Case found for %s" % title)
+    else:
+      ser_plot = pd.Series(siglvls)
+      ser_plot.index = ["" for _ in range(count)]
+      labels  = [str(c) for c in feature_vectors]
+      ser_plot = pd.Series([convert(v) for v in ser_plot])
+      # Bar plot
+      width = 0.1
+      if ax is None:
+        fig, ax = plt.subplots()
+        # ax = ser_plot.plot(kind="bar", width=width)
+      ax.bar(labels, ser_plot, width=width)
+      ax.set_ylabel("0s in SL")
+      ax.set_xticklabels(ser_plot.index.tolist(),
+          rotation=0)
+      ax.set_ylim(ylim)
+      ax.set_title(title)
+      for idx, label in enumerate(labels):
+        ypos = ylim[0] + 1
+        xpos = idx + label_xoffset
+        ax.text(xpos, ypos, label, rotation=90,
+            fontsize=8)
+      # Add the 0 line if needed
+      ax.plot([0, len(labels)-0.75], [0, 0],
+          color="black")
+      ax.set_xticklabels([])
+      plt.show()
+      return cases
+
+  @classmethod
+  def mkCaseManagers(cls, df_X, ser_y, **kwargs):
+    """
+    Constructs a CaseManager for each class in ser_y.
+
+    Parameters
+    ----------
+    df_X: pd.DataFrame
+    ser_y: pd.Series
+    dict: keyword parameters for CaseManager
+    
+    Returns
+    -------
+    dict
+        key: class
+        value: CaseManager
+    """
+    manager_dct = {}
+    classes = list(set(ser_y.values))
+    for a_class in classes:
+      new_ser_y = ser_y.apply(lambda v: 1 if v == a_class else 0)
+      manager_dct[a_class] = CaseManager(df_X, new_ser_y, **kwargs)
+      manager_dct[a_class].build()
+    return manager_dct
