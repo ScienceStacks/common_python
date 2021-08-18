@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sklearn
+from sklearn.ensemble import RandomForestClassifier
 
 
 MAX_SL = 0.05
@@ -290,7 +291,7 @@ class CaseManager:
     for key, value in RANDOM_FOREST_DEFAULT_DCT.items():
       if not key in forest_kwargs.keys():
         forest_kwargs[key] = value
-    self._forest = sklearn.ensemble.RandomForestClassifier(**forest_kwargs)
+    self._forest = RandomForestClassifier(**forest_kwargs)
     self._forest.fit(self._df_X, self._ser_y)
     # Aggregate cases across all decision trees
     self.case_dct = {}
@@ -303,7 +304,7 @@ class CaseManager:
     stgs.sort()
     self.case_dct = {k: self.case_dct[k] for k in stgs}
 
-  def plotEvaluate(self, ser_X, max_sl=0.001, ax=None,
+  def plotEvaluate(self, ser_X, max_sl=MAX_SL, ax=None,
       title="", ylim=(-5, 5), label_xoffset=-0.2,
       is_plot=True):
     """
@@ -332,7 +333,7 @@ class CaseManager:
     #
     def convert(v):
       if v < 0:
-        v = min(v, MIN_SL)
+        v = max(v, -MIN_SL)
         v = np.log10(-v)
       elif v > 0:
         v = max(v, MIN_SL)
@@ -350,10 +351,8 @@ class CaseManager:
     siglvls = [c.fv_statistic.siglvl for c in cases]
     count = len(cases)
     # Construct plot Series
-    if not is_plot:
-      return cases
     # Do the plot
-    if count == 0:
+    if is_plot and (count == 0):
         print("***No Case found for %s" % title)
     else:
       ser_plot = pd.Series(siglvls)
@@ -380,13 +379,14 @@ class CaseManager:
       ax.plot([0, len(labels)-0.75], [0, 0],
           color="black")
       ax.set_xticklabels([])
+    if is_plot:
       plt.show()
-      return cases
+    return cases
 
   @classmethod
   def mkCaseManagers(cls, df_X, ser_y, **kwargs):
     """
-    Constructs a CaseManager for each class in ser_y.
+    Constructs a CaseManager for each class in ser_y and builds the cases.
 
     Parameters
     ----------
