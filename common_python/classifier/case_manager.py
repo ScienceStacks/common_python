@@ -407,3 +407,84 @@ class CaseManager:
       manager_dct[a_class] = cls(df_X, new_ser_y, **kwargs)
       manager_dct[a_class].build()
     return manager_dct
+
+  def selectCaseByDescription(self, ser_desc,
+      include_terms=None, exclude_terms=None):
+    """
+    Use "or" semantics to select cases pruning those not selected.
+    A case is selected if at least one of the terms in include_terms is
+    in the description for the feature or if at least one of the terms in
+    exclude_terms is *not* in the feature description.
+    "And" semantics are achieved by calling this method multiple times.
+
+    Parameters
+    ----------
+    ser_desc: pd.Series
+        key: feature
+        value: str
+    include_terms: list-str
+        terms, one of which must be present
+    exclude_terms: list-str   
+        terms, one of which must be absent
+
+    State
+    -----
+    self.case_dct: Updated
+    """
+    # Initializations
+    common_features = set(self._features).intersection(ser_desc.index)
+    ser_desc_sub = ser_desc.loc[common_features]
+    #
+    def findFeaturesWithTerms(terms):
+      """
+      Finds features with descriptions that contain at least one term.  
+
+      Parameters
+      ----------
+      terms: list-str
+
+      Returns
+      -------
+      list-features
+      """
+      sel = ser_desc.copy()
+      sel = sel.apply(lambda v: False)
+      for term in terms:
+          sel = sel |  ser_desc_sub.str.contains(term)
+      return list(ser_desc_sub[sel].index)
+    #
+    def findCasesWithFeature(features):
+      """
+      Finds the cases that have at least one of the features.
+ 
+      Parameters
+      ----------
+      features: list-Feature
+      
+      Returns
+      -------
+      list-Case
+      """
+      cases = []
+      for feature in features:
+        cases.extend([c for c in self.case_dct.values()
+            if feature in c.feature_vector.fset.list])
+      return list(set(cases))
+    #
+    # Include terms
+    if include_terms is None:
+      selected_cases = []
+    else:
+      include_features = findFeaturesWithTerms(include_terms)
+      selected_cases = findCasesWithFeature(include_features)
+    # Exclude terms
+    if exclude_terms is None:
+      satisfy_exclude_cases = set([])
+    else:
+      exclude_features = findFeaturesWithTerms(exclude_terms)
+      term_absent_cases = findCasesWithFeature(exclude_features)
+      satisfy_exclude_cases = set(self.case_dct.values()).difference(
+          term_absent_cases)
+    #
+    accepted_cases = list(satisfy_exclude_cases.union(selected_cases))
+    self.case_dct = {str(c.feature_vector): c for c in accepted_cases}

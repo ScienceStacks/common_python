@@ -22,18 +22,22 @@ TEST_SER_COMB_PATH = os.path.join(DIR_PATH,
 
 
 if not PERSISTER.isExist():
+  from common.data_provider import DataProvider
   from common.trinary_data import TrinaryData
   DATA = TrinaryData()  # Will get an error if pcl not present
   DATA_LONG = TrinaryData(is_averaged=False,
       is_dropT1=False)
+  PROVIDER = DataProvider()
+  PROVIDER.do()
   # Will get an error if pcl not present
-  PERSISTER.set([DATA, DATA_LONG])
+  PERSISTER.set([DATA, DATA_LONG, PROVIDER])
 else:
   try:
-    [DATA, DATA_LONG] = PERSISTER.get()
+    [DATA, DATA_LONG, PROVIDER] = PERSISTER.get()
   except:
     DATA = None
     DATA_LONG = None
+    PROVIDER = None
 
 def getData():
   """

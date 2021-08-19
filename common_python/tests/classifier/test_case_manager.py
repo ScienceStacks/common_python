@@ -4,6 +4,7 @@ from common_python.classifier.case_manager  \
     import CaseManager, Case, FeatureVectorStatistic
 from common_python import constants as cn
 from common.trinary_data import TrinaryData
+from common_python.tests.classifier import helpers
 
 import copy
 import matplotlib.pyplot as plt
@@ -13,8 +14,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 CLASS = 1
 DATA = TrinaryData(is_regulator=True, is_averaged=False, is_dropT1=False)
 DF_X = DATA.df_X
@@ -31,6 +32,7 @@ FEATURE_VECTOR = FeatureVector(
 COUNT = 10
 FRAC = 0.2
 SIGLVL = 0.05
+CASE_MANAGER  = CaseManager(DF_X, SER_Y)
 
 
 class TestCase(unittest.TestCase):
@@ -48,7 +50,7 @@ class TestCase(unittest.TestCase):
 class TestCaseManager(unittest.TestCase):
 
   def setUp(self):
-    self.manager = CaseManager(DF_X, SER_Y)
+    self.manager = copy.deepcopy(CASE_MANAGER)
 
   def testConstructor(self):
     if IGNORE_TEST:
@@ -113,6 +115,18 @@ class TestCaseManager(unittest.TestCase):
         n_estimators=num_tree)
     classes = set(SER_Y_ALL.values)
     self.assertEqual(len(manager_dct), len(classes))
+
+  def testSelectCaseByDescription(self):
+    # TESTING
+    self.manager.build()
+    num_case = len(self.manager.case_dct)
+    #
+    df_desc = helpers.PROVIDER.df_go_terms.copy()
+    df_desc = df_desc.set_index("GENE_ID")
+    ser_desc = df_desc["GO_Term"]
+    self.manager.selectCaseByDescription(ser_desc, include_terms=["cell"])
+    self.assertLess(len(self.manager.case_dct), num_case)
+    import pdb; pdb.set_trace()
 
 
 if __name__ == '__main__':
