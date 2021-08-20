@@ -115,6 +115,28 @@ class FeatureVector(object):
         for k in self.dict.keys()])
     return result
 
+  def isSubvector(self, feature_vector):
+    """
+    Checks if feature_vector is a sub-part. That is,
+    1. All featues are present in self.fset
+    2. Feature values match.
+
+    Parameters
+    ----------
+    feature_vector:
+    
+    Returns
+    -------
+    bool
+    """
+    for feature in feature_vector.fset.list:
+      if not feature in self.fset.list:
+        return False
+      if feature_vector.dict[feature] != self.dict[feature]:
+        return False
+    return True
+      
+
   def isCompatible(self, other):
     """
     Determines if the attributes in common have

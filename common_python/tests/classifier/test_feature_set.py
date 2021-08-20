@@ -55,6 +55,20 @@ class TestFeatureVector(unittest.TestCase):
     feature_vector2 = FeatureVector(pd.Series(dct))
     feature_vector.equals(feature_vector2)
 
+  def testIsSubvector(self):
+    if IGNORE_TEST:
+      return
+    def test(features, values, expected=True):
+      dct = {k: v for k, v in zip(features, values)}
+      feature_vector = FeatureVector(dct)
+      result = self.feature_vector.isSubvector(feature_vector)
+      self.assertEqual(result, expected)
+    #
+    test([FEATURE2, FEATURE1], [VALUE2, VALUE1])
+    test([FEATURE1, FEATURE2], [VALUE1, VALUE2])
+    test([FEATURE1], [VALUE1])
+    test([FEATURE1], [2], expected=False)
+
   def testIsCompatible(self):
     if IGNORE_TEST:
       return
