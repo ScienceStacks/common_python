@@ -408,7 +408,7 @@ class CaseManager:
       manager_dct[a_class].build()
     return manager_dct
 
-  def selectCaseByDescription(self, ser_desc,
+  def filterCaseByDescription(self, ser_desc,
       include_terms=None, exclude_terms=None):
     """
     Use "or" semantics to select cases pruning those not selected.

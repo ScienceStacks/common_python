@@ -14,8 +14,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 CLASS = 1
 DATA = TrinaryData(is_regulator=True, is_averaged=False, is_dropT1=False)
 DF_X = DATA.df_X
@@ -116,17 +116,20 @@ class TestCaseManager(unittest.TestCase):
     classes = set(SER_Y_ALL.values)
     self.assertEqual(len(manager_dct), len(classes))
 
-  def testSelectCaseByDescription(self):
-    # TESTING
+  def testFilterCaseByDescription(self):
+    if IGNORE_TEST:
+      return
     self.manager.build()
     num_case = len(self.manager.case_dct)
     #
+    term = "cell"
     df_desc = helpers.PROVIDER.df_go_terms.copy()
     df_desc = df_desc.set_index("GENE_ID")
     ser_desc = df_desc["GO_Term"]
-    self.manager.selectCaseByDescription(ser_desc, include_terms=["cell"])
+    self.manager.filterCaseByDescription(ser_desc, include_terms=[term])
     self.assertLess(len(self.manager.case_dct), num_case)
-    import pdb; pdb.set_trace()
+    self.manager.filterCaseByDescription(ser_desc, exclude_terms=[term])
+    self.assertEqual(len(self.manager.case_dct), 0)
 
 
 if __name__ == '__main__':
