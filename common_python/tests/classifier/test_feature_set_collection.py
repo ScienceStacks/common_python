@@ -27,9 +27,6 @@ TEST_DIR_PATH = os.path.join(TEST_DIR,
     "test_feature_set_collection_%d" % CLASS)
 TEST_SERIALIZE_DIR = os.path.join(TEST_DIR,
     "test_feature_set_collection_serialize")
-TEST_PERSISTER_PATH = os.path.join(TEST_DIR,
-    "TEST_FEATURE_SET_COLLECTION.pcl")
-PERSISTER = Persister(TEST_PERSISTER_PATH)
 ANALYZER = test_helpers.getFeatureAnalyzer()
 MIN_SCORE = 0.9
 DF_X = ANALYZER.df_X

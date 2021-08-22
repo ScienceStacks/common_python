@@ -323,7 +323,7 @@ class CaseManager:
     Parameters
     ----------
     sl: float
-    
+
     Returns
     -------
     float
@@ -448,7 +448,7 @@ class CaseManager:
         value: str
     include_terms: list-str
         terms, one of which must be present
-    exclude_terms: list-str   
+    exclude_terms: list-str
         terms, one of which must be absent
 
     State
@@ -461,7 +461,7 @@ class CaseManager:
     #
     def findFeaturesWithTerms(terms):
       """
-      Finds features with descriptions that contain at least one term.  
+      Finds features with descriptions that contain at least one term.
 
       Parameters
       ----------
@@ -480,11 +480,11 @@ class CaseManager:
     def findCasesWithFeature(features):
       """
       Finds the cases that have at least one of the features.
- 
+
       Parameters
       ----------
       features: list-Feature
-      
+
       Returns
       -------
       list-Case
@@ -517,19 +517,21 @@ class CaseManager:
   def toSeries(self):
     """
     Converts cases to a series.
-    
+
     Returns
     -------
     pd.Series:
         index: feature_vector
         value: significance level
     """
-    return pd.Series(
+    ser = pd.Series(
         [c.fv_statistic.siglvl for c in self.case_dct.values()],
         index=self.case_dct.keys(),
         )
+    return ser.sort_index()
 
-  def filterCaseByFeatureVector(include_fv=None, exclude_fv=None):
+  def filterCaseByFeatureVector(self, ser_desc,
+      include_fv=None, exclude_fv=None):
     """
     Updates self.case_dct so that cases must contain the sub-vector
     include_fv and cannot have the sub-vector exclude_fv.
@@ -548,16 +550,15 @@ class CaseManager:
     """
     # Initializations
     common_features = set(self._features).intersection(ser_desc.index)
-    ser_desc_sub = ser_desc.loc[common_features]
     #
     def findCasesWithFeatureVector(feature_vector):
       """
       Finds the cases that the sub-vector feature_vector
- 
+
       Parameters
       ----------
       feature_vector: FeatureVector
-      
+
       Returns
       -------
       list-Case
@@ -566,12 +567,12 @@ class CaseManager:
           if c.feature_vector.isSubvector(feature_vector)]
     #
     # Include terms
-    if include_terms is None:
+    if include_fv is None:
       selected_cases = []
     else:
       selected_cases = findCasesWithFeatureVector(include_fv)
     # Exclude terms
-    if exclude_terms is None:
+    if exclude_fv is None:
       satisfy_exclude_cases = set([])
     else:
       fv_absent_cases = findCasesWithFeatureVector(exclude_fv)

@@ -3,7 +3,6 @@
 from common_python.classifier.case_manager import CaseManager
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 
@@ -37,10 +36,19 @@ class CaseManagerCollection:
     for a_class in self.classes:
       self.manager_dct[a_class].build()
 
+  # FIXME: Appears that feature vectors are duplicated from the heatmap
+  #        but it's not in the  datafra,e
   def plotHeatmap(self, ax=None, is_plot=True):
     """
     Constructs a heatmap in which x-axis is state, y-axis is feature,
     value is significance level using a temperature color code.
+
+    Returns
+    -------
+    pd.DataFrame
+        columns: class
+        index: feature
+        value: significance level
     """
     if ax is None:
       _, ax = plt.subplots(1)
@@ -51,8 +59,13 @@ class CaseManagerCollection:
     df.columns = list(self.manager_dct.keys())
     # Convert to number of zeros
     df = df.applymap(lambda v: CaseManager.convertSLToNumzero(v))
+    df_plot = df.copy()
+    df_plot.index = list(range(len(df_plot)))
     # Do the plot
-    sns.heatmap(df, cmap='seismic', ax=ax, vmin=-max_sl, vmax=max_sl)
+    sns.heatmap(df_plot, cmap='seismic', ax=ax, vmin=-max_sl, vmax=max_sl)
+    ax.set_ylabel = "feature vector"
+    ax.set_xlabel = "class"
+    #
     if is_plot:
       plt.show()
     return df
