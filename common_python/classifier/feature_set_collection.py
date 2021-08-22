@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
-import seaborn
 import typing
 
 MIN_FRAC_INCR = 1.01  # Must increase by at least 1%

@@ -1,7 +1,7 @@
 from common_python.classifier.feature_set  \
     import FeatureSet, FeatureVector
 from common_python.classifier.case_manager  \
-    import CaseManager, Case, FeatureVectorStatistic
+    import CaseManager, Case, FeatureVectorStatistic, CaseManagerCollection
 from common_python import constants as cn
 from common.trinary_data import TrinaryData
 from common_python.tests.classifier import helpers
@@ -14,8 +14,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 CLASS = 1
 DATA = TrinaryData(is_regulator=True, is_averaged=False, is_dropT1=False)
 DF_X = DATA.df_X
@@ -32,7 +32,8 @@ FEATURE_VECTOR = FeatureVector(
 COUNT = 10
 FRAC = 0.2
 SIGLVL = 0.05
-CASE_MANAGER  = CaseManager(DF_X, SER_Y)
+CASE_MANAGER_COLLECTION = CaseManagerCollection(DF_X, SER_Y_ALL)
+CASE_MANAGER  = CASE_MANAGER_COLLECTION.manager_dct[CLASS]
 
 
 class TestCase(unittest.TestCase):
@@ -130,6 +131,60 @@ class TestCaseManager(unittest.TestCase):
     self.assertLess(len(self.manager.case_dct), num_case)
     self.manager.filterCaseByDescription(ser_desc, exclude_terms=[term])
     self.assertEqual(len(self.manager.case_dct), 0)
+
+  def testToSeries(self):
+    if IGNORE_TEST:
+      return
+    self.manager.build()
+    ser = self.manager.toSeries()
+    self.assertGreater(len(ser), 0)
+
+  def testConvertSLToNumzero(self):
+    if IGNORE_TEST:
+      return
+    #
+    sl = 0.5
+    sl_low = CaseManager.convertSLToNumzero(-sl)
+    sl_high = CaseManager.convertSLToNumzero(sl)
+    self.assertEqual(-sl_low, sl_high)
+    #
+    sl = CaseManager.convertSLToNumzero(1e-10)
+    self.assertGreater(sl, 0)
+    #
+    with self.assertRaises(RuntimeError):
+      _ = CaseManager.convertSLToNumzero(0)
+
+
+class TestCaseManagerCollection(unittest.TestCase):
+
+  def setUp(self):
+    self.collection = copy.deepcopy(CASE_MANAGER_COLLECTION)
+
+  def testConstructor(self):
+    if IGNORE_TEST:
+      return
+    self.assertEqual(len(self.collection.manager_dct),
+        len(set(SER_Y_ALL.values)))
+
+  def testBuild(self):
+    if IGNORE_TEST:
+      return
+    self.collection.build()
+    for manager in self.collection.manager_dct.values():
+      self.assertTrue(isinstance(manager.case_dct, dict))
+
+  def testPlotHeatmap(self):
+    # TESTING
+    collection = CaseManagerCollection(DF_X, SER_Y_ALL, n_estimators=300)
+    collection.build()
+    terms = ["fatty acid", "hypoxia"]
+    df_desc = helpers.PROVIDER.df_go_terms.copy()
+    df_desc = df_desc.set_index("GENE_ID")
+    ser_desc = df_desc["GO_Term"]
+    for manager in collection.manager_dct.values():
+      manager.filterCaseByDescription(ser_desc, include_terms=terms)
+    df = collection.plotHeatmap()
+    import pdb; pdb.set_trace()
 
 
 if __name__ == '__main__':
