@@ -36,7 +36,7 @@ class TestCaseQuery(unittest.TestCase):
     case_class_dct = copy.deepcopy(CASE_MANAGER_COLLECTION.manager_dct)
     keys = CASE_MANAGER_COLLECTION.manager_dct.keys()
     case_class_dct = {k:  [c for c in 
-        CASE_MANAGER_COLLECTION.manager_dct[k].case_dct.values()]
+        CASE_MANAGER_COLLECTION.manager_dct[k].case_col.values()]
         for k in keys}
     self.query = CaseQuery(case_class_dct)
 
@@ -79,6 +79,26 @@ class TestCaseQuery(unittest.TestCase):
     ser_X = DF_X.loc["T2.0", :]
     cases = manager.plotEvaluate(ser_X,
         title="State 1 evaluation for T2.0", is_plot=IS_PLOT)
+
+  def testSelectByDescription(self):
+    if IGNORE_TEST:
+      return
+    num_case = len(self.manager.case_col)
+    #
+    term = "cell"
+    df_desc = helpers.PROVIDER.df_go_terms.copy()
+    df_desc = df_desc.set_index("GENE_ID")
+    ser_desc = df_desc["GO_Term"]
+    cases = self.manager.selectCaseByDescription(ser_desc, terms=[term])
+    self.assertLess(len(cases), num_case)
+    new_cases = self.manager.selectCaseByDescription(ser_desc, cases=cases,
+        terms=[term])
+    self.assertEqual(len(new_cases), len(cases))
+    new_cases = self.manager.selectCaseByDescription(ser_desc, cases=cases,
+        terms=["hypoxia"])
+    self.assertLess(len(new_cases), len(cases))
+    import pdb; pdb.set_trace()
+
 
 
 if __name__ == '__main__':

@@ -147,7 +147,55 @@ class TestCaseCollection(unittest.TestCase):
     test(end_idx=10, start_idx=14)
     test(end_idx=14, start_idx=10, expected_result=False)
 
+  def testIntersection(self):
+    if IGNORE_TEST:
+      return
+    collection = self.collection.intersection(self.collection)
+    self.assertTrue(collection == self.collection)
+    #
+    def test(end_idx=10, start_idx=10, expected_length=0):
+      collection1 = copy.deepcopy(self.collection)
+      collection2 = copy.deepcopy(self.collection)
+      for key in self.keys[0:end_idx]:
+        del collection1[key]
+      for key in self.keys[start_idx:]:
+        del collection2[key]
+      collection = collection1.intersection(collection2)
+      self.assertEqual(len(collection), expected_length)
+    #
+    test()
+    test(end_idx=10, start_idx=14, expected_length=4)
+    test(end_idx=14, start_idx=10)
 
+  def testDifference(self):
+    if IGNORE_TEST:
+      return
+    collection = self.collection.difference(self.collection)
+    self.assertEqual(len(collection), 0)
+    #
+    def test(end_idx=10, start_idx=10, expected_length=0):
+      collection1 = copy.deepcopy(self.collection)
+      collection2 = copy.deepcopy(self.collection)
+      for key in self.keys[0:end_idx]:
+        del collection1[key]
+      for key in self.keys[start_idx:]:
+        del collection2[key]
+      collection = collection1.difference(collection2)
+      self.assertEqual(len(collection), expected_length)
+    #
+    idx = 10
+    expected_length = len(self.collection) - idx
+    test(end_idx=idx, start_idx=idx, expected_length=expected_length)
+    test(end_idx=10, start_idx=0, expected_length=len(self.collection)-10)
+    #
+    collection = self.collection.difference(CaseCollection({}))
+    self.assertTrue(collection == self.collection)
+
+  def testMake(self):
+    if IGNORE_TEST:
+      return
+    collection = self.collection.make(self.collection.values())
+    self.assertTrue(collection == self.collection)
 
 
 class TestCaseManager(unittest.TestCase):
@@ -183,10 +231,10 @@ class TestCaseManager(unittest.TestCase):
                                 min_impurity_decrease=.01, min_samples_leaf=5)
     _ = clf.fit(DF_X, SER_Y)
     dtree = clf.estimators_[2]
-    case_dct = self.manager._getCases(dtree)
-    self.assertTrue(len(case_dct) > 3)
+    case_col = self.manager._getCases(dtree)
+    self.assertTrue(len(case_col) > 3)
     if IS_PLOT:
-      self.manager.displayCases(cases=case_dct.values())
+      self.manager.displayCases(cases=case_col.values())
       plt.show()
 
   def testBuild(self):
@@ -195,7 +243,7 @@ class TestCaseManager(unittest.TestCase):
     num_tree = 20
     manager = CaseManager(DF_X, SER_Y, n_estimators=num_tree)
     manager.build()
-    self.assertGreater(len(manager.case_dct), 2*num_tree)
+    self.assertGreater(len(manager.case_col), 2*num_tree)
 
   def testMkCaseManagers(self):
     if IGNORE_TEST:
@@ -205,48 +253,6 @@ class TestCaseManager(unittest.TestCase):
         n_estimators=num_tree)
     classes = set(SER_Y_ALL.values)
     self.assertEqual(len(manager_dct), len(classes))
-
-  def testSelectCaseByDescription(self):
-    if IGNORE_TEST:
-      return
-    self.manager.build()
-    num_case = len(self.manager.case_dct)
-    #
-    term = "cell"
-    df_desc = helpers.PROVIDER.df_go_terms.copy()
-    df_desc = df_desc.set_index("GENE_ID")
-    ser_desc = df_desc["GO_Term"]
-    cases = self.manager.selectCaseByDescription(ser_desc, terms=[term])
-    self.assertLess(len(cases), num_case)
-    new_cases = self.manager.selectCaseByDescription(ser_desc, cases=cases,
-        terms=[term])
-    self.assertEqual(len(new_cases), len(cases))
-    new_cases = self.manager.selectCaseByDescription(ser_desc, cases=cases,
-        terms=["hypoxia"])
-    self.assertLess(len(new_cases), len(cases))
-    import pdb; pdb.set_trace()
-
-  def testToSeries(self):
-    if IGNORE_TEST:
-      return
-    self.manager.build()
-    ser = self.manager.toSeries()
-    self.assertGreater(len(ser), 0)
-
-  def testConvertSLToNumzero(self):
-    if IGNORE_TEST:
-      return
-    #
-    sl = 0.5
-    sl_low = CaseManager.convertSLToNumzero(-sl)
-    sl_high = CaseManager.convertSLToNumzero(sl)
-    self.assertEqual(-sl_low, sl_high)
-    #
-    sl = CaseManager.convertSLToNumzero(1e-10)
-    self.assertGreater(sl, 0)
-    #
-    with self.assertRaises(RuntimeError):
-      _ = CaseManager.convertSLToNumzero(0)
 
 
 if __name__ == '__main__':

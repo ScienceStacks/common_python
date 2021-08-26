@@ -266,7 +266,8 @@ class CaseManager:
   def _getCompatibleFeatureValues(self, feature, value_ub=None):
     """
     Finds the values of the feature that are compatible in the sense that
-    they are less than or equal to the upper bound.
+    they are less than or equal to the upper bound. This is part of the
+    analysis of the DecisionTree nodes.
 
     Parameters
     ----------
@@ -469,7 +470,10 @@ class CaseManager:
     ----------
     df_X: pd.DataFrame
     ser_y: pd.Series
-    dict: keyword parameters for CaseManager
+    names: list-str
+        names to use for class
+    kwargs: dict
+        optional arguments for CaseManager constructor
 
     Returns
     -------
