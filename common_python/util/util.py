@@ -309,3 +309,27 @@ def makeBinaryClass(v):
   else:
     return np.nan
 
+def convertSLToNumzero(sl, min_sl=1e-3):
+  """
+  Converts a (neg or pos) significance level to
+  a count of significant zeroes.
+
+  Parameters
+  ----------
+  sl: float
+
+  Returns
+  -------
+  float
+  """
+  if np.isnan(sl):
+    return 0
+  if sl < 0:
+    sl = min(sl, -min_sl)
+    num_zero = np.log10(-sl)
+  elif sl > 0:
+    sl = max(sl, min_sl)
+    num_zero = -np.log10(sl)
+  else:
+    raise RuntimeError("Cannot have significance level of 0.")
+  return num_zero

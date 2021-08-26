@@ -8,6 +8,7 @@ import sys
 import unittest
 
 IGNORE_TEST = False
+IS_PLOT = False
 
 
 class TestFunctions(unittest.TestCase):
@@ -196,6 +197,13 @@ class TestFunctions(unittest.TestCase):
     arr_power = np.array([4, 2, 1])
     self.assertEqual(NUM,
         sum(arr_power*arr_bin))
+
+  def testConvertSLToNumzero(self):
+    if IGNORE_TEST:
+      return
+    self.assertEqual(ut.convertSLToNumzero(0.001), 3)
+    self.assertEqual(ut.convertSLToNumzero(-0.001), -3)
+    self.assertEqual(ut.convertSLToNumzero(-0.001, min_sl=0.01), -2)
 
 
 if __name__ == '__main__':

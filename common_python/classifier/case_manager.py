@@ -4,8 +4,11 @@
 A Case is a statistically significant FeatureVector in that it distinguishes
 between classes.
 Herein, only binary classes are considered (0, 1).
-A CaseManager constructs cases, provides an efficient way to search
-cases based on a feature vector, and reports the results.
+
+A CaseCollection represents a collection of Cases that are accessed by
+their FeatureValue string.
+
+A CaseManager constructs cases.
 
 The significance level of a case is calculaed based on the frequency of
 case occurrence for labels using a binomial null distribution with p=0.5.
@@ -15,9 +18,11 @@ TODO:
 2. Handle correlated cases
 """
 
+import common_python.constants as cn
 from common_python.statistics.binomial_distribution import BinomialDistribution
 from common_python.classifier.feature_set import FeatureVector
 
+import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -39,19 +44,30 @@ RANDOM_FOREST_DEFAULT_DCT = {
     "min_samples_leaf": 5,
     }
 TREE_UNDEFINED = -2
+IS_CHECK = True  # Does additional tests of consistency
 
 
 ##################################################################
 class FeatureVectorStatistic:
 
-  def __init__(self, num_sample, num_pos, siglvl):
+  def __init__(self, num_sample, num_pos, prior_prob, siglvl):
     self.siglvl = siglvl
     self.num_sample = num_sample
+    self.prior_prob = prior_prob
     self.num_pos = num_pos
 
   def __repr__(self):
-    return "smp=%d, pos=%d, sl=%2.2f" % (self.num_sample,
-        self.num_pos, self.siglvl)
+    return "smp=%d, pos=%d, p=%2.2f, sl=%2.2f" % (self.num_sample,
+        self.num_pos, self.prior_prob, self.siglvl)
+
+  def __eq__ (self, other_statistic):
+    if not np.isclose(self.siglvl, other_statistic.siglvl):
+      return False
+    if self.num_sample != other_statistic.num_sample:
+      return False
+    if not np.isclose(self.prior_prob, other_statistic.prior_prob):
+      return False
+    return self.num_pos == other_statistic.num_pos
 
 
 ##################################################################
@@ -72,7 +88,145 @@ class Case:
     self.dtree = dtree
 
   def __repr__(self):
-    return "%s: %s" % (str(self.feature_vector), str(self.fv_statistic))
+    return "%s-- %s" % (str(self.feature_vector), str(self.fv_statistic))
+
+  def __eq__(self, other_case):
+    if str(self) != str(other_case):
+      return False
+    return self.fv_statistic == other_case.fv_statistic
+
+
+##################################################################
+class CaseCollection(dict):
+  """
+  key: FeatureVector in sorted order
+  value: Case
+  """
+
+  def sort(self):
+    """
+    Sorts the dictionary by key.
+    """
+    keys = list(self.keys())
+    # Check if a sort is needed
+    is_sorted = True
+    for key1, key2 in zip(keys[0:-1], keys[1:]):
+      if key1 > key2:
+        is_sorted = False
+        break
+    if is_sorted:
+      return
+    #
+    keys.sort()
+    dct = {k: self[k] for k in keys}
+    [self.__delitem__(k) for k in keys]
+    self.update(dct)
+
+  def __eq__(self, other_col):
+    diff = set(self.keys()).symmetric_difference(other_col.keys())
+    if len(diff) > 0:
+      return False
+    trues = [self[k] == other_col[k] for k in self.keys()]
+    return(all(trues))
+    
+  def toDataframe(self):
+    """
+    Creates a dataframe from the data in the cases.
+
+    Returns
+    -------
+    pd.DataFrame
+        index: str(feature_vector)
+        columns: cn.NUM_POS, cn.NUM_POS, cn.SIGLVL
+    """
+    siglvls = [c.fv_statistic.siglvl for c in self.values()]
+    num_samples = [c.fv_statistic.num_sample for c in self.values()]
+    num_poss = [c.fv_statistic.num_pos for c in self.values()]
+    prior_probs = [c.fv_statistic.prior_prob for c in self.values()]
+    df = pd.DataFrame({
+        cn.SIGLVL: siglvls,
+        cn.PRIOR_PROB: prior_probs,
+        cn.NUM_SAMPLE: num_samples,
+        cn.NUM_POS: num_poss,
+        }, index=list(self.keys()))
+    return df.sort_index()
+
+  def _checkCommon(self, other_col):
+    if IS_CHECK:
+      common_stg = list(set(self.keys()).intersection(other_col.keys()))
+      trues = [self[k] == other_col[k] for k in common_stg]
+      if not all(trues):
+        raise RuntimeError("Common Cases are not equal.")
+
+  def union(self, other_col):
+    """
+    Union of two CaseCollection.
+
+    Parameters
+    ----------
+    other_col: CaseCollection
+
+    Returns
+    -------
+    CaseCollection
+    """
+    self._checkCommon(other_col)
+    case_col = copy.deepcopy(self)
+    case_col.update(other_col)
+    case_col.sort()
+    return case_col
+
+  def intersection(self, other_col):
+    """
+    Intersection of two CaseCollection.
+
+    Parameters
+    ----------
+    other_col: CaseCollection
+
+    Returns
+    -------
+    CaseCollection
+    """
+    self._checkCommon(other_col)
+    common_keys = set(self.keys()).intersection(other_col.keys())
+    cases = [self[k] for k in common_keys]
+    return CaseCollection.make(cases)
+
+  def difference(self, other_col):
+    """
+    Difference of two CaseCollection.
+
+    Parameters
+    ----------
+    other_col: CaseCollection
+
+    Returns
+    -------
+    CaseCollection
+    """
+    self._checkCommon(other_col)
+    difference_keys = set(self.keys()).difference(other_col.keys())
+    cases = [self[k] for k in difference_keys]
+    return CaseCollection.make(cases)
+
+  ################### CLASS METHODS ###################
+  @classmethod
+  def make(cls, cases):
+    """
+    Returns sorted CaseCollection.
+
+    Parameters
+    ----------
+    list-Case
+    
+    Returns
+    -------
+    CaseCollection (sorted)
+    """
+    case_col = CaseCollection({str(c.feature_vector): c for c in cases})
+    case_col.sort()
+    return case_col
 
 
 ##################################################################
@@ -103,7 +257,7 @@ class CaseManager:
     self._forest = None  # Random forest used to construct cases
     self._df_case = None  # Dataframe representation of cases
     self._features = list(df_X.columns)
-    self.case_dct = None  # key: str(FeatureSet), value: Case; sorted order
+    self.case_col = CaseCollection({})
     total_sample = len(self._ser_y)
     self._prior_prob = sum(self._ser_y) / total_sample
     self._binom = BinomialDistribution(total_sample, self._prior_prob)
@@ -166,7 +320,7 @@ class CaseManager:
     indices = self._getIndices(feature_vector)
     num_sample = len(indices)
     num_pos = sum(self._ser_y.loc[indices])
-    return FeatureVectorStatistic(num_sample, num_pos,
+    return FeatureVectorStatistic(num_sample, num_pos, self._prior_prob,
         self._binom.getSL(num_sample, num_pos))
 
   def _getCases(self, dtree):
@@ -181,9 +335,7 @@ class CaseManager:
 
     Returns
     -------
-    dict
-        key: str(FetureVector)
-        value: case
+    CaseCollection
     """
     def processTree(node, feature_vector=None):
       """
@@ -265,7 +417,7 @@ class CaseManager:
       return cases
     # Calculate the feature vectors beginning at the root
     cases = processTree(0)
-    return {str(c.feature_vector): c for c in cases}
+    return CaseCollection.make(cases)
 
   def displayCases(self, cases=None, is_display=True,
       figsize=(12, 10), fontsize=14):
@@ -279,7 +431,7 @@ class CaseManager:
         names of all features used in classification
     """
     if cases is None:
-      cases = list(self.case_dct.values())
+      cases = list(self.case_col.values())
     for case in cases:
       # Creates plots in matplotlib
       _, ax = plt.subplots(1, figsize=figsize)
@@ -301,111 +453,12 @@ class CaseManager:
     self._forest = RandomForestClassifier(**forest_kwargs)
     self._forest.fit(self._df_X, self._ser_y)
     # Aggregate cases across all decision trees
-    self.case_dct = {}
+    self.case_col = CaseCollection({})
     for dtree in self._forest.estimators_:
-        new_case_dct = self._getCases(dtree)
-        for key, value in new_case_dct.items():
-          self.case_dct[key] = value
+        new_case_col = self._getCases(dtree)
+        self.case_col.update(new_case_col)
     # Sort the cases
-    self._sortCases()
-
-  def _sortCases(self):
-    stgs = list(self.case_dct.keys())
-    stgs.sort()
-    self.case_dct = {k: self.case_dct[k] for k in stgs}
-
-  @staticmethod
-  def convertSLToNumzero(sl):
-    """
-    Converts a (neg or pos) significance level to
-    a count of significant zeroes.
-
-    Parameters
-    ----------
-    sl: float
-
-    Returns
-    -------
-    float
-    """
-    if np.isnan(sl):
-      return 0
-    if sl < 0:
-      sl = min(sl, -MIN_SL)
-      num_zero = np.log10(-sl)
-    elif sl > 0:
-      sl = max(sl, MIN_SL)
-      num_zero = -np.log10(sl)
-    else:
-      raise RuntimeError("Cannot have significance level of 0.")
-    return num_zero
-
-  def plotEvaluate(self, ser_X, max_sl=MAX_SL, ax=None,
-      title="", ylim=(-5, 5), label_xoffset=-0.2,
-      is_plot=True):
-    """
-    Plots the results of a feature vector evaluation.
-
-    Parameters
-    ----------
-    ser_X: pd.DataFrame
-        Feature vector to be evaluated
-    max_sl: float
-        Maximum significance level to plot
-    ax: Axis for plot
-    is_plot: bool
-    label_xoffset: int
-        How much the text label is offset from the bar
-        along the x-axis
-
-    Returns
-    -------
-    list-case
-        cases plotted
-    """
-    if self.case_dct is None:
-      raise ValueError("Must do `build` first!")
-    #
-    feature_vector = FeatureVector(ser_X.to_dict())
-    cases = [c for c in self.case_dct.values()
-         if feature_vector.isCompatible(c.feature_vector)
-         and np.abs(c.fv_statistic.siglvl) < max_sl]
-    # Select applicable cases
-    feature_vectors = [c.feature_vector for c in cases]
-    siglvls = [c.fv_statistic.siglvl for c in cases]
-    count = len(cases)
-    # Construct plot Series
-    # Do the plot
-    if is_plot and (count == 0):
-        print("***No Case found for %s" % title)
-    else:
-      ser_plot = pd.Series(siglvls)
-      ser_plot.index = ["" for _ in range(count)]
-      labels  = [str(c) for c in feature_vectors]
-      ser_plot = pd.Series([self.convertSLToNumzero(v) for v in ser_plot])
-      # Bar plot
-      width = 0.1
-      if ax is None:
-        _, ax = plt.subplots()
-        # ax = ser_plot.plot(kind="bar", width=width)
-      ax.bar(labels, ser_plot, width=width)
-      ax.set_ylabel("0s in SL")
-      ax.set_xticklabels(ser_plot.index.tolist(),
-          rotation=0)
-      ax.set_ylim(ylim)
-      ax.set_title(title)
-      for idx, label in enumerate(labels):
-        ypos = ylim[0] + 1
-        xpos = idx + label_xoffset
-        ax.text(xpos, ypos, label, rotation=90,
-            fontsize=8)
-      # Add the 0 line if needed
-      ax.plot([0, len(labels)-0.75], [0, 0],
-          color="black")
-      ax.set_xticklabels([])
-    if is_plot:
-      plt.show()
-    return cases
+    self.case_col.sort()
 
   @classmethod
   def mkCaseManagers(cls, df_X, ser_y, **kwargs):
@@ -431,154 +484,3 @@ class CaseManager:
       manager_dct[a_class] = cls(df_X, new_ser_y, **kwargs)
       manager_dct[a_class].build()
     return manager_dct
-
-  def filterCaseByDescription(self, ser_desc,
-      include_terms=None, exclude_terms=None):
-    """
-    Use "or" semantics to select cases pruning those not selected.
-    A case is selected if at least one of the terms in include_terms is
-    in the description for the feature or if at least one of the terms in
-    exclude_terms is *not* in the feature description.
-    "And" semantics are achieved by calling this method multiple times.
-
-    Parameters
-    ----------
-    ser_desc: pd.Series
-        key: feature
-        value: str
-    include_terms: list-str
-        terms, one of which must be present
-    exclude_terms: list-str
-        terms, one of which must be absent
-
-    State
-    -----
-    self.case_dct: Updated
-    """
-    # Initializations
-    common_features = set(self._features).intersection(ser_desc.index)
-    ser_desc_sub = ser_desc.loc[common_features]
-    #
-    def findFeaturesWithTerms(terms):
-      """
-      Finds features with descriptions that contain at least one term.
-
-      Parameters
-      ----------
-      terms: list-str
-
-      Returns
-      -------
-      list-features
-      """
-      sel = ser_desc.copy()
-      sel = sel.apply(lambda v: False)
-      for term in terms:
-          sel = sel |  ser_desc_sub.str.contains(term)
-      return list(ser_desc_sub[sel].index)
-    #
-    def findCasesWithFeature(features):
-      """
-      Finds the cases that have at least one of the features.
-
-      Parameters
-      ----------
-      features: list-Feature
-
-      Returns
-      -------
-      list-Case
-      """
-      cases = []
-      for feature in features:
-        cases.extend([c for c in self.case_dct.values()
-            if feature in c.feature_vector.fset.list])
-      return list(set(cases))
-    #
-    # Include terms
-    if include_terms is None:
-      selected_cases = []
-    else:
-      include_features = findFeaturesWithTerms(include_terms)
-      selected_cases = findCasesWithFeature(include_features)
-    # Exclude terms
-    if exclude_terms is None:
-      satisfy_exclude_cases = set([])
-    else:
-      exclude_features = findFeaturesWithTerms(exclude_terms)
-      term_absent_cases = findCasesWithFeature(exclude_features)
-      satisfy_exclude_cases = set(self.case_dct.values()).difference(
-          term_absent_cases)
-    #
-    accepted_cases = list(satisfy_exclude_cases.union(selected_cases))
-    self.case_dct = {str(c.feature_vector): c for c in accepted_cases}
-    self._sortCases()
-
-  def toSeries(self):
-    """
-    Converts cases to a series.
-
-    Returns
-    -------
-    pd.Series:
-        index: feature_vector
-        value: significance level
-    """
-    ser = pd.Series(
-        [c.fv_statistic.siglvl for c in self.case_dct.values()],
-        index=self.case_dct.keys(),
-        )
-    return ser.sort_index()
-
-  def filterCaseByFeatureVector(self, ser_desc,
-      include_fv=None, exclude_fv=None):
-    """
-    Updates self.case_dct so that cases must contain the sub-vector
-    include_fv and cannot have the sub-vector exclude_fv.
-    If they are None, the test is ignored.
-
-    Parameters
-    ----------
-    include_fv: FeatureVector
-        FeatureVector that must be a sub-vector
-            of the Case FeatureVector
-    exclude_fv: FeatureVector
-
-    State
-    -----
-    self.case_dct: Updated
-    """
-    # Initializations
-    common_features = set(self._features).intersection(ser_desc.index)
-    #
-    def findCasesWithFeatureVector(feature_vector):
-      """
-      Finds the cases that the sub-vector feature_vector
-
-      Parameters
-      ----------
-      feature_vector: FeatureVector
-
-      Returns
-      -------
-      list-Case
-      """
-      return [c for c in self.case_dct.values()
-          if c.feature_vector.isSubvector(feature_vector)]
-    #
-    # Include terms
-    if include_fv is None:
-      selected_cases = []
-    else:
-      selected_cases = findCasesWithFeatureVector(include_fv)
-    # Exclude terms
-    if exclude_fv is None:
-      satisfy_exclude_cases = set([])
-    else:
-      fv_absent_cases = findCasesWithFeatureVector(exclude_fv)
-      satisfy_exclude_cases = set(self.case_dct.values()).difference(
-          fv_absent_cases)
-    #
-    accepted_cases = list(satisfy_exclude_cases.union(selected_cases))
-    self.case_dct = {str(c.feature_vector): c for c in accepted_cases}
-    self._sortCases()

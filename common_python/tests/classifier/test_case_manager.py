@@ -1,10 +1,12 @@
+import common_python.constants as cn
 from common_python.classifier.feature_set  \
     import FeatureSet, FeatureVector
 from common_python.classifier.case_manager  \
-    import CaseManager, Case, FeatureVectorStatistic
+    import CaseManager, Case, FeatureVectorStatistic, CaseCollection
 from common_python import constants as cn
 from common.trinary_data import TrinaryData
 from common_python.tests.classifier import helpers
+from common_python.util.persister import Persister
 
 import copy
 import matplotlib.pyplot as plt
@@ -32,19 +34,120 @@ FEATURE_VECTOR = FeatureVector(
 COUNT = 10
 FRAC = 0.2
 SIGLVL = 0.05
-CASE_MANAGER  = CaseManager(DF_X, SER_Y)
+#
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+PERSISTER_PATH = os.path.join(TEST_DIR, "test_case_manager.pcl")
+PERSISTER = Persister(PERSISTER_PATH)
+if PERSISTER.isExist():
+  CASE_MANAGER = PERSISTER.get()
+else:
+  CASE_MANAGER  = CaseManager(DF_X, SER_Y)
+  CASE_MANAGER.build()
+  PERSISTER.set(CASE_MANAGER)
+
+
+class TestFeatureVectorStatistic(unittest.TestCase):
+
+  def setUp(self):
+    self.statistic = FeatureVectorStatistic(COUNT, int(FRAC*COUNT), 0.5, SIGLVL)
+
+  def testConstructor(self):
+    if IGNORE_TEST:
+      return
+    self.assertEqual(self.statistic.num_sample, COUNT)
+    self.assertNotEqual(self.statistic.num_sample, COUNT - 1)
+
+  def testEq(self):
+    if IGNORE_TEST:
+      return
+    self.assertTrue(self.statistic == self.statistic)
+    statistic = FeatureVectorStatistic(COUNT + 1, int(FRAC*COUNT), 0.5, SIGLVL)
+    self.assertFalse(statistic == self.statistic)
 
 
 class TestCase(unittest.TestCase):
 
   def setUp(self):
-    fv_statistic = FeatureVectorStatistic(COUNT, int(FRAC*COUNT), SIGLVL)
+    fv_statistic = FeatureVectorStatistic(COUNT, int(FRAC*COUNT), 0.5, SIGLVL)
     self.case = Case(FEATURE_VECTOR, fv_statistic)
 
   def testConstructor(self):
     if IGNORE_TEST:
       return
     self.assertEqual(self.case.fv_statistic.num_sample, COUNT)
+
+  def testEq(self):
+    if IGNORE_TEST:
+      return
+    self.assertTrue(self.case == self.case)
+    fv_statistic = FeatureVectorStatistic(COUNT - 1, int(FRAC*COUNT), 0.5,
+        SIGLVL)
+    case = Case(FEATURE_VECTOR, fv_statistic)
+    self.assertFalse(case == self.case)
+
+
+class TestCaseCollection(unittest.TestCase):
+
+  def setUp(self):
+    self.collection = CaseCollection(CASE_MANAGER.case_col)
+    self.keys = list(self.collection.keys())
+
+  def testConstructor(self):
+    if IGNORE_TEST:
+      return
+    self.assertTrue(isinstance(self.collection, CaseCollection))
+
+  def testSort(self):
+    if IGNORE_TEST:
+      return
+    collection = copy.deepcopy(self.collection)
+    collection.sort()
+    num_item = len(collection)
+    keys = list(collection.keys())
+    for idx in np.random.randint(0, num_item - 1, 100):
+      if idx < num_item:
+        self.assertLess(keys[idx], keys[idx+1])
+    self.assertTrue(self.collection == collection)
+
+  def testEq(self):
+    if IGNORE_TEST:
+      return
+    self.assertTrue(self.collection == self.collection)
+    collection = copy.deepcopy(self.collection)
+    del collection[self.keys[0]]
+    self.assertFalse(collection == self.collection)
+
+  def testToDataframe(self):
+    if IGNORE_TEST:
+      return
+    df = self.collection.toDataframe()
+    self.assertTrue(isinstance(df, pd.DataFrame))
+    for col in [cn.SIGLVL, cn.PRIOR_PROB, cn.NUM_SAMPLE, cn.NUM_POS]:
+      self.assertTrue(col in df.columns)
+    self.assertGreater(len(df), 0)
+
+  def testUnion(self):
+    if IGNORE_TEST:
+      return
+    collection = self.collection.union(self.collection)
+    self.assertTrue(collection == self.collection)
+    #
+    def test(end_idx=10, start_idx=10, expected_result=True):
+      collection1 = copy.deepcopy(self.collection)
+      collection2 = copy.deepcopy(self.collection)
+      for key in self.keys[0:end_idx]:
+        del collection1[key]
+      for key in self.keys[start_idx:]:
+        del collection2[key]
+      collection = collection1.union(collection2)
+      result = collection == self.collection
+      self.assertEqual(result, expected_result)
+    #
+    test()
+    test(end_idx=10, start_idx=14)
+    test(end_idx=14, start_idx=10, expected_result=False)
+
+
 
 
 class TestCaseManager(unittest.TestCase):
@@ -94,19 +197,6 @@ class TestCaseManager(unittest.TestCase):
     manager.build()
     self.assertGreater(len(manager.case_dct), 2*num_tree)
 
-  def testPlotEvaluate(self):
-    if IGNORE_TEST:
-      return
-    num_tree = 10
-    manager = CaseManager(DF_X, SER_Y, n_estimators=num_tree)
-    manager.build()
-    ser_X = DF_X.loc["T14.0", :]
-    cases = manager.plotEvaluate(ser_X,
-        title="State 1 evaluation for T14.0", is_plot=IS_PLOT)
-    ser_X = DF_X.loc["T2.0", :]
-    cases = manager.plotEvaluate(ser_X,
-        title="State 1 evaluation for T2.0", is_plot=IS_PLOT)
-
   def testMkCaseManagers(self):
     if IGNORE_TEST:
       return
@@ -116,7 +206,7 @@ class TestCaseManager(unittest.TestCase):
     classes = set(SER_Y_ALL.values)
     self.assertEqual(len(manager_dct), len(classes))
 
-  def testFilterCaseByDescription(self):
+  def testSelectCaseByDescription(self):
     if IGNORE_TEST:
       return
     self.manager.build()
@@ -126,10 +216,15 @@ class TestCaseManager(unittest.TestCase):
     df_desc = helpers.PROVIDER.df_go_terms.copy()
     df_desc = df_desc.set_index("GENE_ID")
     ser_desc = df_desc["GO_Term"]
-    self.manager.filterCaseByDescription(ser_desc, include_terms=[term])
-    self.assertLess(len(self.manager.case_dct), num_case)
-    self.manager.filterCaseByDescription(ser_desc, exclude_terms=[term])
-    self.assertEqual(len(self.manager.case_dct), 0)
+    cases = self.manager.selectCaseByDescription(ser_desc, terms=[term])
+    self.assertLess(len(cases), num_case)
+    new_cases = self.manager.selectCaseByDescription(ser_desc, cases=cases,
+        terms=[term])
+    self.assertEqual(len(new_cases), len(cases))
+    new_cases = self.manager.selectCaseByDescription(ser_desc, cases=cases,
+        terms=["hypoxia"])
+    self.assertLess(len(new_cases), len(cases))
+    import pdb; pdb.set_trace()
 
   def testToSeries(self):
     if IGNORE_TEST:
