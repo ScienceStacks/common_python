@@ -365,7 +365,7 @@ class CaseCollectionQuery:
     return cases
 
   @classmethod
-  def mkCaseCollectionQuery(cls, case_managers, **kwargs):
+  def mkCaseMultiCollection(cls, case_managers, **kwargs):
     """
     Constructs a CaseCollectionQuery.
 

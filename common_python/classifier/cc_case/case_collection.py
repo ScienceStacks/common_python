@@ -1,0 +1,301 @@
+'''Interrogate and visualize a collection of cases'''
+
+"""
+A CaseCollection is a collection of Cases that are accessed by
+their FeatureValue string. The class exposes ways to interrogate cases
+and construct new cases.
+"""
+
+import common_python.constants as cn
+
+import copy
+import pandas as pd
+
+
+MAX_SL = 0.05
+MIN_SL = 1e-5  # Minimum value of significance level used
+IS_CHECK = True  # Does additional tests of consistency
+
+
+################## FUNCTIONS ##############################
+def checkKwargs(keyword_values):
+  """
+  Verifies the presence of keywords.
+
+  Parameters
+  ----------
+  keyword_values: list-object
+  """
+  if any([v is None for v in keyword_values]):
+    raise RuntimeError("A keyword %s is unexpectedly None" %
+        " ".join(keyword_values))
+
+
+##################################################################
+class CaseCollection(dict):
+
+  version = 3
+
+  """
+  key: FeatureVector in sorted order
+  value: Case
+  """
+
+  def sort(self):
+    """
+    Sorts the dictionary by key.
+    """
+    keys = list(self.keys())
+    # Check if a sort is needed
+    is_sorted = True
+    for key1, key2 in zip(keys[0:-1], keys[1:]):
+      if key1 > key2:
+        is_sorted = False
+        break
+    if is_sorted:
+      return
+    #
+    keys.sort()
+    dct = {k: self[k] for k in keys}
+    _  = [self.__delitem__(k) for k in keys]
+    self.update(dct)
+
+  def __eq__(self, other_col):
+    diff = set(self.keys()).symmetric_difference(other_col.keys())
+    if len(diff) > 0:
+      return False
+    trues = [v == other_col[k] for k,v in self.items()]
+    return all(trues)
+
+  def toDataframe(self):
+    """
+    Creates a dataframe from the data in the cases.
+
+    Returns
+    -------
+    pd.DataFrame
+        index: str(feature_vector)
+        columns: cn.NUM_POS, cn.NUM_POS, cn.SIGLVL
+    """
+    siglvls = [c.fv_statistic.siglvl for c in self.values()]
+    num_samples = [c.fv_statistic.num_sample for c in self.values()]
+    num_poss = [c.fv_statistic.num_pos for c in self.values()]
+    prior_probs = [c.fv_statistic.prior_prob for c in self.values()]
+    df = pd.DataFrame({
+        cn.SIGLVL: siglvls,
+        cn.PRIOR_PROB: prior_probs,
+        cn.NUM_SAMPLE: num_samples,
+        cn.NUM_POS: num_poss,
+        }, index=list(self.keys()))
+    return df.sort_index()
+
+  @staticmethod
+  def _checkCommon(case_col1, case_col2):
+    if IS_CHECK:
+      common_stg = list(set(case_col1.keys()).intersection(case_col2.keys()))
+      trues = [case_col1[k] == case_col2[k] for k in common_stg]
+      if not all(trues):
+        raise RuntimeError("Common Cases are not equal.")
+
+  #################### Case Selection ######################
+  # All methods must be static and first argument is CaseCollection
+  @staticmethod
+  def selectUnion(case_col, other_col=None):
+    """
+    Union of two CaseCollection.
+
+    Parameters
+    ----------
+    case_col: CaseCollection
+    other_col: CaseCollection
+
+    Returns
+    -------
+    CaseCollection
+    """
+    checkKwargs([other_col])
+    CaseCollection._checkCommon(case_col, other_col)
+    new_case_col = copy.deepcopy(case_col)
+    new_case_col.update(other_col)
+    new_case_col.sort()
+    return new_case_col
+
+  @staticmethod
+  def selectIntersection(case_col, other_col=None):
+    """
+    Intersection of two CaseCollection.
+
+    Parameters
+    ----------
+    case_col: CaseCollection
+    other_col: CaseCollection
+
+    Returns
+    -------
+    CaseCollection
+    """
+    checkKwargs([other_col])
+    CaseCollection._checkCommon(case_col, other_col)
+    common_keys = set(case_col.keys()).intersection(other_col.keys())
+    cases = [case_col[k] for k in common_keys]
+    return CaseCollection.make(cases)
+
+  @staticmethod
+  def selectDifference(case_col, other_col):
+    """
+    Difference of two CaseCollection.
+
+    Parameters
+    ----------
+    case_col: CaseCollection
+    other_col: CaseCollection
+
+    Returns
+    -------
+    CaseCollection
+    """
+    checkKwargs([other_col])
+    CaseCollection._checkCommon(case_col, other_col)
+    difference_keys = set(case_col.keys()).difference(other_col.keys())
+    cases = [case_col[k] for k in difference_keys]
+    return CaseCollection.make(cases)
+
+  @staticmethod
+  def selectSymmetricDifference(case_col, other_col):
+    """
+    What's not common to both.
+
+    Parameters
+    ----------
+    case_col: CaseCollection
+    other_col: CaseCollection
+
+    Returns
+    -------
+    CaseCollection
+    """
+    checkKwargs([other_col])
+    CaseCollection._checkCommon(case_col, other_col)
+    new_case_col = case_col.difference(other_col)
+    new_case_col.update(other_col.difference(case_col))
+    return new_case_col
+
+  @staticmethod
+  def selectByDescription(case_col, ser_desc=None, terms=None):
+    """
+    Returns those cases that have at least one of the terms.
+
+    Parameters
+    ----------
+    case_col: CaseCollection
+    ser_desc: pd.Series
+        key: feature
+        value: str
+    terms: list-str
+        if None, return all cases
+
+    Returns
+    -------
+    CaseCollection
+    """
+    checkKwargs([ser_desc])
+    if terms is None:
+      return list(case_col.values())
+    #
+    def findFeaturesWithTerms(terms):
+      """
+      Finds features with descriptions that contain at least one term.
+
+      Parameters
+      ----------
+      terms: list-str
+
+      Returns
+      -------
+      list-str
+          string representation of feature (str)
+      """
+      sel = ser_desc.apply(lambda v: False)
+      for term in terms:
+          sel = sel |  ser_desc.str.contains(term)
+      return list(ser_desc[sel].index)
+    #
+    def findCasesWithFeature(features):
+      """
+      Finds the cases that have at least one of the features.
+
+      Parameters
+      ----------
+      features: list-str
+          list of feature (str)
+
+      Returns
+      -------
+      list-Case
+      """
+      selected_cases = []
+      for feature in features:
+        selected_cases.extend([c for c in case_col.values()
+            if feature in c.feature_vector.fset.list])
+      return selected_cases
+    #
+    features = findFeaturesWithTerms(terms)
+    return CaseCollection.make(findCasesWithFeature(features))
+
+  @staticmethod
+  def selectByFeatureVector(case_col, feature_vector=None):
+    """
+    Finds cases that contain the Feature Vector.
+
+    Parameters
+    ----------
+    case_col: CaseCollection
+    feature_vector: FeatureVector
+
+    Returns
+    -----
+    CaseCollection
+    """
+    checkKwargs([feature_vector])
+    cases = [c for c in case_col.values()
+        if c.feature_vector.contains(feature_vector)]
+    return CaseCollection.make(cases)
+
+  ################## Instance versions of the queries
+  def union(self, other_col):
+    return CaseCollection.selectUnion(self, other_col=other_col)
+
+  def intersection(self, other_col):
+    return CaseCollection.selectIntersection(self, other_col=other_col)
+
+  def difference(self, other_col):
+    return CaseCollection.selectDifference(self, other_col=other_col)
+
+  def symmetricDifference(self, other_col):
+    return CaseCollection.selectSymmetricDifference(self, other_col=other_col)
+
+  def findByDescription(self, ser_desc, terms):
+    return CaseCollection.selectByDescription(self, ser_desc=ser_desc,
+        terms=terms)
+
+  def findByFeatureVector(self, feature_vector):
+    return CaseCollection.selectByFeatureVector(self, 
+        feature_vector=feature_vector)
+
+  ################### Other CLASS METHODS ###################
+  @classmethod
+  def make(cls, cases):
+    """
+    Returns sorted CaseCollection.
+
+    Parameters
+    ----------
+    list-Case
+
+    Returns
+    -------
+    CaseCollection (sorted)
+    """
+    case_col = CaseCollection({str(c.feature_vector): c for c in cases})
+    case_col.sort()
+    return case_col

@@ -1,11 +1,12 @@
 import common_python.constants as cn
 from common_python.classifier.feature_set  \
     import FeatureSet, FeatureVector
-from common_python.classifier.case_manager  \
-    import CaseManager, Case, FeatureVectorStatistic, CaseCollection
+from common_python.classifier.cc_case.case_core \
+    import  Case, FeatureVectorStatistic
+from common_python.classifier.cc_case.case_builder import CaseBuilder
+from common_python.classifier.cc_case.case_collection import CaseCollection
 from common_python import constants as cn
-from common.trinary_data import TrinaryData
-from common_python.tests.classifier import helpers
+from common_python.tests.classifier.cc_case import helpers
 from common_python.util.persister import Persister
 
 import copy
@@ -16,12 +17,15 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
+FEATURE = "Rv2009"
+FEATURE_VECTOR_MINUS_1 = FeatureVector({FEATURE: -1})
+FEATURE_VECTOR_ZERO = FeatureVector({FEATURE: 0})
+FEATURE_VECTOR_PLUS_1 = FeatureVector({FEATURE: 1})
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 CLASS = 1
-DATA = TrinaryData(is_regulator=True, is_averaged=False, is_dropT1=False)
-DF_X = DATA.df_X
-SER_Y_ALL = DATA.ser_y
+DF_X, SER_Y_ALL = helpers.getData()
 SER_Y = SER_Y_ALL.apply(lambda v: 1 if v == CLASS else 0)
 FEATURE_A = "Rv2009"
 FEATURE_B = "Rv3830c"
@@ -35,66 +39,24 @@ COUNT = 10
 FRAC = 0.2
 SIGLVL = 0.05
 #
-CASE_MANAGER_VERSION = 2
-TEST_DIR = os.path.dirname(os.path.abspath(__file__))
-PERSISTER_PATH = os.path.join(TEST_DIR, "test_case_manager.pcl")
+PERSISTER_PATH = os.path.join(TEST_DIR, "test_case_collection.pcl")
 PERSISTER = Persister(PERSISTER_PATH)
 done = False
 if PERSISTER.isExist():
-  CASE_MANAGER = PERSISTER.get()
-  if "version" in dir(CASE_MANAGER):
-    if CASE_MANAGER.version == CASE_MANAGER_VERSION:
-      done = True
-if not done:
-  CASE_MANAGER  = CaseManager(DF_X, SER_Y)
-  CASE_MANAGER.build()
-  PERSISTER.set(CASE_MANAGER)
-
-
-class TestFeatureVectorStatistic(unittest.TestCase):
-
-  def setUp(self):
-    self.statistic = FeatureVectorStatistic(COUNT, int(FRAC*COUNT), 0.5, SIGLVL)
-
-  def testConstructor(self):
-    if IGNORE_TEST:
-      return
-    self.assertEqual(self.statistic.num_sample, COUNT)
-    self.assertNotEqual(self.statistic.num_sample, COUNT - 1)
-
-  def testEq(self):
-    if IGNORE_TEST:
-      return
-    self.assertTrue(self.statistic == self.statistic)
-    statistic = FeatureVectorStatistic(COUNT + 1, int(FRAC*COUNT), 0.5, SIGLVL)
-    self.assertFalse(statistic == self.statistic)
-
-
-class TestCase(unittest.TestCase):
-
-  def setUp(self):
-    fv_statistic = FeatureVectorStatistic(COUNT, int(FRAC*COUNT), 0.5, SIGLVL)
-    self.case = Case(FEATURE_VECTOR, fv_statistic)
-
-  def testConstructor(self):
-    if IGNORE_TEST:
-      return
-    self.assertEqual(self.case.fv_statistic.num_sample, COUNT)
-
-  def testEq(self):
-    if IGNORE_TEST:
-      return
-    self.assertTrue(self.case == self.case)
-    fv_statistic = FeatureVectorStatistic(COUNT - 1, int(FRAC*COUNT), 0.5,
-        SIGLVL)
-    case = Case(FEATURE_VECTOR, fv_statistic)
-    self.assertFalse(case == self.case)
+  CASE_COLLECTION = PERSISTER.get()
+else:
+  case_builder  = CaseBuilder(DF_X, SER_Y)
+  case_builder.build()
+  CASE_COLLECTION = case_builder.case_col
+  PERSISTER.set(CASE_COLLECTION)
+#
+SER_DESC = helpers.getDescription()
 
 
 class TestCaseCollection(unittest.TestCase):
 
   def setUp(self):
-    self.collection = CaseCollection(CASE_MANAGER.case_col)
+    self.collection = copy.deepcopy(CASE_COLLECTION)
     self.keys = list(self.collection.keys())
 
   def testConstructor(self):
@@ -196,68 +158,73 @@ class TestCaseCollection(unittest.TestCase):
     collection = self.collection.difference(CaseCollection({}))
     self.assertTrue(collection == self.collection)
 
+  def testSymmetricDifference(self):
+    if IGNORE_TEST:
+      return
+    collection = self.collection.difference(self.collection)
+    self.assertEqual(len(collection), 0)
+    #
+    def test(end_idx=0, start_idx=10, start1_trim=None,
+        start2_trim=None, expected_length=0):
+      collection1 = copy.deepcopy(self.collection)
+      collection2 = copy.deepcopy(self.collection)
+      for key in self.keys[0:end_idx]:
+        del collection1[key]
+      for key in self.keys[start_idx:]:
+        del collection2[key]
+      if start1_trim is not None:
+        for key in self.keys[start1_trim:]:
+          del collection1[key]
+      if start2_trim is not None:
+        for key in self.keys[start2_trim:]:
+          del collection2[key]
+      collection = collection1.symmetricDifference(collection2)
+      self.assertEqual(len(collection), expected_length)
+    #
+    test(end_idx=0, start_idx=0, expected_length=len(self.collection))
+    #
+    idx = 10
+    expected_length = len(self.collection)
+    test(end_idx=idx, start_idx=idx, expected_length=expected_length)
+    #
+    offset = 4
+    expected_length = len(self.collection) - offset
+    test(end_idx=idx, start_idx=idx-offset, expected_length=expected_length)
+    #
+    start2_trim = len(self.collection) - idx
+    expected_length = 2*idx
+    test(end_idx=idx, start_idx=len(self.collection), start2_trim=start2_trim,
+        expected_length=expected_length)
+
+  def testFindtByDescription(self):
+    if IGNORE_TEST:
+      return
+    num_case = len(self.collection)
+    #
+    term = "cell"
+    case_col = self.collection.findByDescription(
+        ser_desc=SER_DESC, terms=[term])
+    self.assertLess(len(case_col), num_case)
+    new_case_col = case_col.findByDescription(
+        ser_desc=SER_DESC, terms=[term])
+    self.assertTrue(case_col == new_case_col)
+    new_case_col = self.collection.findByDescription(
+        ser_desc=SER_DESC, terms=["hypoxia"])
+    self.assertLess(len(new_case_col), len(case_col))
+
+  def testSelectByFeatureVector(self):
+    # TESTING
+    case_col = self.collection.findByFeatureVector(
+        feature_vector=FEATURE_VECTOR_ZERO)
+    self.assertLess(len(case_col), len(self.collection))
+    for key in case_col.keys():
+      self.assertTrue(FEATURE in key)
+
   def testMake(self):
     if IGNORE_TEST:
       return
     collection = self.collection.make(self.collection.values())
     self.assertTrue(collection == self.collection)
-
-
-class TestCaseManager(unittest.TestCase):
-
-  def setUp(self):
-    self.manager = copy.deepcopy(CASE_MANAGER)
-
-  def testConstructor(self):
-    if IGNORE_TEST:
-      return
-    self.assertGreater(len(self.manager._features), 0)
-
-  def testGetCompatibleFeatureValues(self):
-    if IGNORE_TEST:
-      return
-    values = self.manager._getCompatibleFeatureValues(FEATURE_B, 1)
-    self.assertEqual(values, [-1, 0, 1])
-    values = self.manager._getCompatibleFeatureValues(FEATURE_B, 0.5)
-    self.assertEqual(values, [-1, 0])
-
-  def testGetStatistic(self):
-    if IGNORE_TEST:
-      return
-    statistic = self.manager._getFeatureVectorStatistic(FEATURE_VECTOR)
-    self.assertLess(statistic.siglvl, 0)
-    self.assertLess(np.abs(statistic.siglvl), 0.05)
-    self.assertGreater(statistic.num_sample, statistic.num_pos)
-
-  def testGetCases(self):
-    if IGNORE_TEST:
-      return
-    clf = RandomForestClassifier(max_depth=4, random_state=0, bootstrap=False,
-                                min_impurity_decrease=.01, min_samples_leaf=5)
-    _ = clf.fit(DF_X, SER_Y)
-    dtree = clf.estimators_[2]
-    case_col = self.manager._getCases(dtree)
-    self.assertTrue(len(case_col) > 3)
-    if IS_PLOT:
-      self.manager.displayCases(cases=case_col.values())
-      plt.show()
-
-  def testBuild(self):
-    if IGNORE_TEST:
-      return
-    num_tree = 20
-    manager = CaseManager(DF_X, SER_Y, n_estimators=num_tree)
-    manager.build()
-    self.assertGreater(len(manager.case_col), 2*num_tree)
-
-  def testMkCaseManagers(self):
-    if IGNORE_TEST:
-      return
-    num_tree = 10
-    manager_dct = CaseManager.mkCaseManagers(DF_X, SER_Y_ALL,
-        n_estimators=num_tree)
-    classes = set(SER_Y_ALL.values)
-    self.assertEqual(len(manager_dct), len(classes))
 
 
 if __name__ == '__main__':
