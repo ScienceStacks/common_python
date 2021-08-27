@@ -210,6 +210,24 @@ class CaseCollection(dict):
     cases = [self[k] for k in difference_keys]
     return CaseCollection.make(cases)
 
+  # TESTME
+  def symmetricDifference(self, other_col):
+    """
+    What's not common to both.
+
+    Parameters
+    ----------
+    other_col: CaseCollection
+
+    Returns
+    -------
+    CaseCollection
+    """
+    self._checkCommon(other_col)
+    cases = self.difference(other_col)
+    cases.extend(other_col.differeince(self))
+    return CaseCollection.make(cases)
+
   ################### CLASS METHODS ###################
   @classmethod
   def make(cls, cases):
@@ -250,6 +268,7 @@ class CaseManager:
     kwargs: dict
         optional arguments used in random forest to find cases.
     """
+    self.version = 2 # Change version when internal state changes
     self._df_X = df_X
     self._ser_y = ser_y
     self._max_sl = max_sl

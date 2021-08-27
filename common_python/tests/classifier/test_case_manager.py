@@ -35,12 +35,17 @@ COUNT = 10
 FRAC = 0.2
 SIGLVL = 0.05
 #
+CASE_MANAGER_VERSION = 2
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 PERSISTER_PATH = os.path.join(TEST_DIR, "test_case_manager.pcl")
 PERSISTER = Persister(PERSISTER_PATH)
+done = False
 if PERSISTER.isExist():
   CASE_MANAGER = PERSISTER.get()
-else:
+  if "version" in dir(CASE_MANAGER):
+    if CASE_MANAGER.version == CASE_MANAGER_VERSION:
+      done = True
+if not done:
   CASE_MANAGER  = CaseManager(DF_X, SER_Y)
   CASE_MANAGER.build()
   PERSISTER.set(CASE_MANAGER)

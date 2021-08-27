@@ -115,9 +115,9 @@ class FeatureVector(object):
         for k in self.dict.keys()])
     return result
 
-  def isSubvector(self, feature_vector):
+  def contains(self, feature_vector):
     """
-    Checks if feature_vector is a sub-part. That is,
+    Checks if feature_vector is contained in self.feature_vector.
     1. All featues are present in self.fset
     2. Feature values match.
 
@@ -137,30 +137,20 @@ class FeatureVector(object):
     return True
       
 
-  def isCompatible(self, other):
+  def isCompatible(self, feature_vector):
     """
     Determines if the attributes in common have
     the same value.
 
     Parameters
     ----------
-    other : FeatureSet
+    feature_vector: FeatureVector
 
     Returns
     -------
     bool
     """
-    keys = set(self.dict.keys()).intersection(
-        other.dict.keys())
-    if len(keys) == 0:
-      return False
-    this_dct = {k: v for k, v in self.dict.items()
-        if k in keys}
-    other_dct = {k: v for k, v in other.dict.items()
-        if k in keys}
-    result = all([this_dct[k] == other_dct[k]
-        for k in keys])
-    return result
+    return self.contains(feature_vector) or feature_vector.contains(self)
 
   @classmethod
   def make(cls, stg: str):

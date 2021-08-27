@@ -14,6 +14,7 @@ TODO:
 
 from common_python.classifier.case_manager import CaseManager, CaseCollection
 from common_python.util import util
+import common_python.constants as cn
 
 import copy
 import matplotlib.pyplot as plt
@@ -22,16 +23,16 @@ import seaborn as sns
 
 
 ################## FUNCTIONS ##############################
-def checkKwargs(keywords, kwarg):
+def checkKwargs(keyword_values):
   """
   Verifies the presence of keywords.
 
   Parameters
   ----------
-  keywords
+  keyword_values: list-object
   """
-  if any([k is None for k in keywords]):
-    raise RuntimeError("A keyword %s is unexpectedly None" % " ".join(keywords)
+  if any([v is None for v in keyword_values]):
+    raise RuntimeError("A keyword %s is unexpectedly None" % " ".join(keywords))
 
 
 ################## CLASSES ################################
@@ -45,16 +46,16 @@ class CaseQuery:
     case_col: CaseCollection
       
     """
-    self.case_col = case_col
-    if classes is None:
-      classes = list(self.case_col.keys())
-    self.classes = classes
+    self.case_col = CaseCollection(case_col)
 
-  def toSeries(self):
-    values = [c.siglvl for c in self.case_col.values()]
-    return pd.Series(values, index=self.case_col.keys())
+  def __len__(self):
+    return len(self.case_col)
 
-  def query(self, method, **kwargs):
+  def __eq__(self, other_query):
+    return self.case_col == other_query.case_col
+
+  @classmethod
+  def select(cls, method, case_query, **kwargs):
     """
     Performs the requested query and returns a CaseQuery.
 
@@ -63,6 +64,7 @@ class CaseQuery:
     method: Method
         first argument: CaseCollection
         returns sorted CaseCollection
+    case_query: CaseQuery
     kwargs: dict
         keyword arguments for method
     
@@ -70,9 +72,61 @@ class CaseQuery:
     -------
     CaseQuery
     """
-    return CaseQuery(method(self.case_col, **kwargs))
+    return cls(method(case_query.case_col, **kwargs))
 
   ######### STATIC METHOD QUERIES ###############
+  # All are static methods that return a CaseCollection
+  @staticmethod
+  def union(case_col, other_query=None):
+    """
+    Constructs the union of CaseCollection
+
+    Parameters
+    ----------
+    case_col: CaseCollection
+    other_query: CaseQuery
+    
+    Returns
+    -------
+    CaseCollection
+    """
+    checkKwargs([other_query])
+    return case_col.union(other_query.case_col)
+
+  @staticmethod
+  def intersection(case_col, other_query=None):
+    """
+    Constructs the intersection of CaseCollection
+
+    Parameters
+    ----------
+    case_col: CaseCollection
+    other_query: CaseQuery
+    
+    Returns
+    -------
+    CaseCollection
+    """
+    checkKwargs([other_query])
+    return case_col.intersection(other_query.case_col)
+
+  @staticmethod
+  def difference(case_col, other_query=None):
+    """
+    Constructs the difference of two CaseCollection.
+
+    Parameters
+    ----------
+    case_col: CaseCollection
+    other_query: CaseQuery
+    
+    Returns
+    -------
+    CaseCollection
+    """
+    checkKwargs([other_query])
+    return case_col.difference(other_query.case_col)
+
   @staticmethod
   def selectByDescription(case_col, ser_desc=None, terms=None):
     """
@@ -80,7 +134,7 @@ class CaseQuery:
 
     Parameters
     ----------
-    case_col: dict
+    case_col: CaseCollection
     ser_desc: pd.Series
         key: feature
         value: str
@@ -126,15 +180,15 @@ class CaseQuery:
       """
       selected_cases = []
       for feature in features:
-        selected_cases.extend([c for c in self.case_col.values()
+        selected_cases.extend([c for c in case_col.values()
             if feature in c.feature_vector.fset.list])
-      return list(set(selected_cases))
+      return selected_cases
     #
     features = findFeaturesWithTerms(terms)
     return CaseCollection.make(findCasesWithFeature(features))
 
   @staticmethod
-  def selectCaseByFeatureVector(case_col, feature_vector=None):
+  def selectByFeatureVector(case_col, feature_vector=None):
     """
     Updates self.case_col so that cases must contain the sub-vector
     include_fv and cannot have the sub-vector exclude_fv.
@@ -149,9 +203,9 @@ class CaseQuery:
     -----
     dict
     """
-    checkKwargs(feature_vector)
-    cases = [c for c in self.case_col.values()
-        if c.feature_vector.isSubvector(feature_vector)]
+    checkKwargs([feature_vector])
+    cases = [c for c in case_col.values()
+        if c.feature_vector.contains(feature_vector)]
     return CaseCollection.make(cases)
 
 
@@ -159,21 +213,23 @@ class CaseQuery:
 class CaseCollectionQuery:
   """Selects subsets of cases and displays results."""
 
-  def __init__(self, case_cols, names=None):
+  def __init__(self, dct):
     """
     Parameters
     ----------
-    case_cols: list-CaseCollection
-    names: list-str
+    dct: dict
+        key: collection identifier (e.g., class name)
+        value: CaseCollection / CaseQueryCollection
     """
-    self.case_cols = case_cols
-    if names is None:
-      names = [str(n) for n in range(len(case_cols))]
-    self.names = names
+    self.names = list(dct.keys())
+    if isinstance(dct[self.names[0]], CaseQuery):
+      self.case_query_dct = dct
+    else:
+      self.case_query_dct = {k: CaseQuery(v) for k, v in dct.items()}
     
   def toDataframe(self):
     """
-    Converts case classes to a dataframe of significance levels.
+    Creates a dataframe of significance levels by class.
 
     Returns
     -------
@@ -182,13 +238,13 @@ class CaseCollectionQuery:
         column: class
         value: significance level
     """
-    sers = [ pd.Series([c.siglvl for c in d.values()], index=d.keys()])
-        for d in self.case_cols]
+    sers = [c.case_col.toDataframe()[cn.SIGLVL] for c in 
+        self.case_query_dct.values()]
     df = pd.concat(sers, axis=1)
-    df.columns = list(self.self.case_cols.keys())
+    df.columns = self.names
     return df
 
-  def query(self, method, **kwargs):
+  def select(self, method, **kwargs):
     """
     Applies the query to each CaseCollection.
 
@@ -200,6 +256,10 @@ class CaseCollectionQuery:
     -------
     CaseCollectionQuery
     """
+    dct = {}
+    for name, case_query in self.case_query_dct.items():
+      dct[name] = CaseQuery.select(method, case_query, **kwargs)
+    return CaseCollectionQuery(dct)
 
   def plotHeatmap(self, ax=None, is_plot=True, max_zero=5, figsize=(10, 12)):
     """
@@ -237,7 +297,7 @@ class CaseCollectionQuery:
       plt.show()
     return df
 
-  def plotEvaluate(self, ser_X, max_sl=MAX_SL, ax=None,
+  def plotEvaluate(self, ser_X, max_sl=0.01, ax=None,
       title="", ylim=(-5, 5), label_xoffset=-0.2,
       is_plot=True):
     """
@@ -305,7 +365,7 @@ class CaseCollectionQuery:
     return cases
 
   @classmethod
-  def mkCaseCollectionQuery(cls, case_managers, **kwargs)
+  def mkCaseCollectionQuery(cls, case_managers, **kwargs):
     """
     Constructs a CaseCollectionQuery.
 
@@ -318,5 +378,5 @@ class CaseCollectionQuery:
     -------
     CaseCollectionQuery
     """
-    case_cols = [m.case_col for m in case_managers]
-    return cls(case_cols, **kwargs)
+    case_col_dct = [m.case_col for m in case_managers]
+    return cls(case_col_dct, **kwargs)
