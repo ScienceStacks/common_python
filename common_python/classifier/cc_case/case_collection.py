@@ -7,6 +7,9 @@ and construct new cases.
 """
 
 import common_python.constants as cn
+from common_python.classifier.feature_set import FeatureVector
+from common_python.classifier.cc_case.case_core  \
+    import FeatureVectorStatistic, Case
 
 import copy
 import pandas as pd
@@ -279,8 +282,58 @@ class CaseCollection(dict):
         terms=terms)
 
   def findByFeatureVector(self, feature_vector):
-    return CaseCollection.selectByFeatureVector(self, 
+    return CaseCollection.selectByFeatureVector(self,
         feature_vector=feature_vector)
+
+  def serialize(self, path):
+    """
+    Serializes the CaseCollection as a CSV file.
+
+    Parameters
+    ----------
+    path: str
+    """
+    df = self.toDataframe()
+    df.index.name = "index"
+    df.to_csv(path, index=True)
+
+  @classmethod
+  def deserialize(cls, path=None, df=None):
+    """
+    Deserializes the CaseCollection from a CSV file.
+
+    Parameters
+    ----------
+    path: str
+      Path to deserialize from, a CSV file with a column named "index"
+    df: DataFrame
+      A dataframe from which cases are constructed
+        index: str representation of feature vector
+
+    Returns
+    -------
+    CaseCollection
+    """
+    if (path is not None) and (df is None):
+      df = pd.read_csv(path)
+      df = df.set_index("index")
+    elif (path is None) and (df is not None):
+      pass
+    else:
+     raise ValueError("Exactly one of path and df must be non-None.")
+    #
+    case_dct = {}
+    for fv_str, row in df.iterrows():
+      feature_vector = FeatureVector.make(fv_str)
+      statistic = FeatureVectorStatistic(
+          row[cn.NUM_SAMPLE],
+          row[cn.NUM_POS],
+          row[cn.PRIOR_PROB],
+          row[cn.SIGLVL])
+      case_dct[fv_str] = Case(feature_vector, statistic)
+    #
+    return CaseCollection(case_dct)
+    
 
   ################### Other CLASS METHODS ###################
   @classmethod

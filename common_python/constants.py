@@ -20,6 +20,7 @@ FRAC = "frac"  # A fractiona
 FRACNEG = "fracneg"  # A fractiona
 FRACPOS = "fracpos"  # A fractiona
 GROUP = "group"
+INDEX = "index"
 INTERCEPT = "intercept"
 KEGG_DESCRIPTION = "kegg_description"
 KEGG_PATHWAY = "kegg_pathway"

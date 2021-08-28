@@ -3,11 +3,9 @@ from common_python.classifier.feature_set  \
     import FeatureSet, FeatureVector
 from common_python.classifier.cc_case.case_core \
     import  Case, FeatureVectorStatistic
-from common_python.classifier.cc_case.case_builder import CaseBuilder
 from common_python.classifier.cc_case.case_collection import CaseCollection
 from common_python import constants as cn
 from common_python.tests.classifier.cc_case import helpers
-from common_python.util.persister import Persister
 
 import copy
 import matplotlib.pyplot as plt
@@ -17,13 +15,15 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 FEATURE = "Rv2009"
 FEATURE_VECTOR_MINUS_1 = FeatureVector({FEATURE: -1})
 FEATURE_VECTOR_ZERO = FeatureVector({FEATURE: 0})
 FEATURE_VECTOR_PLUS_1 = FeatureVector({FEATURE: 1})
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+SERIALIZED_FILE = os.path.join(TEST_DIR, "case_collection.csv")
+TMP_FILE = os.path.join(TEST_DIR, "test_case_collection_tmp.csv")
 CLASS = 1
 DF_X, SER_Y_ALL = helpers.getData()
 SER_Y = SER_Y_ALL.apply(lambda v: 1 if v == CLASS else 0)
@@ -39,18 +39,9 @@ COUNT = 10
 FRAC = 0.2
 SIGLVL = 0.05
 #
-PERSISTER_PATH = os.path.join(TEST_DIR, "test_case_collection.pcl")
-PERSISTER = Persister(PERSISTER_PATH)
-done = False
-if PERSISTER.isExist():
-  CASE_COLLECTION = PERSISTER.get()
-else:
-  case_builder  = CaseBuilder(DF_X, SER_Y)
-  case_builder.build()
-  CASE_COLLECTION = case_builder.case_col
-  PERSISTER.set(CASE_COLLECTION)
-#
 SER_DESC = helpers.getDescription()
+CASE_COLLECTION = CaseCollection.deserialize(SERIALIZED_FILE)
+TMP_FILES = [TMP_FILE]
 
 
 class TestCaseCollection(unittest.TestCase):
@@ -58,6 +49,15 @@ class TestCaseCollection(unittest.TestCase):
   def setUp(self):
     self.collection = copy.deepcopy(CASE_COLLECTION)
     self.keys = list(self.collection.keys())
+    self._remove()
+
+  def tearDown(self):
+    self._remove()
+
+  def _remove(self):
+    for ffile in TMP_FILES:
+      if os.path.isfile(ffile):
+        os.remove(ffile)
 
   def testConstructor(self):
     if IGNORE_TEST:
@@ -213,7 +213,8 @@ class TestCaseCollection(unittest.TestCase):
     self.assertLess(len(new_case_col), len(case_col))
 
   def testSelectByFeatureVector(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     case_col = self.collection.findByFeatureVector(
         feature_vector=FEATURE_VECTOR_ZERO)
     self.assertLess(len(case_col), len(self.collection))
@@ -224,6 +225,19 @@ class TestCaseCollection(unittest.TestCase):
     if IGNORE_TEST:
       return
     collection = self.collection.make(self.collection.values())
+    self.assertTrue(collection == self.collection)
+
+  def testSerialize(self):
+    if IGNORE_TEST:
+      return
+    self.collection.serialize(TMP_FILE)
+    collection = CaseCollection.deserialize(TMP_FILE)
+    self.assertTrue(collection == self.collection)
+
+  def testDeserialize(self):
+    if IGNORE_TEST:
+      return
+    collection = CaseCollection.deserialize(path=SERIALIZED_FILE)
     self.assertTrue(collection == self.collection)
 
 

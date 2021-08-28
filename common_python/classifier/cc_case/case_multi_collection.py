@@ -1,4 +1,4 @@
-'''Interrogate and visualize a CaseCollection for multiple clases'''
+'''Interrogate and visualize a Collection of Cases for multiple clases'''
 
 """
 A CaseMultiCollection is a collection of CaseCollections. Each
@@ -6,9 +6,14 @@ CaseCollection is built for a different class from the same
 feature data.
 """
 
+import common_python.constants as cn
+from common_python.classifier.cc_case.case_collection import CaseCollection
+
 import copy
 import numpy as np
 import pandas as pd
+
+COL_KEY = "__col_key__"  # Column for the key in serialized CSV
 
 
 ###########################################################
@@ -25,6 +30,16 @@ class CaseMultiCollection:
     """
     self.names = list(dct.keys())
     self.collection_dct = dict(dct)
+
+  def __eq__(self, other):
+    diff_names = set(self.names).symmetric_difference(other.names)
+    if len(diff_names) > 0:
+      return False
+    result = True
+    for name in self.names:
+      result = result and (
+          self.collection_dct[name] == other.collection_dct[name])
+    return result
     
   def toDataframe(self):
     """
@@ -56,10 +71,10 @@ class CaseMultiCollection:
     """
     dct = {}
     for name, case_col in self.collection_dct.items():
-      dct[name] = CaseCollection.select(method, case_col, **kwargs)
+      dct[name] = method(case_col, **kwargs)
     return CaseMultiCollection(dct)
 
-  def binarySelect(self, other_multi, method, **kwargs):
+  def binarySelect(self, method, other_multi, **kwargs):
     """
     Does selection for two CaseMultiCollections (e.g., union, intersection)
 
@@ -74,8 +89,8 @@ class CaseMultiCollection:
     """
     dct = {}
     for name, case_col in self.collection_dct.items():
-      dct[name] = CaseCollection.select(method, case_col,
-          multi_collection.collection_dct[name], **kwargs)
+      dct[name] = method(case_col,
+          other_multi.collection_dct[name], **kwargs)
     return CaseMultiCollection(dct)
 
   def plotHeatmap(self, ax=None, is_plot=True, max_zero=5, figsize=(10, 12)):
@@ -182,18 +197,62 @@ class CaseMultiCollection:
     return cases
 
   @classmethod
-  def mkCaseMultiCollection(cls, case_managers, **kwargs):
+  def make(cls, case_builder_dct, **kwargs):
     """
     Constructs a CaseMultiCollection.
 
     Parameters
     ----------
-    case_managers: list-CaseManager
+    case_builder_dct: dict
+        key: builder ID
+        value: CaseBuilder
     kwargs: dict
     
     Returns
     -------
     CaseMultiCollection
     """
-    case_col_dct = [m.case_col for m in case_managers]
+    case_col_dct = {k: m.case_col for k, m in case_builder_dct.items()}
     return cls(case_col_dct, **kwargs)
+
+  def serialize(self, path):
+    """
+    Serializes the collection to the path. The serializations is a
+    CSV file with a column added for the class.
+
+    Parameters
+    ----------
+    
+    Returns
+    -------
+    """
+    # Construct the dataframe to serialize
+    dfs = [c.toDataframe() for c in self.collection_dct.values()]
+    for name, df in zip(self.names, dfs):
+      df[COL_KEY] = name
+    df = pd.concat(dfs, axis=0)
+    df.index.name = cn.INDEX
+    df.to_csv(path, index=True)
+
+  @classmethod
+  def deserialize(self, path):
+    """
+    Deserializes the collection from the path. The serializations is
+    from a CSV file with a column added for the class.
+
+    Parameters
+    ----------
+    
+    Returns
+    -------
+    """
+    # Obtain the dataframe representation
+    df = pd.read_csv(path)
+    df = df.set_index(cn.INDEX)
+    names = list(set(df[COL_KEY]))
+    df_dct = {n: df[df[COL_KEY] == n] for n in names}
+    for df in df_dct.values():
+      del df[COL_KEY]
+    collection_dct = {n: CaseCollection.deserialize(df=df)
+        for n, df in df_dct.items()}
+    return CaseMultiCollection(collection_dct)
