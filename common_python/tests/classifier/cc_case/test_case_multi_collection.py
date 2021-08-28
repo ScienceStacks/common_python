@@ -13,8 +13,8 @@ import os
 import pandas as pd
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 DF_X, SER_y = helpers.getData()
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 SERIALIZED_FILE = os.path.join(TEST_DIR, "case_multi_collection.csv")
@@ -57,7 +57,7 @@ class TestCaseMultiCollection(unittest.TestCase):
       return
     self.multi.serialize(TMP_FILE)
     multi = CaseMultiCollection.deserialize(TMP_FILE)
-    self.assertTrue(collection == self.collection)
+    self.assertTrue(multi == self.multi)
 
   def testDeserialize(self):
     if IGNORE_TEST:
@@ -103,7 +103,8 @@ class TestCaseMultiCollection(unittest.TestCase):
         ser_desc=SER_DESC, terms=terms)
    
   def testPlotHeatmap(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     multi = self._filterCases()
     df1 = multi.plotHeatmap(is_plot=IS_PLOT, title="All Cases")
     self.assertTrue(isinstance(df1, pd.DataFrame))
