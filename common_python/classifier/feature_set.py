@@ -153,29 +153,37 @@ class FeatureVector(object):
     return self.contains(feature_vector) or feature_vector.contains(self)
 
   @classmethod
-  def make(cls, stg: str):
+  def make(cls, obj):
     """
     Creates an FeatureVector object from its string representation.
 
     Parameters
     ----------
-    stg: str
-        String representation of FeatureVector
+    obj: str or pd.Series
+        str: String representation of FeatureVector
+        pd.Series: alternative representation
 
     Returns
     ----------
     FeatureVector
     """
-    elements = stg.split(cn.FEATURE_SEPARATOR)
-    features = []
-    values = []
-    for element in elements:
-      lpos = element.index(SEPARATORS[0])
-      features.append(element[:lpos])
-      rpos = element.index(SEPARATORS[1])
-      values.append(int(element[lpos+1: rpos]))
-    fset = FeatureSet(features)
-    return FeatureVector(fset, values)
+    dct = {}
+    if isinstance(obj, str):
+      stg = obj
+      elements = stg.split(cn.FEATURE_SEPARATOR)
+      for element in elements:
+        lpos = element.index(SEPARATORS[0])
+        feature = element[:lpos]
+        rpos = element.index(SEPARATORS[1])
+        value = int(element[lpos+1: rpos])
+        dct[feature] = value
+    elif isinstance(obj, pd.Series):
+      ser = obj
+      dct = ser.to_dict()
+    else:
+      raise RuntimeError("Invalid object type: %s" % str(type(obj)))
+    #
+    return FeatureVector(dct)
 
 
 ####################################

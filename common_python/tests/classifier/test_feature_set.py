@@ -97,6 +97,11 @@ class TestFeatureVector(unittest.TestCase):
         str(self.feature_vector))
     self.assertTrue(feature_vector.equals(
         self.feature_vector))
+    #
+    ser_X = DF_X.T["T2.0"]
+    feature_vector = FeatureVector.make(ser_X)
+    for feature, value in ser_X.items():
+      self.assertEqual(feature_vector.dict[feature], value)
 
 
 

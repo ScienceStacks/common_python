@@ -7,11 +7,14 @@ feature data.
 """
 
 import common_python.constants as cn
+import common_python.util.util as util
 from common_python.classifier.cc_case.case_collection import CaseCollection
 
 import copy
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 COL_KEY = "__col_key__"  # Column for the key in serialized CSV
 
@@ -30,6 +33,9 @@ class CaseMultiCollection:
     """
     self.names = list(dct.keys())
     self.collection_dct = dict(dct)
+
+  def __len__(self):
+    return sum([len(c) for c in self.collection_dct.values()])
 
   def __eq__(self, other):
     diff_names = set(self.names).symmetric_difference(other.names)
@@ -93,13 +99,47 @@ class CaseMultiCollection:
           other_multi.collection_dct[name], **kwargs)
     return CaseMultiCollection(dct)
 
-  def plotHeatmap(self, ax=None, is_plot=True, max_zero=5, figsize=(10, 12)):
+  def plotBars(self, ser_X, title="", **kwargs):
+    """
+    Creates a classification profile for the feature vector.
+    
+    Parameters
+    ----------
+    ser_X: Series (feature vector)
+    """
+    new_kwargs = dict(kwargs)
+    new_kwargs["is_plot"] = False
+    num_row = 2 
+    num_col = 3 
+    fig, axes = plt.subplots(num_row, num_col,
+        figsize=(16, 10))
+    for idx, name in enumerate(self.names):
+        row = int(idx/num_col)
+        col = idx % num_col
+        if row == 0:
+            label_xoffset = -0.1
+        else:
+            label_xoffset = 0.1 
+        self.collection_dct[name].plotEvaluate(ser_X, 
+            ax=axes[row, col],
+            title = name,
+            label_xoffset=label_xoffset, **new_kwargs)
+    fig.suptitle(title, fontsize=16)
+    if "is_plot" in kwargs:
+      if kwargs["is_plot"]:
+        plt.show()
+
+  def plotHeatmap(self, feature_vector=None, ax=None, is_plot=True,
+      max_zero=5, figsize=(10, 12), title=""):
     """
     Constructs a heatmap in which x-axis is state, y-axis is feature,
     value is significance level using a temperature color code.
+    If feature_vector is not None, then only considers cases
+    that are contained within this vector.
 
     Parameters
     ----------
+    feature_vector: FeatureVector
     ax: Matplotlib.axes
     is_plot: bool
     max_zero: float
@@ -115,86 +155,24 @@ class CaseMultiCollection:
     if ax is None:
       _, ax = plt.subplots(1, figsize=figsize)
     # Contruct a datadrame
-    df = self.toDataframe()
-    # Convert to number of zeros
+    if feature_vector is not None:
+      multi = self.select(CaseCollection.selectIsContained,
+          feature_vector=feature_vector)
+    else:
+      multi = self
+    df = multi.toDataframe()
     df = df.applymap(lambda v: util.convertSLToNumzero(v))
     df_plot = df.copy()
     df_plot.index = list(range(len(df_plot)))
     # Do the plot
     sns.heatmap(df_plot, cmap='seismic', ax=ax, vmin=-max_zero, vmax=max_zero)
-    ax.set_ylabel = "feature vector"
-    ax.set_xlabel = "class"
+    ax.set_ylabel("feature vector")
+    ax.set_xlabel("class")
+    ax.set_title(title)
     #
     if is_plot:
       plt.show()
     return df
-
-  def plotEvaluate(self, ser_X, max_sl=0.01, ax=None,
-      title="", ylim=(-5, 5), label_xoffset=-0.2,
-      is_plot=True):
-    """
-    Plots the results of a feature vector evaluation.
-
-    Parameters
-    ----------
-    ser_X: pd.DataFrame
-        Feature vector to be evaluated
-    max_sl: float
-        Maximum significance level to plot
-    ax: Axis for plot
-    is_plot: bool
-    label_xoffset: int
-        How much the text label is offset from the bar
-        along the x-axis
-
-    Returns
-    -------
-    list-case
-        cases plotted
-    """
-    if self.case_col is None:
-      raise ValueError("Must do `build` first!")
-    #
-    feature_vector = FeatureVector(ser_X.to_dict())
-    cases = [c for c in self.case_col.values()
-         if feature_vector.isCompatible(c.feature_vector)
-         and np.abs(c.fv_statistic.siglvl) < max_sl]
-    # Select applicable cases
-    feature_vectors = [c.feature_vector for c in cases]
-    siglvls = [c.fv_statistic.siglvl for c in cases]
-    count = len(cases)
-    # Construct plot Series
-    # Do the plot
-    if is_plot and (count == 0):
-        print("***No Case found for %s" % title)
-    else:
-      ser_plot = pd.Series(siglvls)
-      ser_plot.index = ["" for _ in range(count)]
-      labels  = [str(c) for c in feature_vectors]
-      ser_plot = pd.Series([util.convertSLToNumzero(v) for v in ser_plot])
-      # Bar plot
-      width = 0.1
-      if ax is None:
-        _, ax = plt.subplots()
-        # ax = ser_plot.plot(kind="bar", width=width)
-      ax.bar(labels, ser_plot, width=width)
-      ax.set_ylabel("0s in SL")
-      ax.set_xticklabels(ser_plot.index.tolist(),
-          rotation=0)
-      ax.set_ylim(ylim)
-      ax.set_title(title)
-      for idx, label in enumerate(labels):
-        ypos = ylim[0] + 1
-        xpos = idx + label_xoffset
-        ax.text(xpos, ypos, label, rotation=90,
-            fontsize=8)
-      # Add the 0 line if needed
-      ax.plot([0, len(labels)-0.75], [0, 0],
-          color="black")
-      ax.set_xticklabels([])
-    if is_plot:
-      plt.show()
-    return cases
 
   @classmethod
   def make(cls, case_builder_dct, **kwargs):

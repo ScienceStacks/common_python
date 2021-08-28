@@ -1,6 +1,7 @@
 from common_python.classifier.cc_case.case_multi_collection  \
     import CaseMultiCollection
 from common_python.classifier.cc_case.case_collection import CaseCollection 
+from common_python.classifier.feature_set import FeatureVector
 from common_python.classifier.cc_case.case_builder import CaseBuilder
 from common_python import constants as cn
 from common_python.tests.classifier.cc_case import helpers
@@ -12,8 +13,9 @@ import os
 import pandas as pd
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
+DF_X, SER_y = helpers.getData()
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 SERIALIZED_FILE = os.path.join(TEST_DIR, "case_multi_collection.csv")
 TMP_FILE = os.path.join(TEST_DIR, "test_case_multi_collection_tmp.csv")
@@ -94,33 +96,29 @@ class TestCaseMultiCollection(unittest.TestCase):
     new_multi = self.multi.binarySelect(CaseCollection.difference, multi)
     newer_multi = new_multi.binarySelect(CaseCollection.union, multi)
     self.assertTrue(newer_multi == self.multi)
-   
-  # TESTME 
-  def testPlotHeatmap(self):
-    if IGNORE_TEST:
-      return
-    terms = ["fatty acid", "hypoxia"]
-    df_desc = helpers.PROVIDER.df_go_terms.copy()
-    df_desc = df_desc.set_index("GENE_ID")
-    ser_desc = df_desc["GO_Term"]
-    for manager in self.collection.manager_dct.values():
-      manager.filterCaseByDescription(ser_desc, include_terms=terms)
-    df = self.collection.plotHeatmap(is_plot=IS_PLOT)
-    df.to_csv("t.csv")
-    self.assertTrue(isinstance(df, pd.DataFrame))
 
-  def testPlotEvaluate(self):
+  def _filterCases(self):
+    terms = ["fatty acid", "hypoxia"]
+    return self.multi.select(CaseCollection.selectByDescription,
+        ser_desc=SER_DESC, terms=terms)
+   
+  def testPlotHeatmap(self):
+    # TESTING
+    multi = self._filterCases()
+    df1 = multi.plotHeatmap(is_plot=IS_PLOT, title="All Cases")
+    self.assertTrue(isinstance(df1, pd.DataFrame))
+    #
+    feature_vector = FeatureVector.make(DF_X.T["T2.0"])
+    df2 = multi.plotHeatmap(feature_vector=feature_vector, is_plot=IS_PLOT,
+        title="T2.0")
+    self.assertLess(len(df2), len(df1))
+   
+  def testBars(self):
     if IGNORE_TEST:
       return
-    num_tree = 10
-    manager = CaseManager(DF_X, SER_Y, n_estimators=num_tree)
-    manager.build()
     ser_X = DF_X.loc["T14.0", :]
-    cases = manager.plotEvaluate(ser_X,
-        title="State 1 evaluation for T14.0", is_plot=IS_PLOT)
-    ser_X = DF_X.loc["T2.0", :]
-    cases = manager.plotEvaluate(ser_X,
-        title="State 1 evaluation for T2.0", is_plot=IS_PLOT)
+    multi = self._filterCases()
+    multi.plotBars(ser_X=ser_X, is_plot=IS_PLOT)
 
 
 if __name__ == '__main__':

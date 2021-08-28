@@ -14,6 +14,8 @@ TODO:
 from common_python.classifier.cc_case.case_core import  \
     Case, FeatureVectorStatistic
 from common_python.classifier.cc_case.case_collection import CaseCollection
+from common_python.classifier.cc_case.case_multi_collection  \
+    import CaseMultiCollection
 from common_python.statistics.binomial_distribution import BinomialDistribution
 from common_python.classifier.feature_set import FeatureVector
 
@@ -273,9 +275,9 @@ class CaseBuilder:
     self.case_col.sort()
 
   @classmethod
-  def mkCaseBuilders(cls, df_X, ser_y, **kwargs):
+  def make(cls, df_X, ser_y, **kwargs):
     """
-    Constructs a CaseBuilder for each class in ser_y and builds the cases.
+    Constructs a CaseMultiCollection from the data.
 
     Parameters
     ----------
@@ -292,10 +294,11 @@ class CaseBuilder:
         key: class
         value: CaseBuilder
     """
-    builder_dct = {}
+    dct = {}
     classes = list(set(ser_y.values))
     for a_class in classes:
       new_ser_y = ser_y.apply(lambda v: 1 if v == a_class else 0)
-      builder_dct[a_class] = cls(df_X, new_ser_y, **kwargs)
-      builder_dct[a_class].build()
-    return builder_dct
+      builder = cls(df_X, new_ser_y, **kwargs)
+      builder.build()
+      dct[a_class] = builder.case_col
+    return CaseMultiCollection(dct)

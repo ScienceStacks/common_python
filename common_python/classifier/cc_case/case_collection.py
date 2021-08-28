@@ -7,11 +7,14 @@ and construct new cases.
 """
 
 import common_python.constants as cn
+import common_python.util.util as util
 from common_python.classifier.feature_set import FeatureVector
 from common_python.classifier.cc_case.case_core  \
     import FeatureVectorStatistic, Case
 
 import copy
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 
@@ -264,6 +267,25 @@ class CaseCollection(dict):
         if c.feature_vector.contains(feature_vector)]
     return CaseCollection.make(cases)
 
+  @staticmethod
+  def selectIsContained(case_col, feature_vector=None):
+    """
+    Finds cases that are contained in the Feature Vector.
+
+    Parameters
+    ----------
+    case_col: CaseCollection
+    feature_vector: FeatureVector
+
+    Returns
+    -----
+    CaseCollection
+    """
+    checkKwargs([feature_vector])
+    cases = [c for c in case_col.values()
+        if feature_vector.contains(c.feature_vector)]
+    return CaseCollection.make(cases)
+
   ################## Instance versions of the queries
   def union(self, other_col):
     return CaseCollection.selectUnion(self, other_col=other_col)
@@ -283,6 +305,10 @@ class CaseCollection(dict):
 
   def findByFeatureVector(self, feature_vector):
     return CaseCollection.selectByFeatureVector(self,
+        feature_vector=feature_vector)
+
+  def findIsContained(self, feature_vector):
+    return CaseCollection.selectIsContained(self,
         feature_vector=feature_vector)
 
   def serialize(self, path):
@@ -333,7 +359,71 @@ class CaseCollection(dict):
       case_dct[fv_str] = Case(feature_vector, statistic)
     #
     return CaseCollection(case_dct)
-    
+
+  def plotEvaluate(self, ser_X, max_sl=0.01, ax=None,
+      title="", ylim=(-5, 5), label_xoffset=-0.2,
+      is_plot=True):
+    """
+    Plots the results of a feature vector evaluation.
+
+    Parameters
+    ----------
+    ser_X: pd.DataFrame
+        Feature vector to be evaluated
+    max_sl: float
+        Maximum significance level to plot
+    ax: Axis for plot
+    is_plot: bool
+    label_xoffset: int
+        How much the text label is offset from the bar
+        along the x-axis
+
+    Returns
+    -------
+    list-case
+        cases plotted
+    """
+    # Select applicable cases
+    feature_vector = FeatureVector(ser_X.to_dict())
+    cases = [c for c in self.values()
+         if feature_vector.contains(c.feature_vector)
+         and np.abs(c.fv_statistic.siglvl) < max_sl]
+    feature_vectors = [c.feature_vector for c in cases]
+    siglvls = [c.fv_statistic.siglvl for c in cases]
+    count = len(cases)
+    # Construct plot Series
+    # Do the plot
+    if is_plot and (count == 0):
+        print("***No Case found for %s" % title)
+    else:
+      ser_plot = pd.Series(siglvls, dtype="float64")
+      ser_plot.index = ["" for _ in range(count)]
+      labels  = [str(c) for c in feature_vectors]
+      ser_plot = pd.Series([util.convertSLToNumzero(v) for v in ser_plot],
+          dtype='float64')
+      # Bar plot
+      width = 0.1
+      if ax is None:
+        _, ax = plt.subplots()
+        # ax = ser_plot.plot(kind="bar", width=width)
+      ax.bar(labels, ser_plot, width=width)
+      ax.set_ylabel("0s in SL")
+      ax.set_xticklabels(ser_plot.index.tolist(),
+          rotation=0)
+      ax.set_ylim(ylim)
+      ax.set_title(title)
+      for idx, label in enumerate(labels):
+        ypos = ylim[0] + 1
+        xpos = idx + label_xoffset
+        ax.text(xpos, ypos, label, rotation=90,
+            fontsize=8)
+      # Add the 0 line if needed
+      ax.plot([0, len(labels)-0.75], [0, 0],
+          color="black")
+      ax.set_xticklabels([])
+    if is_plot:
+      plt.show()
+    return self.make(cases)
 
   ################### Other CLASS METHODS ###################
   @classmethod

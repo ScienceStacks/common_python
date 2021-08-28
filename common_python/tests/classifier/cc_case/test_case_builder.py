@@ -98,14 +98,14 @@ class TestCaseBuilder(unittest.TestCase):
     builder.build()
     self.assertGreater(len(builder.case_col), 2*num_tree)
 
-  def testMkCaseBuilders(self):
+  def testMake(self):
     if IGNORE_TEST:
       return
     num_tree = 10
-    builder_dct = CaseBuilder.mkCaseBuilders(DF_X, SER_Y_ALL,
+    multi = CaseBuilder.make(DF_X, SER_Y_ALL,
         n_estimators=num_tree)
     classes = set(SER_Y_ALL.values)
-    self.assertEqual(len(builder_dct), len(classes))
+    self.assertEqual(len(multi.collection_dct), len(classes))
 
 
 if __name__ == '__main__':

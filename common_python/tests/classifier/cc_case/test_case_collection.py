@@ -212,7 +212,7 @@ class TestCaseCollection(unittest.TestCase):
         ser_desc=SER_DESC, terms=["hypoxia"])
     self.assertLess(len(new_case_col), len(case_col))
 
-  def testSelectByFeatureVector(self):
+  def testFindByFeatureVector(self):
     if IGNORE_TEST:
       return
     case_col = self.collection.findByFeatureVector(
@@ -220,6 +220,19 @@ class TestCaseCollection(unittest.TestCase):
     self.assertLess(len(case_col), len(self.collection))
     for key in case_col.keys():
       self.assertTrue(FEATURE in key)
+
+  def testFindIsContained(self):
+    if IGNORE_TEST:
+      return
+    ser_X = DF_X.T["T2.0"]
+    feature_vector = FeatureVector.make(ser_X)
+    case_col = self.collection.findIsContained(
+        feature_vector=feature_vector)
+    self.assertGreater(len(case_col), 100)
+    self.assertLess(len(case_col), len(self.collection))
+    for case in case_col.values():
+      for feature, value in case.feature_vector.dict.items():
+        self.assertEqual(ser_X.loc[feature], value)
 
   def testMake(self):
     if IGNORE_TEST:
@@ -239,6 +252,19 @@ class TestCaseCollection(unittest.TestCase):
       return
     collection = CaseCollection.deserialize(path=SERIALIZED_FILE)
     self.assertTrue(collection == self.collection)
+
+  def testPlotEvaluate(self):
+    if IGNORE_TEST:
+      return
+    num_tree = 10
+    ser_X = DF_X.loc["T14.0", :]
+    new_collection = self.collection.findByDescription(
+        ser_desc=SER_DESC, terms=["fatty acid"])
+    collection = new_collection.plotEvaluate(ser_X,
+        title="State 1 evaluation for T14.0", is_plot=IS_PLOT)
+    ser_X = DF_X.loc["T2.0", :]
+    collection = new_collection.plotEvaluate(ser_X,
+        title="State 1 evaluation for T2.0", is_plot=IS_PLOT)
 
 
 if __name__ == '__main__':
