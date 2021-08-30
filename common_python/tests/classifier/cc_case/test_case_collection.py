@@ -287,7 +287,6 @@ class TestCaseCollection(unittest.TestCase):
         is_drop_duplicate=False)
     frac_pos, num_total = self.collection.countCases()
     self.assertGreater(num_total_all, num_total)
-    self.assertGreater(frac_pos, frac_pos_all)
 
 
 if __name__ == '__main__':

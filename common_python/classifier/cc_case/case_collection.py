@@ -99,7 +99,7 @@ class CaseCollection(dict):
     result = result and all([v == other_col[k] for k,v in self.items()])
     return result
 
-  def toDataframe(self):
+  def toDataframe(self, max_sl=0.001):
     """
     Creates a dataframe from the data in the cases.
 
@@ -108,6 +108,7 @@ class CaseCollection(dict):
     pd.DataFrame
         index: str(feature_vector)
         columns: cn.NUM_POS, cn.NUM_POS, cn.SIGLVL
+    max_sl: float
     """
     siglvls = [c.fv_statistic.siglvl for c in self.values()]
     num_samples = [c.fv_statistic.num_sample for c in self.values()]
@@ -121,9 +122,15 @@ class CaseCollection(dict):
         cn.NUM_POS: num_poss,
         cn.INSTANCE_STR:  instance_strs,
         }, index=list(self.keys()))
+    # Select those complying with significance levels
+    ser = df[cn.SIGLVL]
+    ser = ser.abs()
+    sel = ser <= max_sl
+    df = df[sel]
+    #
     return df.sort_index()
 
-  def countCases(self, is_drop_duplicate=True):
+  def countCases(self, max_sl=0.001, is_drop_duplicate=True):
     """
     Counts the positive and negative cases that are not redundant in the
     training data (in that they select difference instances).
@@ -132,12 +139,13 @@ class CaseCollection(dict):
     -------
     float, int
         fraction positive cases, total cases
+    max_sl: float
     is_drop_duplicate: bool
         drop cases that are for the same samples
     """
     # Construct dataframe that eliminates feature vectors that select
     # the same instances
-    df = self.toDataframe()
+    df = self.toDataframe(max_sl=max_sl)
     df[cn.FRAC] = df[cn.NUM_POS] / df[cn.NUM_SAMPLE]
     if is_drop_duplicate:
       df = df.set_index(cn.INSTANCE_STR)
@@ -152,7 +160,11 @@ class CaseCollection(dict):
     if sum(sel_pos) > 0:
       if min(df[sel_pos][cn.FRAC] < 0.1):
         raise RuntimeError("Negative example is classified as positive.")
-    return sum(sel_pos)/num_tot, num_tot
+    if num_tot == 0:
+      frac = 0.0
+    else:
+      frac = sum(sel_pos)/ num_tot
+    return frac, num_tot
     
 
   @staticmethod
@@ -372,7 +384,8 @@ class CaseCollection(dict):
     return CaseCollection.selectIsContained(self,
         feature_vector=feature_vector)
 
-  def serialize(self, collection_path, df_X_path=None, ser_y_path=None):
+  def serialize(self, collection_path,
+      df_X_path=None, ser_y_path=None):
     """
     Serializes the CaseCollection as a CSV file.
 
@@ -385,7 +398,8 @@ class CaseCollection(dict):
     ser_y_path: str
         path to label training data
     """
-    util.serializePandas(self.toDataframe(), collection_path)
+    df = self.toDataframe(max_sl=1.0)
+    util.serializePandas(df, collection_path)
     if df_X_path is not None:
       if not os.path.isfile(df_X_path):
         util.serializePandas(self.df_X)

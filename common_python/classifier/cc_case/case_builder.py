@@ -231,7 +231,7 @@ class CaseBuilder:
       return cases
     # Calculate the feature vectors beginning at the root
     cases = processTree(0)
-    return CaseCollection.make(cases)
+    return CaseCollection.make(cases, df_X=self._df_X, ser_y=self._ser_y)
 
   def displayCases(self, cases=None, is_display=True,
       figsize=(12, 10), fontsize=14):

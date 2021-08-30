@@ -13,14 +13,23 @@ import os
 import pandas as pd
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
-DF_X, SER_y = helpers.getData()
+IGNORE_TEST = False
+IS_PLOT = False
+DF_X, SER_Y = helpers.getData()
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
-SERIALIZED_FILE = os.path.join(TEST_DIR, "case_multi_collection.csv")
-TMP_FILE = os.path.join(TEST_DIR, "test_case_multi_collection_tmp.csv")
-CASE_MULTI_COLLECTION = CaseMultiCollection.deserialize(path=SERIALIZED_FILE)
-TMP_FILES = [TMP_FILE]
+SERIALIZED_PATH = os.path.join(TEST_DIR, "case_multi_collection.csv")
+TMP_PATH = os.path.join(TEST_DIR, "test_case_multi_collection_tmp.csv")
+df_X_path = os.path.join(TEST_DIR, "feature_values.csv")
+ser_y_path = os.path.join(TEST_DIR, "class_values.csv")
+PERSISTER_PATH = os.path.join(TEST_DIR, "test_case_multi_collection.pcl")
+persister = Persister(PERSISTER_PATH)
+if persister.isExist():
+  CASE_MULTI_COLLECTION = persister.get()
+else:
+  CASE_MULTI_COLLECTION = CaseMultiCollection.deserialize(SERIALIZED_PATH,
+      df_X_path=df_X_path, ser_y_path=ser_y_path)
+  persister.set(CASE_MULTI_COLLECTION)
+TMP_PATHS = [TMP_PATH]
 SER_DESC = helpers.getDescription()
 
 
@@ -34,7 +43,7 @@ class TestCaseMultiCollection(unittest.TestCase):
     self._removeFiles()
 
   def _removeFiles(self):
-    for ffile in TMP_FILES:
+    for ffile in TMP_PATHS:
       if os.path.isfile(ffile):
         os.remove(ffile)
 
@@ -55,24 +64,28 @@ class TestCaseMultiCollection(unittest.TestCase):
   def testSerialize(self):
     if IGNORE_TEST:
       return
-    self.multi.serialize(TMP_FILE)
-    multi = CaseMultiCollection.deserialize(TMP_FILE)
+    self.multi.serialize(TMP_PATH)
+    multi = CaseMultiCollection.deserialize(TMP_PATH)
     self.assertTrue(multi == self.multi)
 
   def testDeserialize(self):
     if IGNORE_TEST:
       return
-    multi = CaseMultiCollection.deserialize(path=SERIALIZED_FILE)
+    multi = CaseMultiCollection.deserialize(SERIALIZED_PATH,
+        df_X_path=df_X_path, ser_y_path=ser_y_path)
     self.assertTrue(multi == self.multi)
 
   def testToDataframe(self):
     if IGNORE_TEST:
       return
-    df = self.multi.toDataframe()
-    self.assertTrue(isinstance(df, pd.DataFrame))
+    df1 = self.multi.toDataframe()
+    self.assertTrue(isinstance(df1, pd.DataFrame))
     num_case = sum([len(c) for c in
         self.multi.collection_dct.values()])
-    self.assertLessEqual(len(df), num_case)
+    self.assertLessEqual(len(df1), num_case)
+    #
+    df2 = self.multi.toDataframe(max_sl=0.05)
+    self.assertGreater(len(df2), len(df1))
 
   def testSelect(self):
     if IGNORE_TEST:
@@ -115,21 +128,35 @@ class TestCaseMultiCollection(unittest.TestCase):
     self.assertLess(len(df2), len(df1))
    
   def testPlotBars(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     multi = self.multi
     multi = self._filterCases()
     multi.plotBars(is_plot=IS_PLOT, title="All Cases")
     #
     feature_vector = FeatureVector.make(DF_X.T["T2.0"])
     multi.plotBars(feature_vector=feature_vector, is_plot=IS_PLOT,
-        title="T2.0")
+        title="T2.0", max_sl=1e-4)
    
-  def testBars(self):
+  def testPlotBars2(self):
     if IGNORE_TEST:
       return
     ser_X = DF_X.loc["T14.0", :]
     multi = self._filterCases()
-    multi.plotBars(ser_X=ser_X, is_plot=IS_PLOT)
+    multi.plotBars(FeatureVector(ser_X), is_plot=IS_PLOT)
+   
+  def testPlotBars3(self):
+    if IGNORE_TEST:
+      return
+    ser_X = DF_X.loc["T14.0", :]
+    self.multi.plotBars(FeatureVector(ser_X), is_plot=IS_PLOT, expected_class=3)
+   
+  def testPlotBarsForFeatures(self):
+    if IGNORE_TEST:
+      return
+    df = DF_X[DF_X.index.str.contains(".0")]
+    self.multi.plotBarsForFeatures(df, 5, 5, suptitle = "rep 0",
+       ser_y=SER_Y, fontsize=8)
 
 
 if __name__ == '__main__':

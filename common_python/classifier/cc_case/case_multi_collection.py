@@ -8,6 +8,7 @@ feature data.
 
 import common_python.constants as cn
 import common_python.util.util as util
+from common_python.classifier.feature_set import FeatureVector
 from common_python.classifier.cc_case.case_collection import CaseCollection
 
 import copy
@@ -47,9 +48,13 @@ class CaseMultiCollection:
           self.collection_dct[name] == other.collection_dct[name])
     return result
     
-  def toDataframe(self):
+  def toDataframe(self, max_sl=0.001):
     """
     Creates a dataframe of significance levels by class.
+
+    Parameters
+    ----------
+    max_sl: float
 
     Returns
     -------
@@ -58,9 +63,29 @@ class CaseMultiCollection:
         column: class
         value: significance level
     """
-    sers = [c.toDataframe()[cn.SIGLVL] for c in self.collection_dct.values()]
+    def selDataframe(df, max_sl, direction):
+      if direction < 0:
+        sel = df[cn.SIGLVL] < 0
+      else:
+        sel = df[cn.SIGLVL] >= 0
+      ser = direction*df[sel][cn.SIGLVL]
+      if sum(sel) > 0:
+        ser_result = ser[ser <= max_sl]
+      else:
+        ser_result  = pd.Series()
+      return ser_result
+    #
+    def mkPrunedSer(collection, max_sl):
+      df = collection.toDataframe()
+      df_neg = selDataframe(df, max_sl, -1)
+      df_pos = selDataframe(df, max_sl, 1)
+      df_result = pd.concat([df_neg, df_pos], axis=0)
+      return df_result
+    # 
+    sers = [mkPrunedSer(c, max_sl) for c in self.collection_dct.values()]
     df = pd.concat(sers, axis=1)
     df.columns = self.names
+    #
     return df
 
   def select(self, method, **kwargs):
@@ -98,36 +123,6 @@ class CaseMultiCollection:
       dct[name] = method(case_col,
           other_multi.collection_dct[name], **kwargs)
     return CaseMultiCollection(dct)
-
-  def plotBars(self, ser_X, title="", **kwargs):
-    """
-    Creates a classification profile for the feature vector.
-    
-    Parameters
-    ----------
-    ser_X: Series (feature vector)
-    """
-    new_kwargs = dict(kwargs)
-    new_kwargs["is_plot"] = False
-    num_row = 2 
-    num_col = 3 
-    fig, axes = plt.subplots(num_row, num_col,
-        figsize=(16, 10))
-    for idx, name in enumerate(self.names):
-        row = int(idx/num_col)
-        col = idx % num_col
-        if row == 0:
-            label_xoffset = -0.1
-        else:
-            label_xoffset = 0.1 
-        self.collection_dct[name].plotEvaluate(ser_X, 
-            ax=axes[row, col],
-            title = name,
-            label_xoffset=label_xoffset, **new_kwargs)
-    fig.suptitle(title, fontsize=16)
-    if "is_plot" in kwargs:
-      if kwargs["is_plot"]:
-        plt.show()
 
   def plotHeatmap(self, feature_vector=None, ax=None, is_plot=True,
       max_zero=5, figsize=(10, 12), title=""):
@@ -175,16 +170,20 @@ class CaseMultiCollection:
     return df
 
   def plotBars(self, feature_vector=None, ax=None, is_plot=True,
-      max_zero=5, figsize=(10, 12), title="", fontsize=16):
+      max_sl=0.001, expected_class=None,
+      figsize=(5, 5), title="", fontsize=16,
+      xticklabels=True, yticklabels=True,
+      xlabel="class", ylabel="fraction positive"):
     """
     Constructs a bar plot of the fraction positive for each class.
 
     Parameters
     ----------
     feature_vector: FeatureVector
+    expected_class: int
     ax: Matplotlib.axes
     is_plot: bool
-    max_zero: float
+    max_sl: float
     figsize: (float, float)
     """
     if ax is None:
@@ -198,15 +197,22 @@ class CaseMultiCollection:
     fracs = []
     counts = []
     for name, collection in multi.collection_dct.items():
-       frac, count = collection.countCases()
+       frac, count = collection.countCases(max_sl=max_sl)
        fracs.append(frac)
        counts.append(count)
     # Do the plot
-    ax.bar(self.names, fracs)
+    bar_list = ax.bar(self.names, fracs)
+    if expected_class is not None:
+      bar_list[expected_class].set_color('r')
     for idx, frac in enumerate(fracs):
-        ax.text(self.names[idx], frac + 0.01, str(counts[idx]), fontsize=16)
-    ax.set_ylabel("fraction positive", fontsize=fontsize)
-    ax.set_xlabel("class", fontsize=fontsize)
+        ax.text(self.names[idx], frac + 0.01, str(counts[idx]),
+            fontsize=fontsize)
+    if not xticklabels:
+      ax.set_xticklabels([])
+    if not yticklabels:
+      ax.set_yticklabels([])
+    ax.set_ylabel(ylabel, fontsize=fontsize)
+    ax.set_xlabel(xlabel, fontsize=fontsize)
     ax.set_title(title, fontsize=fontsize+2)
     #
     if is_plot:
@@ -231,16 +237,18 @@ class CaseMultiCollection:
     case_col_dct = {k: m.case_col for k, m in case_builder_dct.items()}
     return cls(case_col_dct, **kwargs)
 
-  def serialize(self, path):
+  def serialize(self, multi_path, df_X_path=None, ser_y_path=None):
     """
-    Serializes the collection to the path. The serializations is a
-    CSV file with a column added for the class.
+    Serializes the CaseMultiCollection as a CSV file.
 
     Parameters
     ----------
-    
-    Returns
-    -------
+    multi_path: str
+        where to save CSV for collection
+    df_X_path: str
+        path to feature vector training data
+    ser_y_path: str
+        path to label training data
     """
     # Construct the dataframe to serialize
     dfs = [c.toDataframe() for c in self.collection_dct.values()]
@@ -248,27 +256,94 @@ class CaseMultiCollection:
       df[COL_KEY] = name
     df = pd.concat(dfs, axis=0)
     df.index.name = cn.INDEX
-    df.to_csv(path, index=True)
+    #
+    util.serializePandas(df, multi_path)
 
   @classmethod
-  def deserialize(self, path):
+  def deserialize(self, multi_path, df_X_path=None, ser_y_path=None):
     """
     Deserializes the collection from the path. The serializations is
     from a CSV file with a column added for the class.
 
     Parameters
     ----------
-    
+    multi_path: str
+        where to save CSV for collection
+    df_X_path: str
+        path to feature vector training data
+    ser_y_path: str
+        path to label training data
+
     Returns
     -------
+    CaseMultiCollection
     """
     # Obtain the dataframe representation
-    df = pd.read_csv(path)
+    df = pd.read_csv(multi_path)
     df = df.set_index(cn.INDEX)
     names = list(set(df[COL_KEY]))
     df_dct = {n: df[df[COL_KEY] == n] for n in names}
     for df in df_dct.values():
       del df[COL_KEY]
-    collection_dct = {n: CaseCollection.deserialize(df=df)
+    collection_dct = {n:
+        CaseCollection.deserialize(df=df, df_X_path=df_X_path,
+        ser_y_path=ser_y_path)
         for n, df in df_dct.items()}
     return CaseMultiCollection(collection_dct)
+
+  def plotBarsForFeatures(self, df_X, num_row, num_col,
+     ser_y=None, suptitle="", **kwargs):
+    """
+    Does bar plots for a matrix of feature data.
+
+    Parameters
+    ----------
+    df_X: pd.DataFrame
+        rows: instances
+        columns: features
+    num_row: int
+         number of rows of plots
+    num_col: int
+         number of columns of plots
+    ser_y: pd.Series
+        expected class
+    suptitle: str
+    kwargs: dict
+         key words provided to plotBars
+    
+    Returns
+    -------
+    """
+    if "figsize" in kwargs:
+      figsize = kwargs["figsize"]
+    else:
+      figsize = (10, 12)
+    if "fontsize" in kwargs:
+      fontsize = kwargs["fontsize"]
+    else:
+      fontsize = 8
+      kwargs["fontsize"] = fontsize
+    #
+    fig, axes = plt.subplots(num_row, num_col, figsize=figsize)
+    indices = list(df_X.index)
+    indices = sorted(indices, key=lambda s: float(s[1:3]))
+    for irow in range(num_row):
+      for icol in range(num_col):
+        idx = irow*num_col + icol
+        instance = indices[idx]
+        feature_vector = FeatureVector(df_X.loc[instance, :])
+        ax = axes[irow, icol]
+        if ser_y is not None:
+          expected_class = ser_y.loc[instance]
+        else:
+          expected_class = None
+        self.plotBars(feature_vector=feature_vector, is_plot=False,
+            title=instance, ax=ax, expected_class=expected_class,
+            xlabel="", ylabel="", xticklabels=False, yticklabels=False, **kwargs)
+        plt.suptitle(suptitle)
+    plt.show()
+    if "is_plot" in kwargs:
+      if not kwargs["is_plot"]:
+        pass
+      else:
+        plt.show()
