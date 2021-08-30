@@ -18,6 +18,7 @@ case occurrence for labels using a binomial null distribution with p=0.5.
 """
 
 import common_python.constants as cn
+from common_python.classifier.feature_set import FeatureVector
 
 import copy
 import numpy as np
@@ -67,7 +68,8 @@ class FeatureVectorStatistic:
 class Case:
   """Case for a binary classification."""
 
-  def __init__(self, feature_vector, fv_statistic, dtree=None):
+  def __init__(self, feature_vector, fv_statistic, dtree=None,
+      df_X=None):
     """
     Parameters
     ----------
@@ -75,10 +77,46 @@ class Case:
     fv_statistic: FeatureVectorStatistic
     dtree: sklearn.DecisionTreeClassifier
         Tree from which case was constructed
+    df_X: pd.DataFrame - training data
+        columns: features
+        index: instances
     """
     self.feature_vector = feature_vector
     self.fv_statistic = fv_statistic
     self.dtree = dtree
+    self.instances = self._getCompatibleInstances(df_X, self.feature_vector)
+    if self.instances is None:
+      self.instance_str = ""
+    else:
+      self.instance_str = "+".join(self.instances)
+
+  @staticmethod
+  def _getCompatibleInstances(df_X, feature_vector):
+    """
+    Constructs a bit vector that represents the rows (instances) for which
+    the case is compatible.
+
+    Parameters
+    ----------
+    df_X: pd.DataFrame (features)
+    feature_vector: FeatureVector
+
+    Returns
+    -------
+    list (sorted)
+    """
+    if df_X is not None:
+      instances = []
+      for idx in df_X.index:
+        ser = df_X.loc[idx,:]
+        fv = FeatureVector(ser)
+        if fv.contains(feature_vector):
+          instances.append(idx)
+      instances.sort()
+      return instances
+    else:
+      return None
+    
 
   def __repr__(self):
     return "%s-- %s" % (str(self.feature_vector), str(self.fv_statistic))
@@ -87,154 +125,3 @@ class Case:
     if str(self) != str(other_case):
       return False
     return self.fv_statistic == other_case.fv_statistic
-
-
-##################################################################
-class CaseCollection(dict):
-  """
-  key: FeatureVector in sorted order
-  value: Case
-  """
-
-  def sort(self):
-    """
-    Sorts the dictionary by key.
-    """
-    keys = list(self.keys())
-    # Check if a sort is needed
-    is_sorted = True
-    for key1, key2 in zip(keys[0:-1], keys[1:]):
-      if key1 > key2:
-        is_sorted = False
-        break
-    if is_sorted:
-      return
-    #
-    keys.sort()
-    dct = {k: self[k] for k in keys}
-    [self.__delitem__(k) for k in keys]
-    self.update(dct)
-
-  def __eq__(self, other_col):
-    diff = set(self.keys()).symmetric_difference(other_col.keys())
-    if len(diff) > 0:
-      return False
-    trues = [self[k] == other_col[k] for k in self.keys()]
-    return all(trues)
-
-  def toDataframe(self):
-    """
-    Creates a dataframe from the data in the cases.
-
-    Returns
-    -------
-    pd.DataFrame
-        index: str(feature_vector)
-        columns: cn.NUM_POS, cn.NUM_POS, cn.SIGLVL
-    """
-    siglvls = [c.fv_statistic.siglvl for c in self.values()]
-    num_samples = [c.fv_statistic.num_sample for c in self.values()]
-    num_poss = [c.fv_statistic.num_pos for c in self.values()]
-    prior_probs = [c.fv_statistic.prior_prob for c in self.values()]
-    df = pd.DataFrame({
-        cn.SIGLVL: siglvls,
-        cn.PRIOR_PROB: prior_probs,
-        cn.NUM_SAMPLE: num_samples,
-        cn.NUM_POS: num_poss,
-        }, index=list(self.keys()))
-    return df.sort_index()
-
-  def _checkCommon(self, other_col):
-    if IS_CHECK:
-      common_stg = list(set(self.keys()).intersection(other_col.keys()))
-      trues = [self[k] == other_col[k] for k in common_stg]
-      if not all(trues):
-        raise RuntimeError("Common Cases are not equal.")
-
-  def union(self, other_col):
-    """
-    Union of two CaseCollection.
-
-    Parameters
-    ----------
-    other_col: CaseCollection
-
-    Returns
-    -------
-    CaseCollection
-    """
-    self._checkCommon(other_col)
-    case_col = copy.deepcopy(self)
-    case_col.update(other_col)
-    case_col.sort()
-    return case_col
-
-  def intersection(self, other_col):
-    """
-    Intersection of two CaseCollection.
-
-    Parameters
-    ----------
-    other_col: CaseCollection
-
-    Returns
-    -------
-    CaseCollection
-    """
-    self._checkCommon(other_col)
-    common_keys = set(self.keys()).intersection(other_col.keys())
-    cases = [self[k] for k in common_keys]
-    return CaseCollection.make(cases)
-
-  def difference(self, other_col):
-    """
-    Difference of two CaseCollection.
-
-    Parameters
-    ----------
-    other_col: CaseCollection
-
-    Returns
-    -------
-    CaseCollection
-    """
-    self._checkCommon(other_col)
-    difference_keys = set(self.keys()).difference(other_col.keys())
-    cases = [self[k] for k in difference_keys]
-    return CaseCollection.make(cases)
-
-  # TESTME
-  def symmetricDifference(self, other_col):
-    """
-    What's not common to both.
-
-    Parameters
-    ----------
-    other_col: CaseCollection
-
-    Returns
-    -------
-    CaseCollection
-    """
-    self._checkCommon(other_col)
-    case_col = self.difference(other_col)
-    case_col.extend(other_col.differeince(self))
-    return CaseCollection.make(cases)
-
-  ################### CLASS METHODS ###################
-  @classmethod
-  def make(cls, cases):
-    """
-    Returns sorted CaseCollection.
-
-    Parameters
-    ----------
-    list-Case
-
-    Returns
-    -------
-    CaseCollection (sorted)
-    """
-    case_col = CaseCollection({str(c.feature_vector): c for c in cases})
-    case_col.sort()
-    return case_col

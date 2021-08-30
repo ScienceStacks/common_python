@@ -1,4 +1,6 @@
 # Implementation
+1. CaseCollection counts the number of non-redundant positive and negative cases.
+1. Bar plot of fraction of positive cases for each class.
 1. CaseCollection - serialize/deserialize
 2. CaseMultiCollection - serialize/deserialize
 3. Refactor codes for CaseMultiCollection

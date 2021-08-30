@@ -21,6 +21,7 @@ FRACNEG = "fracneg"  # A fractiona
 FRACPOS = "fracpos"  # A fractiona
 GROUP = "group"
 INDEX = "index"
+INSTANCE_STR = "instance_str"
 INTERCEPT = "intercept"
 KEGG_DESCRIPTION = "kegg_description"
 KEGG_PATHWAY = "kegg_pathway"

@@ -3,7 +3,8 @@ from common_python.classifier.feature_set  \
     import FeatureSet, FeatureVector
 from common_python.classifier.cc_case.case_builder import CaseBuilder
 from common_python.classifier.cc_case.case_core import  \
-    Case, CaseCollection, FeatureVectorStatistic
+    Case, FeatureVectorStatistic
+from common_python.classifier.cc_case.case_collection import CaseCollection
 from common.trinary_data import TrinaryData
 from common_python.tests.classifier import helpers
 from common_python.util.persister import Persister

@@ -70,7 +70,7 @@ class CaseBuilder:
     self._forest = None  # Random forest used to construct cases
     self._df_case = None  # Dataframe representation of cases
     self._features = list(df_X.columns)
-    self.case_col = CaseCollection({})
+    self.case_col = CaseCollection({}, df_X=self._df_X, ser_y=self._ser_y)
     total_sample = len(self._ser_y)
     self._prior_prob = sum(self._ser_y) / total_sample
     self._binom = BinomialDistribution(total_sample, self._prior_prob)
@@ -267,7 +267,7 @@ class CaseBuilder:
     self._forest = RandomForestClassifier(**forest_kwargs)
     self._forest.fit(self._df_X, self._ser_y)
     # Aggregate cases across all decision trees
-    self.case_col = CaseCollection({})
+    self.case_col = CaseCollection({}, df_X=self._df_X, ser_y=self._ser_y)
     for dtree in self._forest.estimators_:
         new_case_col = self._getCases(dtree)
         self.case_col.update(new_case_col)

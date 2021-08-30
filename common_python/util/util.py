@@ -333,3 +333,52 @@ def convertSLToNumzero(sl, min_sl=1e-3):
   else:
     raise RuntimeError("Cannot have significance level of 0.")
   return num_zero
+
+def deserializePandas(path):
+  """
+  Retrives a pandas DataFrame or Series. There should be a column
+  labelled "index". If there is only one non-index column, then
+  a Series is returned.
+
+  Parameters
+  ----------
+  path: str
+    Path to CSV file
+  
+  Returns
+  -------
+  pd.Series/pd.DataFrame
+  """
+  UNNAMED = "Unnamed: 0"
+  if path is None:
+    return None
+  df = pd.read_csv(path)
+  if UNNAMED in df.columns:
+    del df[UNNAMED]
+  if not cn.INDEX in df.columns:
+    raise ValueError("CSV file does not have a column labelled `index`: %s"
+        % path)
+  df = df.set_index("index")
+  if len(df.columns) == 1:
+    columns = list(df.columns)
+    return df[columns[0]]
+  else:
+    return df
+
+def serializePandas(pd_object, path):
+  """
+  Serializes a pandas DataFrame or Series.
+  Creates a column for the index labelled "index".
+
+  Parameters
+  ----------
+  pd_object: pd.Series, pd.DataFrame
+  path: str
+    Path to CSV file
+  """
+  if path is None:
+    return
+  #
+  df = pd.DataFrame(pd_object.copy())
+  df[cn.INDEX] = list(df.index)
+  df.to_csv(path)

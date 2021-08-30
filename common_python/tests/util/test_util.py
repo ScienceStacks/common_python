@@ -1,17 +1,32 @@
 '''Tests for utility routines.'''
 
+import common_python.constants as cn
 import common_python.util.util as ut
 
 import numpy as np
+import os
 import pandas as pd
 import sys
 import unittest
 
 IGNORE_TEST = False
 IS_PLOT = False
+TMP_FILE1 = "util_tmp.csv"
+TMP_FILES = [TMP_FILE1]
 
 
 class TestFunctions(unittest.TestCase):
+
+  def setUp(self):
+    self._remove()
+
+  def tearDown(self):
+    self._remove()
+
+  def _remove(self):
+    for ffile in TMP_FILES:
+      if os.path.isfile(ffile):
+        os.remove(ffile)
 
   def testConvertType(self):
     if IGNORE_TEST:
@@ -204,6 +219,16 @@ class TestFunctions(unittest.TestCase):
     self.assertEqual(ut.convertSLToNumzero(0.001), 3)
     self.assertEqual(ut.convertSLToNumzero(-0.001), -3)
     self.assertEqual(ut.convertSLToNumzero(-0.001, min_sl=0.01), -2)
+
+  def testSerializePandasDeserializePandas(self):
+    if IGNORE_TEST:
+      return
+    indices = [10*v for v in range(10)]
+    df = pd.DataFrame({'a': range(10), 'b': range(10)})
+    df.index = indices
+    ut.serializePandas(df, TMP_FILE1)
+    df_new = ut.deserializePandas(TMP_FILE1)
+    self.assertTrue(df_new.equals(df))
 
 
 if __name__ == '__main__':

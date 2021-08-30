@@ -6,6 +6,7 @@ from common_python.classifier.cc_case.case_core \
 from common_python.classifier.cc_case.case_collection import CaseCollection
 from common_python import constants as cn
 from common_python.tests.classifier.cc_case import helpers
+from common_python.util.persister import Persister
 
 import copy
 import matplotlib.pyplot as plt
@@ -22,7 +23,9 @@ FEATURE_VECTOR_MINUS_1 = FeatureVector({FEATURE: -1})
 FEATURE_VECTOR_ZERO = FeatureVector({FEATURE: 0})
 FEATURE_VECTOR_PLUS_1 = FeatureVector({FEATURE: 1})
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
-SERIALIZED_FILE = os.path.join(TEST_DIR, "case_collection.csv")
+COLLECTION_PATH = os.path.join(TEST_DIR, "case_collection.csv")
+DF_X_PATH = os.path.join(TEST_DIR, "feature_values.csv")
+SER_Y_PATH = os.path.join(TEST_DIR, "class_values.csv")
 TMP_FILE = os.path.join(TEST_DIR, "test_case_collection_tmp.csv")
 CLASS = 1
 DF_X, SER_Y_ALL = helpers.getData()
@@ -40,7 +43,15 @@ FRAC = 0.2
 SIGLVL = 0.05
 #
 SER_DESC = helpers.getDescription()
-CASE_COLLECTION = CaseCollection.deserialize(SERIALIZED_FILE)
+#
+PERSISTER_FILE = "test_case_collection.pcl"
+persister = Persister(PERSISTER_FILE)
+if persister.isExist():
+  CASE_COLLECTION = persister.get()
+else:
+  CASE_COLLECTION = CaseCollection.deserialize(COLLECTION_PATH,
+      df_X_path=DF_X_PATH, ser_y_path=SER_Y_PATH)
+  persister.set(CASE_COLLECTION)
 TMP_FILES = [TMP_FILE]
 
 
@@ -89,7 +100,8 @@ class TestCaseCollection(unittest.TestCase):
       return
     df = self.collection.toDataframe()
     self.assertTrue(isinstance(df, pd.DataFrame))
-    for col in [cn.SIGLVL, cn.PRIOR_PROB, cn.NUM_SAMPLE, cn.NUM_POS]:
+    for col in [cn.SIGLVL, cn.PRIOR_PROB, cn.NUM_SAMPLE, cn.NUM_POS,
+        cn.INSTANCE_STR]:
       self.assertTrue(col in df.columns)
     self.assertGreater(len(df), 0)
 
@@ -155,7 +167,8 @@ class TestCaseCollection(unittest.TestCase):
     test(end_idx=idx, start_idx=idx, expected_length=expected_length)
     test(end_idx=10, start_idx=0, expected_length=len(self.collection)-10)
     #
-    collection = self.collection.difference(CaseCollection({}))
+    collection = self.collection.difference(CaseCollection({},
+        df_X=DF_X, ser_y=SER_Y))
     self.assertTrue(collection == self.collection)
 
   def testSymmetricDifference(self):
@@ -244,19 +257,20 @@ class TestCaseCollection(unittest.TestCase):
     if IGNORE_TEST:
       return
     self.collection.serialize(TMP_FILE)
-    collection = CaseCollection.deserialize(TMP_FILE)
+    collection = CaseCollection.deserialize(TMP_FILE,
+        df_X_path=DF_X_PATH, ser_y_path=SER_Y_PATH)
     self.assertTrue(collection == self.collection)
 
   def testDeserialize(self):
     if IGNORE_TEST:
       return
-    collection = CaseCollection.deserialize(path=SERIALIZED_FILE)
+    collection = CaseCollection.deserialize(collection_path=COLLECTION_PATH,
+        df_X_path=DF_X_PATH, ser_y_path=SER_Y_PATH)
     self.assertTrue(collection == self.collection)
 
   def testPlotEvaluate(self):
     if IGNORE_TEST:
       return
-    num_tree = 10
     ser_X = DF_X.loc["T14.0", :]
     new_collection = self.collection.findByDescription(
         ser_desc=SER_DESC, terms=["fatty acid"])
@@ -265,6 +279,15 @@ class TestCaseCollection(unittest.TestCase):
     ser_X = DF_X.loc["T2.0", :]
     collection = new_collection.plotEvaluate(ser_X,
         title="State 1 evaluation for T2.0", is_plot=IS_PLOT)
+
+  def testCountCases(self):
+    if IGNORE_TEST:
+      return
+    frac_pos_all, num_total_all = self.collection.countCases(
+        is_drop_duplicate=False)
+    frac_pos, num_total = self.collection.countCases()
+    self.assertGreater(num_total_all, num_total)
+    self.assertGreater(frac_pos, frac_pos_all)
 
 
 if __name__ == '__main__':

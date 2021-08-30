@@ -46,6 +46,19 @@ class CaseCollection(dict):
   key: FeatureVector in sorted order
   value: Case
   """
+  def __init__(self, dct, df_X=None, ser_y=None):
+    """
+    Parameters
+    ----------
+    dct: dict
+    df_X: pd.DataFrame
+        feature vector training data
+    ser_y: pd.Series
+        label training data
+    """
+    super().__init__(dct)
+    self.df_X = df_X
+    self.ser_y = ser_y
 
   def sort(self):
     """
@@ -67,11 +80,24 @@ class CaseCollection(dict):
     self.update(dct)
 
   def __eq__(self, other_col):
+    def check(pd_obj1, pd_obj2):
+      if isinstance(pd_obj1, pd.DataFrame):
+        return pd_obj1.equals(pd_obj2)
+      elif isinstance(pd_obj2, pd.DataFrame):
+        return pd_obj2.equals(pd_obj2)
+      elif isinstance(pd_obj1, pd.Series):
+        return pd_obj1.equals(pd_obj2)
+      elif isinstance(pd_obj2, pd.Series):
+        return pd_obj2.equals(pd_obj2)
+      return pd_obj1 == pd_obj2
+    #
+    result = True
+    result = result and check(self.df_X, other_col.df_X)
+    result = result and check(self.ser_y, other_col.ser_y)
     diff = set(self.keys()).symmetric_difference(other_col.keys())
-    if len(diff) > 0:
-      return False
-    trues = [v == other_col[k] for k,v in self.items()]
-    return all(trues)
+    result = result and (len(diff) == 0)
+    result = result and all([v == other_col[k] for k,v in self.items()])
+    return result
 
   def toDataframe(self):
     """
@@ -87,13 +113,45 @@ class CaseCollection(dict):
     num_samples = [c.fv_statistic.num_sample for c in self.values()]
     num_poss = [c.fv_statistic.num_pos for c in self.values()]
     prior_probs = [c.fv_statistic.prior_prob for c in self.values()]
+    instance_strs = [c.instance_str for c in self.values()]
     df = pd.DataFrame({
         cn.SIGLVL: siglvls,
         cn.PRIOR_PROB: prior_probs,
         cn.NUM_SAMPLE: num_samples,
         cn.NUM_POS: num_poss,
+        cn.INSTANCE_STR:  instance_strs,
         }, index=list(self.keys()))
     return df.sort_index()
+
+  def countCases(self, is_drop_duplicate=True):
+    """
+    Counts the positive and negative cases that are not redundant in the
+    training data (in that they select difference instances).
+    
+    Returns
+    -------
+    float, int
+        fraction positive cases, total cases
+    is_drop_duplicate: bool
+        drop cases that are for the same samples
+    """
+    # Construct dataframe that eliminates feature vectors that select
+    # the same instances
+    df = self.toDataframe()
+    df[cn.FRAC] = df[cn.NUM_POS] / df[cn.NUM_SAMPLE]
+    if is_drop_duplicate:
+      df = df.set_index(cn.INSTANCE_STR)
+      df = df.drop_duplicates()
+    # Calculate statistics
+    num_tot = len(df)
+    sel_neg = df[cn.SIGLVL] < 0
+    if max(df[sel_neg][cn.FRAC] > 0.9):
+      raise RuntimeError("Positive example is classified as negative.")
+    sel_pos = df[cn.SIGLVL] > 0
+    if min(df[sel_pos][cn.FRAC] < 0.1):
+      raise RuntimeError("Negative example is classified as positive.")
+    return sum(sel_pos)/num_tot, num_tot
+    
 
   @staticmethod
   def _checkCommon(case_col1, case_col2):
@@ -144,7 +202,7 @@ class CaseCollection(dict):
     CaseCollection._checkCommon(case_col, other_col)
     common_keys = set(case_col.keys()).intersection(other_col.keys())
     cases = [case_col[k] for k in common_keys]
-    return CaseCollection.make(cases)
+    return CaseCollection.make(cases, df_X=case_col.df_X, ser_y=case_col.ser_y)
 
   @staticmethod
   def selectDifference(case_col, other_col):
@@ -164,7 +222,7 @@ class CaseCollection(dict):
     CaseCollection._checkCommon(case_col, other_col)
     difference_keys = set(case_col.keys()).difference(other_col.keys())
     cases = [case_col[k] for k in difference_keys]
-    return CaseCollection.make(cases)
+    return CaseCollection.make(cases, df_X=case_col.df_X, ser_y=case_col.ser_y)
 
   @staticmethod
   def selectSymmetricDifference(case_col, other_col):
@@ -246,7 +304,8 @@ class CaseCollection(dict):
       return selected_cases
     #
     features = findFeaturesWithTerms(terms)
-    return CaseCollection.make(findCasesWithFeature(features))
+    cases = findCasesWithFeature(features)
+    return CaseCollection.make(cases, df_X=case_col.df_X, ser_y=case_col.ser_y)
 
   @staticmethod
   def selectByFeatureVector(case_col, feature_vector=None):
@@ -265,7 +324,7 @@ class CaseCollection(dict):
     checkKwargs([feature_vector])
     cases = [c for c in case_col.values()
         if c.feature_vector.contains(feature_vector)]
-    return CaseCollection.make(cases)
+    return CaseCollection.make(cases, df_X=case_col.df_X, ser_y=case_col.ser_y)
 
   @staticmethod
   def selectIsContained(case_col, feature_vector=None):
@@ -284,7 +343,7 @@ class CaseCollection(dict):
     checkKwargs([feature_vector])
     cases = [c for c in case_col.values()
         if feature_vector.contains(c.feature_vector)]
-    return CaseCollection.make(cases)
+    return CaseCollection.make(cases, df_X=case_col.df_X, ser_y=case_col.ser_y)
 
   ################## Instance versions of the queries
   def union(self, other_col):
@@ -311,42 +370,64 @@ class CaseCollection(dict):
     return CaseCollection.selectIsContained(self,
         feature_vector=feature_vector)
 
-  def serialize(self, path):
+  def serialize(self, collection_path, df_X_path=None, ser_y_path=None):
     """
     Serializes the CaseCollection as a CSV file.
 
     Parameters
     ----------
-    path: str
+    collection_path: str
+        where to save CSV for collection
+    df_X_path: str
+        path to feature vector training data
+    ser_y_path: str
+        path to label training data
     """
-    df = self.toDataframe()
-    df.index.name = "index"
-    df.to_csv(path, index=True)
+    util.serializePandas(self.toDataframe(), collection_path)
+    if df_X_path is not None:
+      if not os.path.isfile(df_X_path):
+        util.serializePandas(self.df_X)
+    if ser_y_path is not None:
+      if not os.path.isfile(ser_y_path):
+        util.serializePandas(self.ser_y)
 
   @classmethod
-  def deserialize(cls, path=None, df=None):
+  def deserialize(cls, collection_path=None, df=None,
+      df_X_path=None, ser_y_path=None):
     """
     Deserializes the CaseCollection from a CSV file.
 
     Parameters
     ----------
-    path: str
+    collection_path: str
       Path to deserialize from, a CSV file with a column named "index"
     df: DataFrame
-      A dataframe from which cases are constructed
+      A dataframe representation of the cases to construct
         index: str representation of feature vector
+    df_X_path: str
+        path to feature vector training data
+    ser_y_path: str
+        path to label training data
 
     Returns
     -------
     CaseCollection
     """
-    if (path is not None) and (df is None):
-      df = pd.read_csv(path)
-      df = df.set_index("index")
-    elif (path is None) and (df is not None):
+    # Retrieve the files
+    if (collection_path is not None) and (df is None):
+      df = util.deserializePandas(collection_path)
+    elif (collection_path is None) and (df is not None):
       pass
     else:
-     raise ValueError("Exactly one of path and df must be non-None.")
+     raise ValueError("Exactly one of collection_path and df must be non-None.")
+    if df_X_path is not None:
+      df_X = util.deserializePandas(df_X_path)
+    else:
+      df_X = None
+    if ser_y_path is not None:
+      ser_y = util.deserializePandas(ser_y_path)
+    else:
+      ser_y = None
     #
     case_dct = {}
     for fv_str, row in df.iterrows():
@@ -356,9 +437,9 @@ class CaseCollection(dict):
           row[cn.NUM_POS],
           row[cn.PRIOR_PROB],
           row[cn.SIGLVL])
-      case_dct[fv_str] = Case(feature_vector, statistic)
+      case_dct[fv_str] = Case(feature_vector, statistic, df_X=df_X)
     #
-    return CaseCollection(case_dct)
+    return CaseCollection(case_dct, df_X=df_X, ser_y=ser_y)
 
   def plotEvaluate(self, ser_X, max_sl=0.01, ax=None,
       title="", ylim=(-5, 5), label_xoffset=-0.2,
@@ -380,7 +461,7 @@ class CaseCollection(dict):
 
     Returns
     -------
-    list-case
+    CaseCollection
         cases plotted
     """
     # Select applicable cases
@@ -423,22 +504,27 @@ class CaseCollection(dict):
       ax.set_xticklabels([])
     if is_plot:
       plt.show()
-    return self.make(cases)
+    return CaseCollection.make(cases, df_X=self.df_X, ser_y=self.ser_y)
 
   ################### Other CLASS METHODS ###################
   @classmethod
-  def make(cls, cases):
+  def make(cls, cases, df_X=None, ser_y=None):
     """
     Returns sorted CaseCollection.
 
     Parameters
     ----------
-    list-Case
+    cases: list-Case
+    df_X: pd.DataFrame
+        feature vector training data
+    ser_y: pd.Series
+        label training data
 
     Returns
     -------
     CaseCollection (sorted)
     """
-    case_col = CaseCollection({str(c.feature_vector): c for c in cases})
+    dct = {str(c.feature_vector): c for c in cases}
+    case_col = CaseCollection(dct, df_X=df_X, ser_y=ser_y)
     case_col.sort()
     return case_col
