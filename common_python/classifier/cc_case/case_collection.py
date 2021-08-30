@@ -145,11 +145,13 @@ class CaseCollection(dict):
     # Calculate statistics
     num_tot = len(df)
     sel_neg = df[cn.SIGLVL] < 0
-    if max(df[sel_neg][cn.FRAC] > 0.9):
-      raise RuntimeError("Positive example is classified as negative.")
+    if sum(sel_neg) > 0:
+      if max(df[sel_neg][cn.FRAC] > 0.9):
+        raise RuntimeError("Positive example is classified as negative.")
     sel_pos = df[cn.SIGLVL] > 0
-    if min(df[sel_pos][cn.FRAC] < 0.1):
-      raise RuntimeError("Negative example is classified as positive.")
+    if sum(sel_pos) > 0:
+      if min(df[sel_pos][cn.FRAC] < 0.1):
+        raise RuntimeError("Negative example is classified as positive.")
     return sum(sel_pos)/num_tot, num_tot
     
 

@@ -174,6 +174,44 @@ class CaseMultiCollection:
       plt.show()
     return df
 
+  def plotBars(self, feature_vector=None, ax=None, is_plot=True,
+      max_zero=5, figsize=(10, 12), title="", fontsize=16):
+    """
+    Constructs a bar plot of the fraction positive for each class.
+
+    Parameters
+    ----------
+    feature_vector: FeatureVector
+    ax: Matplotlib.axes
+    is_plot: bool
+    max_zero: float
+    figsize: (float, float)
+    """
+    if ax is None:
+      _, ax = plt.subplots(1, figsize=figsize)
+    # Contruct a datadrame
+    if feature_vector is not None:
+      multi = self.select(CaseCollection.selectIsContained,
+          feature_vector=feature_vector)
+    else:
+      multi = self
+    fracs = []
+    counts = []
+    for name, collection in multi.collection_dct.items():
+       frac, count = collection.countCases()
+       fracs.append(frac)
+       counts.append(count)
+    # Do the plot
+    ax.bar(self.names, fracs)
+    for idx, frac in enumerate(fracs):
+        ax.text(self.names[idx], frac + 0.01, str(counts[idx]), fontsize=16)
+    ax.set_ylabel("fraction positive", fontsize=fontsize)
+    ax.set_xlabel("class", fontsize=fontsize)
+    ax.set_title(title, fontsize=fontsize+2)
+    #
+    if is_plot:
+      plt.show()
+
   @classmethod
   def make(cls, case_builder_dct, **kwargs):
     """

@@ -13,8 +13,8 @@ import os
 import pandas as pd
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 DF_X, SER_y = helpers.getData()
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 SERIALIZED_FILE = os.path.join(TEST_DIR, "case_multi_collection.csv")
@@ -113,6 +113,16 @@ class TestCaseMultiCollection(unittest.TestCase):
     df2 = multi.plotHeatmap(feature_vector=feature_vector, is_plot=IS_PLOT,
         title="T2.0")
     self.assertLess(len(df2), len(df1))
+   
+  def testPlotBars(self):
+    # TESTING
+    multi = self.multi
+    multi = self._filterCases()
+    multi.plotBars(is_plot=IS_PLOT, title="All Cases")
+    #
+    feature_vector = FeatureVector.make(DF_X.T["T2.0"])
+    multi.plotBars(feature_vector=feature_vector, is_plot=IS_PLOT,
+        title="T2.0")
    
   def testBars(self):
     if IGNORE_TEST:
