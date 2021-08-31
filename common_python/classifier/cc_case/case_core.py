@@ -69,7 +69,7 @@ class Case:
   """Case for a binary classification."""
 
   def __init__(self, feature_vector, fv_statistic, dtree=None,
-      df_X=None):
+      df_X=None, ser_y=None):
     """
     Parameters
     ----------
@@ -80,10 +80,14 @@ class Case:
     df_X: pd.DataFrame - training data
         columns: features
         index: instances
+    ser_y: pd.series
+        binary class values (0, 1)
     """
     self.feature_vector = feature_vector
     self.fv_statistic = fv_statistic
     self.dtree = dtree
+    self.df_X = df_X
+    self.ser_y = ser_y
     self.instances = self._getCompatibleInstances(df_X, self.feature_vector)
     if self.instances is None:
       self.instance_str = ""

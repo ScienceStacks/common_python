@@ -200,7 +200,7 @@ class CaseBuilder:
           if np.abs(fv_statistic.siglvl) < self._max_sl:
             # Statistically significant FeatureVector is a Case.
             new_cases.append(Case(new_feature_vector, fv_statistic,
-                dtree=dtree))
+                dtree=dtree, df_X=self._df_X, ser_y=self._ser_y))
           child = branch_nodes[node]
           new_cases.extend(processTree(child, feature_vector=new_feature_vector))
         return new_cases

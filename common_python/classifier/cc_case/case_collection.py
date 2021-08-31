@@ -453,7 +453,7 @@ class CaseCollection(dict):
           row[cn.NUM_POS],
           row[cn.PRIOR_PROB],
           row[cn.SIGLVL])
-      case_dct[fv_str] = Case(feature_vector, statistic, df_X=df_X)
+      case_dct[fv_str] = Case(feature_vector, statistic, df_X=df_X, ser_y=ser_y)
     #
     return CaseCollection(case_dct, df_X=df_X, ser_y=ser_y)
 

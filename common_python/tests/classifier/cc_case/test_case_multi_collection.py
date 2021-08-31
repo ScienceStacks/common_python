@@ -78,14 +78,14 @@ class TestCaseMultiCollection(unittest.TestCase):
   def testToDataframe(self):
     if IGNORE_TEST:
       return
-    df1 = self.multi.toDataframe()
+    df1 = self.multi.toDataframe(max_sl=1.0)
     self.assertTrue(isinstance(df1, pd.DataFrame))
     num_case = sum([len(c) for c in
         self.multi.collection_dct.values()])
     self.assertLessEqual(len(df1), num_case)
     #
-    df2 = self.multi.toDataframe(max_sl=0.05)
-    self.assertGreater(len(df2), len(df1))
+    df2 = self.multi.toDataframe(max_sl=1e-5)
+    self.assertGreater(len(df1), len(df2))
 
   def testSelect(self):
     if IGNORE_TEST:
@@ -156,10 +156,10 @@ class TestCaseMultiCollection(unittest.TestCase):
       return
     df = DF_X[DF_X.index.str.contains(".0")]
     self.multi.plotBarsForFeatures(df, 5, 5, suptitle = "rep 0",
-       ser_y=SER_Y, fontsize=8)
+       ser_y=SER_Y, fontsize=8, is_plot=IS_PLOT)
     #
     self.multi.plotBarsForFeatures(df, 1, 1, suptitle = "rep 0",
-       ser_y=SER_Y, fontsize=8)
+       ser_y=SER_Y, fontsize=8, is_plot=IS_PLOT)
 
 
 if __name__ == '__main__':

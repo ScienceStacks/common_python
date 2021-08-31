@@ -104,6 +104,10 @@ class TestCaseCollection(unittest.TestCase):
         cn.INSTANCE_STR]:
       self.assertTrue(col in df.columns)
     self.assertGreater(len(df), 0)
+    #
+    df1 = self.collection.toDataframe(max_sl=1.0)
+    df2 = self.collection.toDataframe(max_sl=0.01)
+    self.assertGreater(len(df1), len(df2))
 
   def testUnion(self):
     if IGNORE_TEST:

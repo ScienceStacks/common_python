@@ -63,24 +63,9 @@ class CaseMultiCollection:
         column: class
         value: significance level
     """
-    def selDataframe(df, max_sl, direction):
-      if direction < 0:
-        sel = df[cn.SIGLVL] < 0
-      else:
-        sel = df[cn.SIGLVL] >= 0
-      ser = direction*df[sel][cn.SIGLVL]
-      if sum(sel) > 0:
-        ser_result = ser[ser <= max_sl]
-      else:
-        ser_result  = pd.Series()
-      return ser_result
-    #
     def mkPrunedSer(collection, max_sl):
-      df = collection.toDataframe()
-      df_neg = selDataframe(df, max_sl, -1)
-      df_pos = selDataframe(df, max_sl, 1)
-      df_result = pd.concat([df_neg, df_pos], axis=0)
-      return df_result
+      df = collection.toDataframe(max_sl=max_sl)
+      return df[cn.SIGLVL]
     # 
     sers = [mkPrunedSer(c, max_sl) for c in self.collection_dct.values()]
     df = pd.concat(sers, axis=1)
@@ -252,7 +237,7 @@ class CaseMultiCollection:
         path to label training data
     """
     # Construct the dataframe to serialize
-    dfs = [c.toDataframe() for c in self.collection_dct.values()]
+    dfs = [c.toDataframe(max_sl=1.0) for c in self.collection_dct.values()]
     for name, df in zip(self.names, dfs):
       df[COL_KEY] = name
     df = pd.concat(dfs, axis=0)
@@ -315,15 +300,17 @@ class CaseMultiCollection:
     Returns
     -------
     """
-    if "figsize" in kwargs:
-      figsize = kwargs["figsize"]
+    new_kwargs = dict(kwargs)
+    new_kwargs["is_plot"] = False
+    if "figsize" in new_kwargs:
+      figsize = new_kwargs["figsize"]
     else:
       figsize = (10, 12)
-    if "fontsize" in kwargs:
-      fontsize = kwargs["fontsize"]
+    if "fontsize" in new_kwargs:
+      fontsize = new_kwargs["fontsize"]
     else:
       fontsize = 8
-      kwargs["fontsize"] = fontsize
+      new_kwargs["fontsize"] = fontsize
     #
     if (num_row == 1) and (num_col == 1):
       fig, axes = plt.subplots(1, figsize=figsize)
@@ -347,13 +334,11 @@ class CaseMultiCollection:
           expected_class = ser_y.loc[instance]
         else:
           expected_class = None
-        self.plotBars(feature_vector=feature_vector, is_plot=False,
+        self.plotBars(feature_vector=feature_vector,
             title=instance, ax=ax, expected_class=expected_class,
-            xlabel="", ylabel="", xticklabels=False, yticklabels=False, **kwargs)
+            xlabel="", ylabel="", xticklabels=False, yticklabels=False,
+            **new_kwargs)
         plt.suptitle(suptitle)
-    plt.show()
     if "is_plot" in kwargs:
-      if not kwargs["is_plot"]:
-        pass
-      else:
+      if kwargs["is_plot"]:
         plt.show()
