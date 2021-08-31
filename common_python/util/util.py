@@ -382,3 +382,26 @@ def serializePandas(pd_object, path):
   df = pd.DataFrame(pd_object.copy())
   df[cn.INDEX] = list(df.index)
   df.to_csv(path)
+
+def findRepositoryRoot(repository_name):
+  """
+  Finds the root of the named repository.
+
+  Parameters
+  ----------
+  repository_name: str
+  
+  Returns
+  -------
+  str: path to repository root
+  """
+  cur_path = os.path.abspath(".")
+  done = False
+  while not done:
+    parent_path, cur_dir = os.path.split(cur_path)
+    if cur_dir == repository_name:
+      if not repository_name in parent_path:
+        return cur_path
+    if (len(parent_path) == 0) or (len(cur_dir) == 0):
+      raise ValueError("Repository root not found: %s" % repository_name)
+    cur_path = parent_path

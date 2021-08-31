@@ -230,6 +230,15 @@ class TestFunctions(unittest.TestCase):
     df_new = ut.deserializePandas(TMP_FILE1)
     self.assertTrue(df_new.equals(df))
 
+  def testFindRepositoryRoot(self):
+    if IGNORE_TEST:
+      return
+    path = ut.findRepositoryRoot("home")
+    self.assertTrue("home" in path)
+    with self.assertRaises(ValueError):
+      ut.findRepositoryRoot("xstte")
+
+
 
 if __name__ == '__main__':
   unittest.main()

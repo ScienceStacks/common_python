@@ -214,6 +214,7 @@ class CaseMultiCollection:
     ax.set_ylabel(ylabel, fontsize=fontsize)
     ax.set_xlabel(xlabel, fontsize=fontsize)
     ax.set_title(title, fontsize=fontsize+2)
+    ax.set_ylim([0, 1.1])
     #
     if is_plot:
       plt.show()
@@ -324,15 +325,24 @@ class CaseMultiCollection:
       fontsize = 8
       kwargs["fontsize"] = fontsize
     #
-    fig, axes = plt.subplots(num_row, num_col, figsize=figsize)
+    if (num_row == 1) and (num_col == 1):
+      fig, axes = plt.subplots(1, figsize=figsize)
+    else:
+      fig, axes = plt.subplots(num_row, num_col, figsize=figsize)
     indices = list(df_X.index)
-    indices = sorted(indices, key=lambda s: float(s[1:3]))
+    try:
+      indices = sorted(indices, key=lambda s: float(s[1:3]))
+    except Exception:
+      pass
     for irow in range(num_row):
       for icol in range(num_col):
         idx = irow*num_col + icol
         instance = indices[idx]
         feature_vector = FeatureVector(df_X.loc[instance, :])
-        ax = axes[irow, icol]
+        if isinstance(axes, np.ndarray):
+          ax = axes[irow, icol]
+        else:
+          ax = axes
         if ser_y is not None:
           expected_class = ser_y.loc[instance]
         else:

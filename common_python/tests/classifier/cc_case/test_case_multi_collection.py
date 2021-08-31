@@ -157,6 +157,9 @@ class TestCaseMultiCollection(unittest.TestCase):
     df = DF_X[DF_X.index.str.contains(".0")]
     self.multi.plotBarsForFeatures(df, 5, 5, suptitle = "rep 0",
        ser_y=SER_Y, fontsize=8)
+    #
+    self.multi.plotBarsForFeatures(df, 1, 1, suptitle = "rep 0",
+       ser_y=SER_Y, fontsize=8)
 
 
 if __name__ == '__main__':
