@@ -165,7 +165,7 @@ class FeatureAnalyzer(object):
 
   def __init__(self, clf, df_X, ser_y,
       num_cross_iter=NUM_CROSS_ITER, is_report=True,
-      report_interval=None):
+      report_interval=None, max_cpc=100):
     """
     :param Classifier clf: binary classifier
     :param pd.DataFrame df_X:
@@ -176,6 +176,7 @@ class FeatureAnalyzer(object):
         rows: instances
     :parm int num_cross_iter: iterations in cross valid
     :param int report_interval: number processed
+    :param int max_cpc: maximum nmber of CPC pairs calculated
     :param dict data_path_dct: paths for metrics data
        key: SFA, CPC, IPA
        value: path
@@ -186,6 +187,7 @@ class FeatureAnalyzer(object):
     self._ser_y = ser_y
     self._is_report = is_report
     self._num_cross_iter = num_cross_iter
+    self._max_cpc = max_cpc
     iterator = util_classifier.partitioner(
         self._ser_y, self._num_cross_iter,
         num_holdout=1)
@@ -264,16 +266,23 @@ class FeatureAnalyzer(object):
   @property
   def df_cpc(self):
     """
-    creates classifier predicition correation pd.DataFrame
+    creates classifier predicition correation pd.DataFrame. Limits
+    the number of correlations calculated based on self._max_cpc.
+    :returns pd.DataFrame
         row index: features
         columns: features
-        scores: correlation
+        values: correlation
     """
     if self._df_cpc is None:
-      total = (len(self.features))**2
+      length = len(self.features)
+      num_cpc = min(length, self._max_cpc)
+      total = (num_cpc)**2
       dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
-      for feature1 in self.features:
-        for feature2 in self.features:
+      sorted_features = list(self.ser_sfa.sort_values(ascending=False).index)
+      sel_features = sorted_features[0:length]
+      df_X = self._df_X[sel_features]
+      for idx, feature1 in enumerate(sel_features):
+        for feature2 in sel_features[idx:]:
           clf_desc1 =  \
               util_classifier.ClassifierDescription(
               clf=self._clf, features=[feature1])
@@ -281,7 +290,7 @@ class FeatureAnalyzer(object):
               util_classifier.ClassifierDescription(
               clf=self._clf, features=[feature2])
           score = util_classifier.correlatePredictions(
-              clf_desc1, clf_desc2, self._df_X,
+              clf_desc1, clf_desc2, df_X,
               self._ser_y, self._partitions)
           dct[FEATURE1].append(feature1)
           dct[FEATURE2].append(feature2)
@@ -289,8 +298,11 @@ class FeatureAnalyzer(object):
           self._reportProgress(CPC,
               len(dct[FEATURE1]), total)
       df = pd.DataFrame(dct)
-      self._df_cpc = df.pivot(index=FEATURE1,
-          columns=FEATURE2, values=cn.SCORE)
+      self._df_cpc = df.pivot(index=FEATURE1, columns=FEATURE2, values=cn.SCORE)
+      # Create the symmetric matrix
+      self._df_cpc = self._df_cpc.fillna(0)
+      self._df_cpc += self._df_cpc.T
+      self._df_cpc.loc[sel_features, sel_features] *= 0.5  # count diagonal once
     return self._df_cpc
 
   def score(self, features):

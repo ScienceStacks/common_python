@@ -114,7 +114,21 @@ class TestFeatureAnalyzer(unittest.TestCase):
   def test_df_cpc(self):
     if IGNORE_TEST:
       return
-    df = self.analyzer.df_cpc
+    size = 5 - len(FEATURES)
+    features = list(DF_X.columns)
+    features = features[:size]
+    features.insert(0, FEATURE2)
+    features.insert(0, FEATURE1)
+    df_X = copy.deepcopy(DF_X[features])
+    ser_y = copy.deepcopy(SER_Y)
+    clf = copy.deepcopy(CLF)
+    analyzer = feature_analyzer.FeatureAnalyzer(
+        clf, df_X, ser_y,
+        is_report=IS_REPORT,
+        num_cross_iter=NUM_CROSS_ITER_ACCURATE)
+    analyzer_dct = ANALYZER_DCT
+    df = analyzer.df_cpc
+    #
     self.assertEqual(df.loc[FEATURE1, FEATURE1], 0)
     self.assertTrue(np.isclose(
         df.loc[FEATURE2, FEATURE2], 1))
@@ -247,7 +261,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
         persister_path=TEST_PERSISTER_PATH)
     # Create a new analyzer with no data
     analyzer = FeatureAnalyzer(None,
-        pd.DataFrame(), pd.Series())
+        pd.DataFrame(dtype=float), pd.Series(dtype=float))
     new_analyzer = analyzer.serialize(dir_path,
         is_restart=False,
         persister_path=TEST_PERSISTER_PATH)
