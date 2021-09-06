@@ -276,6 +276,7 @@ class FeatureAnalyzer(object):
         self._reportProgress(SFA, len(self._sfa_dct), total)
         self._persister.set(self)
       self._ser_sfa = pd.Series(self._sfa_dct)
+      self._persister.set(self)
     return self._ser_sfa
 
   def _iteratePairs(self, instance_dct):
@@ -323,9 +324,13 @@ class FeatureAnalyzer(object):
     # Do the calculations
     length = len(self.features)
     num_feature = min(length, self._max_features_for_pairing)
+    columns = list(self._df_X.columns)
     num_pair = int(((num_feature)*(num_feature-1))/2 + num_feature)
-    sorted_features = list(self.ser_sfa.sort_values(ascending=False).index)
-    sel_features = sorted_features[0:num_feature]
+    if len(columns) > num_feature:
+      sorted_features = list(self.ser_sfa.sort_values(ascending=False).index)
+      sel_features = sorted_features[0:num_feature]
+    else:
+      sel_features = columns
     df_X = self._df_X[sel_features]
     #
     return num_pair, df_X, getIterator(sel_features)
@@ -363,6 +368,7 @@ class FeatureAnalyzer(object):
       self._df_cpc = df.pivot(index=FEATURE1, columns=FEATURE2, values=cn.SCORE)
       # Create the symmetric matrix
       self._df_cpc = util.makeSymmetricDF(self._df_cpc)
+      self._persister.set(self)
     return self._df_cpc
 
   def score(self, features):
@@ -430,6 +436,7 @@ class FeatureAnalyzer(object):
       df = pd.DataFrame(self._ipa_dct)
       self._df_ipa = df.pivot(index=FEATURE1, columns=FEATURE2, values=cn.SCORE)
       self._df_ipa = util.makeSymmetricDF(self._df_ipa)
+      self._persister.set(self)
     return self._df_ipa
 
   def getMetric(self, metric):
