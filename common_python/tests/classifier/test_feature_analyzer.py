@@ -111,9 +111,18 @@ class TestFeatureAnalyzer(unittest.TestCase):
   def test_ser_sfa(self):
     if IGNORE_TEST:
       return
+    self._init()
     ser = self.analyzer.ser_sfa
     trues = [isinstance(v, float) for v in ser.values]
     self.assertTrue(all(trues))
+    # Try with persister
+    analyzer = feature_analyzer.FeatureAnalyzer(
+        self.clf, self.df_X, self.ser_y,
+        is_report=IS_REPORT,
+        persister_path=TEST_PERSISTER_PATH,
+        num_cross_iter=NUM_CROSS_ITER_ACCURATE)
+    ser = analyzer.ser_sfa
+    self.assertTrue(analyzer.ser_sfa.equals(ser))
 
   def _makeDFX(self, num_cols):
     features = list(DF_X.columns.tolist())

@@ -201,6 +201,7 @@ class FeatureAnalyzer(object):
     self._num_processed = 0
     # Single feature accuracy
     self._ser_sfa = None
+    self._sfa_dct = None
     # classifier prediction correlation
     self._df_cpc = None
     self._cpc_dct = None  # Used for saving intermediate computation results
@@ -254,19 +255,27 @@ class FeatureAnalyzer(object):
       value: accuracy in [0, 1]
     """
     if self._ser_sfa is None:
+      if self._persister.isExist():
+        analyzer = self._persister.get()
+        if hasattr(analyzer, "_sfa_dct"):
+          if analyzer._sfa_dct is not None:
+            self._sfa_dct = analyzer._sfa_dct
+      if self._sfa_dct is None:
+        self._sfa_dct = {}
       total = len(self.features)
       self._num_processed = 0
-      scores = []
       for feature in self.features:
+        if feature in self._sfa_dct.keys():
+          continue
         df_X = pd.DataFrame(self._df_X[feature])
         bcv_result = util_classifier.binaryCrossValidate(
             self._clf, df_X, self._ser_y,
             partitions=self._partitions)
         score = bcv_result.score
-        scores.append(score)
-        self._reportProgress(SFA, len(scores), total)
-      self._ser_sfa = pd.Series(
-          scores, index=self.features)
+        self._sfa_dct[feature] = score
+        self._reportProgress(SFA, len(self._sfa_dct), total)
+        self._persister.set(self)
+      self._ser_sfa = pd.Series(self._sfa_dct)
     return self._ser_sfa
 
   def _iteratePairs(self, instance_dct):
