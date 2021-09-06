@@ -405,3 +405,35 @@ def findRepositoryRoot(repository_name):
     if (len(parent_path) == 0) or (len(cur_dir) == 0):
       raise ValueError("Repository root not found: %s" % repository_name)
     cur_path = parent_path
+
+def makeSymmetricDF(df):
+  """
+  Makes the dataframe symmetric if uncalculated values are np.nan.
+
+  Parameters
+  ----------
+  df: pd.DataFrame
+    index is same a columns
+  
+  Returns
+  -------
+  pd.DataFrame
+  """
+  df_result = df.fillna(0)
+  df_result += df_result.T
+  features = list(df_result.columns)
+  df_result.loc[features, features] *= 0.5  # count diagonal once
+  return df_result
+
+def copyProperties(obj1, obj2):
+  """
+  Copies the properties __dict__ of obj1 to obj2.
+
+  Parameters
+  ----------
+  obj1: object
+  obj2: object
+  """
+  for name, value in obj1.__dict__.items():
+    obj2.__dict__[name] = value
+    

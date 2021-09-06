@@ -37,7 +37,6 @@ import argparse
 import collections
 import copy
 import matplotlib.pyplot as plt
-import numpy as np
 import os
 import pandas as pd
 import seaborn
@@ -272,8 +271,8 @@ class FeatureAnalyzer(object):
 
   def _iteratePairs(self, instance_dct):
     """
-    Creates an iterate of feature pairs based the feature
-    pairs present in the persister file.
+    Creates an iterator for feature pairs. Uses the
+    persister.
 
     Parameters
     ----------
@@ -282,13 +281,14 @@ class FeatureAnalyzer(object):
         feature1: str
         feature2: str
         score: float
-    
+
     Returns
     -------
     int, pd.DataFrame, iterator
       int: total number of pairs
-      pd.DataFrame: df_X
-      iterator: feature, feature
+      pd.DataFrame: df_X with columns used for the features
+      iterator:
+        returns: feature, feature
     """
     def getIterator(sel_features):
       for idx, feature1 in enumerate(sel_features):
@@ -297,10 +297,10 @@ class FeatureAnalyzer(object):
             continue
           yield feature1, feature2
     #
-    is_stmt = False
     if self._persister.isExist():
       analyzer = self._persister.get()
-      if instance_dct in dir(analyzer):
+      if hasattr(analyzer, instance_dct):
+        # Update the dictionary used for collecting calculations
         stmt = "self.%s = analyzer.%s" % (instance_dct, instance_dct)
         exec(stmt)
     is_none = eval("self.%s is None" % instance_dct)
@@ -322,63 +322,6 @@ class FeatureAnalyzer(object):
     return num_pair, df_X, getIterator(sel_features)
 
   @property
-  def olddf_cpc(self):
-    """
-    creates classifier predicition correation pd.DataFrame. Limits
-    the number of correlations calculated based on self._max_features_for_pairing.
-    :returns pd.DataFrame
-        row index: features
-        columns: features
-        values: correlation
-    """
-    if self._df_cpc is None:
-      # Recover prior data
-      if self._persister.isExist():
-        analyzer = self._persister.get()
-        if "_cpc_dct" in dir(analyzer):
-          self._cpc_dct = analyzer._cpc_dct
-      if self._cpc_dct is None:
-        self._cpc_dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
-      # Do the calculations
-      length = len(self.features)
-      num_pairs = min(length, self._max_features_for_pairing)
-      total = ((num_pairs)**2)/2 + num_pairs
-      sorted_features = list(self.ser_sfa.sort_values(ascending=False).index)
-      sel_features = sorted_features[0:num_pairs]
-      df_X = self._df_X[sel_features]
-      if self._cpc_dct is not None:
-        pairs = [(f1, f2) for f1, f2
-            in zip(self._cpc_dct[FEATURE1], self._cpc_dct[FEATURE2])]
-      else:
-        pairs = []
-      for idx, feature1 in enumerate(sel_features):
-        for feature2 in sel_features[idx:]:
-          if (feature1, feature2) in pairs:
-            continue
-          clf_desc1 =  \
-              util_classifier.ClassifierDescription(
-              clf=self._clf, features=[feature1])
-          clf_desc2 =  \
-              util_classifier.ClassifierDescription(
-              clf=self._clf, features=[feature2])
-          score = util_classifier.correlatePredictions(
-              clf_desc1, clf_desc2, df_X,
-              self._ser_y, self._partitions)
-          self._cpc_dct[FEATURE1].append(feature1)
-          self._cpc_dct[FEATURE2].append(feature2)
-          self._cpc_dct[cn.SCORE].append(score)
-          self._reportProgress(CPC,
-              len(self._cpc_dct[FEATURE1]), total)
-          self._persister.set(self)
-      df = pd.DataFrame(self._cpc_dct)
-      self._df_cpc = df.pivot(index=FEATURE1, columns=FEATURE2, values=cn.SCORE)
-      # Create the symmetric matrix
-      self._df_cpc = self._df_cpc.fillna(0)
-      self._df_cpc += self._df_cpc.T
-      self._df_cpc.loc[sel_features, sel_features] *= 0.5  # count diagonal once
-    return self._df_cpc
-
-  @property
   def df_cpc(self):
     """
     creates classifier predicition correation pd.DataFrame. Limits
@@ -391,7 +334,6 @@ class FeatureAnalyzer(object):
     """
     if self._df_cpc is None:
       num_pair, df_X, itr = self._iteratePairs("_cpc_dct")
-      sel_features = list(df_X.columns)
       for feature1, feature2 in itr:
         clf_desc1 =  \
             util_classifier.ClassifierDescription(
@@ -411,15 +353,13 @@ class FeatureAnalyzer(object):
       df = pd.DataFrame(self._cpc_dct)
       self._df_cpc = df.pivot(index=FEATURE1, columns=FEATURE2, values=cn.SCORE)
       # Create the symmetric matrix
-      self._df_cpc = self._df_cpc.fillna(0)
-      self._df_cpc += self._df_cpc.T
-      self._df_cpc.loc[sel_features, sel_features] *= 0.5  # count diagonal once
+      self._df_cpc = util.makeSymmetricDF(self._df_cpc)
     return self._df_cpc
 
   def score(self, features):
     """
     Scores a classifier with the specified features.
-    
+
     Parameters
     ----------
     features: list-str
@@ -439,7 +379,7 @@ class FeatureAnalyzer(object):
     """
     Determines if a subset of the features is
     sufficient to maintain the classification accuracy.
-    
+
     Parameters
     ----------
     features: list-str
@@ -466,35 +406,31 @@ class FeatureAnalyzer(object):
     """
     #
     if self._df_ipa is None:
-      total = (len(self.features))**2
-      dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
-      for feature1 in self.features:
-        for feature2 in self.features:
-          score1 = self.score([feature1])
-          score2 = self.score([feature2])
-          score3 = self.score([feature1, feature2])
-          score = score3 - max(score1, score2)
-          dct[FEATURE1].append(feature1)
-          dct[FEATURE2].append(feature2)
-          dct[cn.SCORE].append(score)
-          self._reportProgress(CPC,
-              len(dct[FEATURE1]), total)
-          self._reportProgress(IPA,
-              len(dct[FEATURE1]), total)
-      df = pd.DataFrame(dct)
-      self._df_ipa = df.pivot(index=FEATURE1,
-          columns=FEATURE2, values=cn.SCORE)
+      num_pair, df_X, itr = self._iteratePairs("_ipa_dct")
+      for feature1, feature2 in itr:
+        score1 = self.score([feature1])
+        score2 = self.score([feature2])
+        score3 = self.score([feature1, feature2])
+        score = score3 - max(score1, score2)
+        self._ipa_dct[FEATURE1].append(feature1)
+        self._ipa_dct[FEATURE2].append(feature2)
+        self._ipa_dct[cn.SCORE].append(score)
+        self._reportProgress(IPA,
+            len(self._ipa_dct[FEATURE1]), num_pair)
+        self._persister.set(self)
+      df = pd.DataFrame(self._ipa_dct)
+      self._df_ipa = df.pivot(index=FEATURE1, columns=FEATURE2, values=cn.SCORE)
+      self._df_ipa = util.makeSymmetricDF(self._df_ipa)
     return self._df_ipa
 
   def getMetric(self, metric):
     if metric == SFA:
       return self.ser_sfa
-    elif metric == CPC:
+    if metric == CPC:
       return self.df_cpc
-    elif metric == IPA:
+    if metric == IPA:
       return self.df_ipa
-    else:
-      raise ValueError("Invalid metric: %s" % metric)
+    raise ValueError("Invalid metric: %s" % metric)
 
 
   ### PLOTS ###
@@ -524,8 +460,8 @@ class FeatureAnalyzer(object):
       if is_plot:
         plt.show()
       return df
-    else:
-      return None
+    #
+    return None
 
   def plotCPC(self, **kwargs):
     self._plotHeatmap(CPC, **kwargs)
@@ -594,13 +530,13 @@ class FeatureAnalyzer(object):
     """
     if df is None:
       return df
-    else:
-      df.columns = [normalizeCompoundFeature(c)
-               for c in df.columns]
-      df = df.set_index(FEATURE1)
-      df.index = [normalizeCompoundFeature(i)
-                  for i in df.index]
-      return df
+    #
+    df.columns = [normalizeCompoundFeature(c)
+             for c in df.columns]
+    df = df.set_index(FEATURE1)
+    df.index = [normalizeCompoundFeature(i)
+                for i in df.index]
+    return df
 
   def serialize(self, dir_path, is_restart=True):
     """
@@ -625,9 +561,10 @@ class FeatureAnalyzer(object):
     # Recover any existing persister
     if not is_restart:
       if self._persister.isExist():
-        self = self._persister.get()
-    values = []
+        new_self = self._persister.get()
+        util.copyProperties(new_self, self)
     # Calculate each variable in turn
+    values = []
     for value_stg in VALUE_STGS:
       values.append(eval(value_stg))
       self._persister.set(self)
@@ -716,7 +653,7 @@ class FeatureAnalyzer(object):
           analyzer._df_cpc = FeatureAnalyzer._makeMatrix(df)
           checkFeatures(analyzer._df_cpc, columns,
               is_index=True, is_columns=True)
-        except:
+        except Exception:
           pass
       elif metric == IPA:
         analyzer._df_ipa = FeatureAnalyzer._makeMatrix(df)
@@ -727,8 +664,8 @@ class FeatureAnalyzer(object):
 
 
 if __name__ == '__main__':
-  msg = "Run FeatureAnalyzer for for a directory path."
-  parser = argparse.ArgumentParser(description=msg)
+  MSG = "Run FeatureAnalyzer for for a directory path."
+  parser = argparse.ArgumentParser(description=MSG)
   parser.add_argument("path",
       help="Absolute path to the serialization directory",
       type=str)

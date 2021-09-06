@@ -238,6 +238,32 @@ class TestFunctions(unittest.TestCase):
     with self.assertRaises(ValueError):
       ut.findRepositoryRoot("xstte")
 
+  def testMakeSymmetricDF(self):
+    if IGNORE_TEST:
+      return
+    df = pd.DataFrame({
+        'a': [1.0, 1.2],
+        'b': [np.nan, 1.0]})
+    df.index = df.columns
+    df_new = ut.makeSymmetricDF(df)
+    self.assertTrue(df_new.equals(df_new.T))
+
+  def testCopyProperties(self):
+    if IGNORE_TEST:
+      return
+    class ATestClass:
+      def __init__(self, a, b):
+        self.a = a
+        self.b = b
+      def __eq__(self, other):
+        return (self.a == other.a) and (self.b == other.b)
+    #
+    obj1 = ATestClass(1, 2)
+    obj2 = ATestClass(None, None)
+    ut.copyProperties(obj1, obj2)
+    self.assertTrue(obj1 == obj2)
+    
+
 
 
 if __name__ == '__main__':

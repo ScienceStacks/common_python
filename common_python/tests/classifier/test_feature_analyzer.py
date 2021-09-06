@@ -54,6 +54,8 @@ TMP_PATHS = [TEST_PERSISTER_PATH, TEST_PERSISTER2_PATH, TEST_SER_PATH]
 class TestFeatureAnalyzer(unittest.TestCase):
 
   def _init(self):
+    if hasattr(self, "df_X"):
+      return
     self.df_X = copy.deepcopy(DF_X[FEATURES])
     self.ser_y = copy.deepcopy(SER_Y)
     self.clf = copy.deepcopy(CLF)
@@ -167,9 +169,9 @@ class TestFeatureAnalyzer(unittest.TestCase):
   def test_df_ipa(self):
     if IGNORE_TEST:
       return
+    self._init()
     df = self.analyzer.df_ipa
-    self.assertTrue(helpers.isValidDataFrame(df,
-      [FEATURE1, FEATURE2]))
+    self.assertTrue(helpers.isValidDataFrame(df, FEATURES))
     trues = [isinstance(v, float) for v in
         np.reshape(df.values, len(df)*len(df.columns))]
     self.assertTrue(all(trues))
