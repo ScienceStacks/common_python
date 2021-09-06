@@ -1,5 +1,6 @@
 import common_python.constants as cn
 from common_python.testing import helpers
+from common_python.util.persister import Persister
 from common_python.classifier import feature_analyzer
 from common_python.classifier.feature_analyzer import FeatureAnalyzer
 from common_python.tests.classifier import helpers as test_helpers
@@ -29,13 +30,16 @@ NUM_CROSS_ITER_ACCURATE = 50
 CLF = svm.LinearSVC()
 FEATURE1 = "Rv0158"
 FEATURE2 = "Rv1460"
-FEATURES = [FEATURE1, FEATURE2]
+FEATURE3 = "Rv2123"
+FEATURES = [FEATURE1, FEATURE2, FEATURE3]
 # Number of features used for scaling runs
 NUM_FEATURE_SCALE = 100
 # File paths for tests
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_PERSISTER_PATH = os.path.join(TEST_DIR,
     "persister.pcl")
+TEST_PERSISTER2_PATH = os.path.join(TEST_DIR,
+    "persister2.pcl")
 TMP_DIR_DCT = {CLASS:
      os.path.join(TEST_DIR, "tmp_feature_analyzer_%d") % CLASS}
 TEST_SER_PATH = os.path.join(TEST_DIR, "ser.csv")
@@ -45,6 +49,7 @@ TEST_DIR_PATH = os.path.join(TEST_DIR,
 TEST_DIR_PATH_DCT = {CLASS: TEST_DIR_PATH}
 ANALYZER = test_helpers.getFeatureAnalyzer()
 ANALYZER_DCT = {test_helpers.CLASS: ANALYZER}
+TMP_PATHS = [TEST_PERSISTER_PATH, TEST_PERSISTER2_PATH, TEST_SER_PATH]
 
 class TestFeatureAnalyzer(unittest.TestCase):
 
@@ -55,11 +60,12 @@ class TestFeatureAnalyzer(unittest.TestCase):
     self.analyzer = feature_analyzer.FeatureAnalyzer(
         self.clf, self.df_X, self.ser_y,
         is_report=IS_REPORT,
+        persister_path=TEST_PERSISTER_PATH,
         num_cross_iter=NUM_CROSS_ITER_ACCURATE)
     self.analyzer_dct = ANALYZER_DCT
 
   def _remove(self):
-    paths = [TEST_SER_PATH, TEST_PERSISTER_PATH]
+    paths = list(TMP_PATHS)
     paths.extend(list(TMP_DIR_DCT.values()))
     for path in paths:
       if os.path.isdir(path):
@@ -95,6 +101,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     start = time.time()
     analyzer = feature_analyzer.FeatureAnalyzer(
         self.clf, df_X, self.ser_y,
+        persister_path=TEST_PERSISTER2_PATH,
         num_cross_iter=NUM_CROSS_ITER)
     _ = analyzer.ser_sfa
     self._report("test_ser_sfa_scale", start)
@@ -114,26 +121,33 @@ class TestFeatureAnalyzer(unittest.TestCase):
   def test_df_cpc(self):
     if IGNORE_TEST:
       return
-    size = 5 - len(FEATURES)
+    size = 10
+    added_size = 7 - len(FEATURES)
     features = list(DF_X.columns)
-    features = features[:size]
-    features.insert(0, FEATURE2)
-    features.insert(0, FEATURE1)
+    features = features[:added_size]
+    for feature in FEATURES:
+      features.insert(0, feature)
     df_X = copy.deepcopy(DF_X[features])
     ser_y = copy.deepcopy(SER_Y)
     clf = copy.deepcopy(CLF)
     analyzer = feature_analyzer.FeatureAnalyzer(
         clf, df_X, ser_y,
         is_report=IS_REPORT,
+        persister_path=TEST_PERSISTER2_PATH,
         num_cross_iter=NUM_CROSS_ITER_ACCURATE)
-    analyzer_dct = ANALYZER_DCT
     df = analyzer.df_cpc
     #
+    self.assertTrue(df.equals(df.T))  # Must be symmetric
     self.assertEqual(df.loc[FEATURE1, FEATURE1], 0)
     self.assertTrue(np.isclose(
         df.loc[FEATURE2, FEATURE2], 1))
+    self.assertGreater(df.loc[FEATURE3, FEATURE2], 0)
+    self.assertLess(df.loc[FEATURE3, FEATURE1], 1)
     self.assertTrue(helpers.isValidDataFrame(df,
-      [FEATURE1, FEATURE2]))
+      [FEATURE1, FEATURE2, FEATURE3]))
+    persister = Persister(TEST_PERSISTER2_PATH)
+    analyzer = persister.get()
+    self.assertTrue(isinstance(analyzer._cpc_dct, dict))
 
   def test_df_cpc_scale(self):
     if IGNORE_TEST:
@@ -144,6 +158,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     df_X = self._makeDFX(num_cols)
     analyzer = feature_analyzer.FeatureAnalyzer(
         self.clf, df_X, self.ser_y,
+        persister_path=TEST_PERSISTER2_PATH,
         num_cross_iter=NUM_CROSS_ITER)
     start = time.time()
     _ = analyzer.df_cpc
@@ -168,6 +183,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     df_X = self._makeDFX(num_cols)
     analyzer = feature_analyzer.FeatureAnalyzer(
         self.clf, df_X, self.ser_y,
+        persister_path=TEST_PERSISTER2_PATH,
         num_cross_iter=NUM_CROSS_ITER)
     start = time.time()
     _ = analyzer.df_ipa
@@ -186,6 +202,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
         self.clf, self.df_X, self.ser_y,
         is_report=IS_REPORT,
         report_interval = INTERVAL,
+        persister_path=TEST_PERSISTER2_PATH,
         num_cross_iter=NUM_CROSS_ITER_ACCURATE)
     analyzer._reportProgress(
        feature_analyzer.SFA, 0, 10)
@@ -238,8 +255,7 @@ class TestFeatureAnalyzer(unittest.TestCase):
     if IGNORE_TEST:
       return
     dir_path = TMP_DIR_DCT[CLASS]
-    self.analyzer.serialize(dir_path,
-        persister_path=TEST_PERSISTER_PATH)
+    self.analyzer.serialize(dir_path)
     for name in feature_analyzer.VARIABLES:
       path = FeatureAnalyzer._getPath(dir_path, name)
       self.assertTrue(os.path.isfile(path))
@@ -255,16 +271,17 @@ class TestFeatureAnalyzer(unittest.TestCase):
   def testSerializeWithPersister(self):
     if IGNORE_TEST:
       return
-    # Serialize the existing data
+    # Tests that the persistent state is used in serialization
+    self._init()
     dir_path = TMP_DIR_DCT[CLASS]
-    self.analyzer.serialize(dir_path,
-        persister_path=TEST_PERSISTER_PATH)
+    self.analyzer.serialize(dir_path)
     # Create a new analyzer with no data
     analyzer = FeatureAnalyzer(None,
-        pd.DataFrame(dtype=float), pd.Series(dtype=float))
+        pd.DataFrame(dtype=float), pd.Series(dtype=float),
+        persister_path=TEST_PERSISTER_PATH,
+        )
     new_analyzer = analyzer.serialize(dir_path,
-        is_restart=False,
-        persister_path=TEST_PERSISTER_PATH)
+        is_restart=False)
     self._equals(self.analyzer, new_analyzer)
 
   def testmakeAnalyzers(self):
@@ -283,6 +300,35 @@ class TestFeatureAnalyzer(unittest.TestCase):
     score = self.analyzer.score(features)
     be_result = self.analyzer.backEliminate(features)
     self.assertTrue(np.isclose(score, be_result.score))
+
+  def testIteratePairs(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    def test(analyzer, features):
+      num_pair, df_X, itr = analyzer._iteratePairs("_cpc_dct")
+      existing_pair = len(analyzer._cpc_dct[cn.SCORE])
+      lst = [(f1, f2) for f1, f2 in itr]
+      self.assertTrue(isinstance(df_X, pd.DataFrame))
+      self.assertEqual(num_pair, len(lst) + existing_pair)
+    #
+    features = list(FEATURES)
+    columns = list(DF_X.columns)
+    features.extend(columns[:5])
+    features = list(set(features))
+    df_X = DF_X[features]
+    analyzer = feature_analyzer.FeatureAnalyzer(
+        self.clf, df_X, self.ser_y,
+        is_report=IS_REPORT,
+        persister_path=TEST_PERSISTER_PATH,
+        num_cross_iter=NUM_CROSS_ITER_ACCURATE)
+    test(analyzer, FEATURES)
+    df = analyzer.df_cpc
+    test(analyzer, features)
+    test(analyzer, features)
+    #
+    dct = feature_analyzer.deserialize(TEST_DIR_PATH_DCT)
+    test(dct[1], dct[1].features)
     
 
 

@@ -37,6 +37,7 @@ import argparse
 import collections
 import copy
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 import pandas as pd
 import seaborn
@@ -165,7 +166,8 @@ class FeatureAnalyzer(object):
 
   def __init__(self, clf, df_X, ser_y,
       num_cross_iter=NUM_CROSS_ITER, is_report=True,
-      report_interval=None, max_cpc=100):
+      persister_path=PERSISTER_PATH,
+      report_interval=None, max_features_for_pairing=100):
     """
     :param Classifier clf: binary classifier
     :param pd.DataFrame df_X:
@@ -175,8 +177,10 @@ class FeatureAnalyzer(object):
         values: 0, 1
         rows: instances
     :parm int num_cross_iter: iterations in cross valid
+    :param str persister_path: path to persister file
     :param int report_interval: number processed
-    :param int max_cpc: maximum nmber of CPC pairs calculated
+    :param int max_features_for_pairing: maximum number of features_for_pair
+                                         used to calculate pairs (CPC, IPC)
     :param dict data_path_dct: paths for metrics data
        key: SFA, CPC, IPA
        value: path
@@ -187,20 +191,23 @@ class FeatureAnalyzer(object):
     self._ser_y = ser_y
     self._is_report = is_report
     self._num_cross_iter = num_cross_iter
-    self._max_cpc = max_cpc
+    self._max_features_for_pairing = max_features_for_pairing
     iterator = util_classifier.partitioner(
         self._ser_y, self._num_cross_iter,
         num_holdout=1)
     self._partitions = [p for p in iterator]
     self._report_interval = report_interval
+    self._persister = Persister(persister_path)
     # Number procesed since last report
     self._num_processed = 0
     # Single feature accuracy
     self._ser_sfa = None
     # classifier prediction correlation
     self._df_cpc = None
+    self._cpc_dct = None  # Used for saving intermediate computation results
     # incremental prediction accuracy
     self._df_ipa = None
+    self._ipa_dct = None  # Used for saving intermediate computation results
     ######### PUBLIC ################
     self.features = df_X.columns.tolist()
 
@@ -263,26 +270,91 @@ class FeatureAnalyzer(object):
           scores, index=self.features)
     return self._ser_sfa
 
+  def _iteratePairs(self, instance_dct):
+    """
+    Creates an iterate of feature pairs based the feature
+    pairs present in the persister file.
+
+    Parameters
+    ----------
+    instance_dct: str
+      name of instance dict. Keys:
+        feature1: str
+        feature2: str
+        score: float
+    
+    Returns
+    -------
+    int, pd.DataFrame, iterator
+      int: total number of pairs
+      pd.DataFrame: df_X
+      iterator: feature, feature
+    """
+    def getIterator(sel_features):
+      for idx, feature1 in enumerate(sel_features):
+        for feature2 in sel_features[idx:]:
+          if (feature1, feature2) in pairs:
+            continue
+          yield feature1, feature2
+    #
+    is_stmt = False
+    if self._persister.isExist():
+      analyzer = self._persister.get()
+      if instance_dct in dir(analyzer):
+        stmt = "self.%s = analyzer.%s" % (instance_dct, instance_dct)
+        exec(stmt)
+    is_none = eval("self.%s is None" % instance_dct)
+    if is_none:
+      stmt = "self.%s = {'%s': [], '%s': [], '%s': []}" % (
+          instance_dct, FEATURE1, FEATURE2, cn.SCORE)
+      exec(stmt)
+    pair_dct = eval("self.%s" % instance_dct)
+    pairs = [(f1, f2) for f1, f2
+        in zip(pair_dct[FEATURE1], pair_dct[FEATURE2])]
+    # Do the calculations
+    length = len(self.features)
+    num_feature = min(length, self._max_features_for_pairing)
+    num_pair = int(((num_feature)*(num_feature-1))/2 + num_feature)
+    sorted_features = list(self.ser_sfa.sort_values(ascending=False).index)
+    sel_features = sorted_features[0:num_feature]
+    df_X = self._df_X[sel_features]
+    #
+    return num_pair, df_X, getIterator(sel_features)
+
   @property
-  def df_cpc(self):
+  def olddf_cpc(self):
     """
     creates classifier predicition correation pd.DataFrame. Limits
-    the number of correlations calculated based on self._max_cpc.
+    the number of correlations calculated based on self._max_features_for_pairing.
     :returns pd.DataFrame
         row index: features
         columns: features
         values: correlation
     """
     if self._df_cpc is None:
+      # Recover prior data
+      if self._persister.isExist():
+        analyzer = self._persister.get()
+        if "_cpc_dct" in dir(analyzer):
+          self._cpc_dct = analyzer._cpc_dct
+      if self._cpc_dct is None:
+        self._cpc_dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
+      # Do the calculations
       length = len(self.features)
-      num_cpc = min(length, self._max_cpc)
-      total = (num_cpc)**2
-      dct = {FEATURE1: [], FEATURE2: [], cn.SCORE: []}
+      num_pairs = min(length, self._max_features_for_pairing)
+      total = ((num_pairs)**2)/2 + num_pairs
       sorted_features = list(self.ser_sfa.sort_values(ascending=False).index)
-      sel_features = sorted_features[0:length]
+      sel_features = sorted_features[0:num_pairs]
       df_X = self._df_X[sel_features]
+      if self._cpc_dct is not None:
+        pairs = [(f1, f2) for f1, f2
+            in zip(self._cpc_dct[FEATURE1], self._cpc_dct[FEATURE2])]
+      else:
+        pairs = []
       for idx, feature1 in enumerate(sel_features):
         for feature2 in sel_features[idx:]:
+          if (feature1, feature2) in pairs:
+            continue
           clf_desc1 =  \
               util_classifier.ClassifierDescription(
               clf=self._clf, features=[feature1])
@@ -292,12 +364,51 @@ class FeatureAnalyzer(object):
           score = util_classifier.correlatePredictions(
               clf_desc1, clf_desc2, df_X,
               self._ser_y, self._partitions)
-          dct[FEATURE1].append(feature1)
-          dct[FEATURE2].append(feature2)
-          dct[cn.SCORE].append(score)
+          self._cpc_dct[FEATURE1].append(feature1)
+          self._cpc_dct[FEATURE2].append(feature2)
+          self._cpc_dct[cn.SCORE].append(score)
           self._reportProgress(CPC,
-              len(dct[FEATURE1]), total)
-      df = pd.DataFrame(dct)
+              len(self._cpc_dct[FEATURE1]), total)
+          self._persister.set(self)
+      df = pd.DataFrame(self._cpc_dct)
+      self._df_cpc = df.pivot(index=FEATURE1, columns=FEATURE2, values=cn.SCORE)
+      # Create the symmetric matrix
+      self._df_cpc = self._df_cpc.fillna(0)
+      self._df_cpc += self._df_cpc.T
+      self._df_cpc.loc[sel_features, sel_features] *= 0.5  # count diagonal once
+    return self._df_cpc
+
+  @property
+  def df_cpc(self):
+    """
+    creates classifier predicition correation pd.DataFrame. Limits
+    the number of correlations calculated based on
+    self._max_features_for_pairing.
+    :returns pd.DataFrame
+        row index: features
+        columns: features
+        values: correlation
+    """
+    if self._df_cpc is None:
+      num_pair, df_X, itr = self._iteratePairs("_cpc_dct")
+      sel_features = list(df_X.columns)
+      for feature1, feature2 in itr:
+        clf_desc1 =  \
+            util_classifier.ClassifierDescription(
+            clf=self._clf, features=[feature1])
+        clf_desc2 =  \
+            util_classifier.ClassifierDescription(
+            clf=self._clf, features=[feature2])
+        score = util_classifier.correlatePredictions(
+            clf_desc1, clf_desc2, df_X,
+            self._ser_y, self._partitions)
+        self._cpc_dct[FEATURE1].append(feature1)
+        self._cpc_dct[FEATURE2].append(feature2)
+        self._cpc_dct[cn.SCORE].append(score)
+        self._reportProgress(CPC,
+            len(self._cpc_dct[FEATURE1]), num_pair)
+        self._persister.set(self)
+      df = pd.DataFrame(self._cpc_dct)
       self._df_cpc = df.pivot(index=FEATURE1, columns=FEATURE2, values=cn.SCORE)
       # Create the symmetric matrix
       self._df_cpc = self._df_cpc.fillna(0)
@@ -491,8 +602,7 @@ class FeatureAnalyzer(object):
                   for i in df.index]
       return df
 
-  def serialize(self, dir_path,
-      is_restart=True, persister_path=PERSISTER_PATH):
+  def serialize(self, dir_path, is_restart=True):
     """
     Writes all state to a directory.
     Parameters
@@ -501,7 +611,6 @@ class FeatureAnalyzer(object):
       Path to where data are written.
     is_restart: bool
       Does not use an existing persister
-    persister_path: str
 
     Returns
     -------
@@ -514,15 +623,14 @@ class FeatureAnalyzer(object):
     if not os.path.isdir(dir_path):
       os.mkdir(dir_path)
     # Recover any existing persister
-    persister = Persister(persister_path)
     if not is_restart:
-      if persister.isExist():
-        self = persister.get()
+      if self._persister.isExist():
+        self = self._persister.get()
     values = []
     # Calculate each variable in turn
     for value_stg in VALUE_STGS:
       values.append(eval(value_stg))
-      persister.set(self)
+      self._persister.set(self)
     variables = [SFA, CPC, IPA, DF_X, SER_Y]
     for idx, name in enumerate(variables):
       path = FeatureAnalyzer._getPath(dir_path, name)
