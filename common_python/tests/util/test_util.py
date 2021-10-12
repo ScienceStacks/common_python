@@ -9,8 +9,8 @@ import pandas as pd
 import sys
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 TMP_FILE1 = "util_tmp.csv"
 TMP_FILES = [TMP_FILE1]
 
@@ -262,6 +262,32 @@ class TestFunctions(unittest.TestCase):
     obj2 = ATestClass(None, None)
     ut.copyProperties(obj1, obj2)
     self.assertTrue(obj1 == obj2)
+
+  def testIsEqual(self):
+    # TESTING
+    class TestClass:
+        def __init__(self, a, df):
+          self.a = a
+          self.df = df
+    #
+    df = pd.DataFrame({"a": range(10), "b": range(10)})
+    a = "hello there"
+    self.assertTrue(ut.isEqual(1, 1))
+    self.assertFalse(ut.isEqual(1, 2))
+    self.assertTrue(ut.isEqual("hello there", a))
+    self.assertFalse(ut.isEqual("goodbye there", a))
+    self.assertTrue(ut.isEqual(1.0, 1.000001))
+    self.assertFalse(ut.isEqual(1.0, "1.000001"))
+    #
+    df_copy = df.copy()
+    self.assertTrue(ut.isEqual(df, df_copy))
+    self.assertTrue(ut.isEqual(df["a"], df_copy["a"]))
+    # Test recursion
+    a = 13.5
+    obj1 = TestClass(a, df)
+    obj2 = TestClass(a, df)
+    self.assertTrue(ut.isEqual(obj1, obj2))
+    
     
 
 

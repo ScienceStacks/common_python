@@ -53,10 +53,10 @@ TMP_PATHS = [TEST_PERSISTER_PATH, TEST_PERSISTER2_PATH, TEST_SER_PATH]
 
 class TestFeatureAnalyzer(unittest.TestCase):
 
-  def _init(self):
-    if hasattr(self, "df_X"):
+  def _init(self, num_feature=3, isForce=False):
+    if hasattr(self, "df_X") and (not isForce):
       return
-    self.df_X = copy.deepcopy(DF_X[FEATURES])
+    self.df_X = copy.deepcopy(DF_X[FEATURES[0:num_feature]])
     self.ser_y = copy.deepcopy(SER_Y)
     self.clf = copy.deepcopy(CLF)
     self.analyzer = feature_analyzer.FeatureAnalyzer(
@@ -340,6 +340,27 @@ class TestFeatureAnalyzer(unittest.TestCase):
     #
     dct = feature_analyzer.deserialize(TEST_DIR_PATH_DCT)
     test(dct[1], dct[1].features)
+
+  def testMerge(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    analyzer = self.analyzer.copy()
+    analyzer.merge(self.analyzer)
+    r = [(a, self.analyzer.__getattribute__(a) == analyzer.__getattribute__(a))
+        for a in self.analyzer.__dict__.keys()]
+    self.assertTrue(analyzer.isEqual(self.analyzer))
+
+  def testMerge2(self):
+    if IGNORE_TEST:
+      return
+    self._init(num_feature=2, isForce=True)
+    small_analyzer = self.analyzer.copy()
+    self._init(num_feature=3, isForce=True)
+    large_analyzer = self.analyzer.copy()
+    small_analyzer.merge(large_analyzer)
+    self.assertFalse(large_analyzer.isEqual(small_analyzer))
+    self.assertTrue(large_analyzer.isEqual(self.analyzer))
     
 
 

@@ -76,6 +76,29 @@ class ClassifierDescriptorSVM(ClassifierDescriptor):
       coefs = [np.abs(x) for x in clf.coef_[class_selection]]
     return coefs
 
+  def getFeatureContributions(self, clf, features, ser_X):
+    """
+    Constructs the contributions of features to the binary classification.
+    These are the individual values of each do product.
+
+    Parameters
+    ----------
+    :param SVMClassifier clf:
+    :param list-str features: features in order for classifier
+    :param Series ser_X: column - feature, row - instance
+    
+    Returns
+    -------
+    DataFrame: column - feature, row - class, value - contribution
+    """
+    ser_X_sub = ser_X.loc[features]
+    df_coef = pd.DataFrame(clf.coef_, columns=features)
+    df_X = pd.concat([ser_X_sub for _ in range(len(clf.coef_))], axis=1)
+    df_X = df_X.T
+    df_X.index = df_coef.index
+    df_result = df_X.multiply(df_coef)
+    return df_result
+
 
 ###################################################
 class ClassifierEnsemble(ClassifierCollection):
@@ -88,7 +111,7 @@ class ClassifierEnsemble(ClassifierCollection):
     :param ClassifierDescriptor clf_desc:
     :param int holdouts: number of holdouts when fitting
     :param int size: size of the ensemble
-    :param int/None filter_high_rank: maximum rank considered
+    :param int/None filter_high_rank: maximum feature rank considered
     :param dict kwargs: keyword arguments used by parent classes
     """
     self.clf_desc = clf_desc
@@ -101,7 +124,7 @@ class ClassifierEnsemble(ClassifierCollection):
   def fit(self, df_X, ser_y, collectionMaker=None):
     """
     Fits the number of classifiers desired to the data with
-    holdouts. Current selects holdouts independent of class.
+    holdouts. Selects holdouts independent of class.
     :param Function collectionMaker: function of df_X, ser_y
         that makes a collection
     :param pd.DataFrame df_X: feature vectors; indexed by instance
@@ -353,7 +376,6 @@ class ClassifierEnsemble(ClassifierCollection):
     #
     return prob
           
-
   def plotRank(self, top=None, fig=None, ax=None, 
       is_plot=True, **kwargs):
     """
@@ -380,6 +402,32 @@ class ClassifierEnsemble(ClassifierCollection):
     df = self.makeImportanceDF()
     kwargs = util.setValue(kwargs, cn.PLT_YLABEL, "Importance")
     self._plot(df, top, fig, ax, is_plot, **kwargs)
+
+  def plotFeatureContributions(self, ser_X, ax=None, is_plot=True):
+    """
+    Plots the contribution of each feature to the final score by class
+    averaged across the ensemble.  This is presented as a bar plot.
+    :param Series ser_X:
+    :param bool is_plot:
+    """
+    if not "getFeatureContributions" in dir(self.clf_desc):
+      raise RuntimeError(
+          "Classifier description must have the method getFeatureContributions")
+    # Calculate the mean and standard deviations of feature contributions
+    dfs = [self.clf_desc.getFeatureContributions(c, self.columns, ser_X)
+        for c in self.clfs]
+    df_mean = dfs[0] - dfs[0]
+    df_std = dfs[0] - dfs[0]
+    for idx in df_mean.index:
+      for col in df_mean.columns:
+        values = [df.loc[idx, col] for df in dfs]
+        df_mean.loc[idx, col] = np.mean(values)
+        df_std.loc[idx, col] = np.std(values)
+    import pdb; pdb.set_trace()
+    # Plot the contributions for each instance
+    if ax is None:
+      _, ax = plt.subplots(1)
+    df_mean.plot(kind="bar", stacked=True, yerr=df_std.values)
 
   def _makeFeatureDF(self, df_values):
     """
@@ -418,7 +466,8 @@ class ClassifierEnsemble(ClassifierCollection):
     return exporter.get()
 
   @classmethod
-  def crossValidate(cls, trinary_data, num_holdout=5, num_iter=10, **kwargs):
+  def crossValidate(cls, trinary_data, num_holdout=5, num_iter=10,
+      clf_desc=ClassifierDescriptorSVM(), **kwargs):
     """
     Cross validates with the specified number of holdouts. Returns
     an overall accuracy calculation based on exact matches with
@@ -432,6 +481,7 @@ class ClassifierEnsemble(ClassifierCollection):
         number of holdouts for each class
     num_iter: int
         number of cross validation iterations (folds)
+    clf_desc: ClassifierDescriptor
     kwargs: dict
         arguments from constructor
         
@@ -459,7 +509,7 @@ class ClassifierEnsemble(ClassifierCollection):
         indices = list(trinary_data.ser_y.index)
       return list(set(trinary_data.ser_y.loc[indices]))
     #
-    svm_ensemble = cls(ClassifierDescriptorSVM(), **kwargs)
+    svm_ensemble = cls(clf_desc=clf_desc, **kwargs)
     all_classes = getClasses()
     total_correct = 0
     for _ in range(num_iter):

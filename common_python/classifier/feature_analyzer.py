@@ -37,6 +37,7 @@ import argparse
 import collections
 import copy
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 import pandas as pd
 import seaborn
@@ -210,6 +211,62 @@ class FeatureAnalyzer(object):
     self._ipa_dct = None  # Used for saving intermediate computation results
     ######### PUBLIC ################
     self.features = df_X.columns.tolist()
+
+  def copy(self):
+    return copy.deepcopy(self)
+
+  def isEqual(self, other):
+    return util.isEqual(self, other)
+
+  # FIXME Handle df_X, ser_y, ser.features
+  #  1) Merge df_X, ser_y
+  #  2) Construct new object
+  #  3) Update _ser_sfa, _df_cpc, _df_ipa
+  def merge(self, other):
+    """
+    Merges another analyzer with this one by combining the
+    ser_sfa, df_cpc, and df_ipa.
+
+    Parameters
+    ----------
+    other: FeatureAnalyzer
+    """
+    def populate(destination_pd, source_pd):
+      """
+      Populates the destination pandas object with values in the source.
+      """
+      new_destination_pd = destination_pd.copy()
+      for idx in source_pd.index:
+        if isinstance(source_pd, pd.DataFrame):
+          for column in source_pd.columns:
+            new_destination_pd.loc[idx, column] = source_pd.loc[idx, column]
+        else:
+          new_destination_pd.loc[idx] = source_pd.loc[idx]
+      return new_destination_pd
+    #
+    def concat(attribute, cls):
+      self_item = self.__getattribute__(attribute)
+      other_item = other.__getattribute__(attribute)
+      self_true = self_item is not None
+      other_true = other_item is not None
+      if self_true and other_true:
+        # Get all of the columns and indices
+        template_item = self_item +  other_item
+        template_item.values[:] = 0
+        # Construct comparable items
+        new_other = populate(template_item, other_item)
+        new_self = populate(template_item, self_item)
+        # Compute the values
+        new_item = new_other.combine(new_self, np.maximum)
+      elif not self_true:
+        new_item = other_item
+      else:
+        new_item = self_item
+      return new_item
+
+    self._ser_sfa = concat("_ser_sfa", pd.Series)
+    self._df_cpc = concat("_df_cpc", pd.DataFrame)
+    self._df_ipa = concat("_df_ipa", pd.DataFrame)
 
   def _reportProgress(self, metric, count, total):
     """

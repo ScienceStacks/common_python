@@ -436,4 +436,51 @@ def copyProperties(obj1, obj2):
   """
   for name, value in obj1.__dict__.items():
     obj2.__dict__[name] = value
-    
+
+def isEqual(obj1, obj2):
+  """
+  Tests if two objects have the same instance dictionaries
+  and values.
+ 
+  Parameters
+  ----------
+  obj1: object
+  obj2: object
+ 
+  Returns
+  -------
+  bool
+  """
+  result = True
+  result_info = None
+  simple_types = [int, str, bool, list, dict]
+  if (obj1 is None) and (obj2 is None):
+    result_info = 0
+    result = True
+  elif obj1.__class__ in simple_types:
+    result_info = 1
+    result = obj1 == obj2
+  elif obj1.__class__ == float:
+    try:
+      result_info = 2
+      result = np.isclose(obj1, obj2)
+    except Exception:
+      result_info = 3
+      result = False
+  #
+  elif "equals" in dir(obj1):
+    result_info = 4
+    result = obj1.equals(obj2)
+  #
+  else:
+    for key in set(obj1.__dict__.keys()).union(obj2.__dict__.keys()):
+      try:
+        if not isEqual(obj1.__getattribute__(key),
+            obj2.__getattribute__(key)):
+          result_info = key
+          result = False
+      except Exception:
+        result_info = 5
+        result = False
+  #
+  return result
