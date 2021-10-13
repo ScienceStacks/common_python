@@ -119,6 +119,7 @@ class ClassifierEnsemble(ClassifierCollection):
     self.holdouts = holdouts
     self.size = size
     self.columns = None # Columns used in prediction
+    self.classes = None
     super().__init__(**kwargs)
 
   def fit(self, df_X, ser_y, collectionMaker=None):
@@ -135,6 +136,7 @@ class ClassifierEnsemble(ClassifierCollection):
           self.clf_desc.clf, df_X, ser_y, self.size, 
           holdouts=self.holdouts)
     #
+    self.classes = list(set(ser_y.values))
     if collectionMaker is None:
       collectionMaker = defaultCollectionMaker
     collection = collectionMaker(df_X, ser_y)
@@ -403,31 +405,59 @@ class ClassifierEnsemble(ClassifierCollection):
     kwargs = util.setValue(kwargs, cn.PLT_YLABEL, "Importance")
     self._plot(df, top, fig, ax, is_plot, **kwargs)
 
-  def plotFeatureContributions(self, ser_X, ax=None, is_plot=True):
+  # FIXME: Add shading to indicate the true class
+  def plotFeatureContributions(self, ser_X, title="", ax=None,
+     true_class=None,  is_plot=True):
     """
     Plots the contribution of each feature to the final score by class
     averaged across the ensemble.  This is presented as a bar plot.
     :param Series ser_X:
+    :param int true_class: true class for ser_X
     :param bool is_plot:
     """
     if not "getFeatureContributions" in dir(self.clf_desc):
       raise RuntimeError(
           "Classifier description must have the method getFeatureContributions")
+    if self.classes is None:
+      raise RuntimeError("Must fit before doing plotFeatureContributions")
     # Calculate the mean and standard deviations of feature contributions
     dfs = [self.clf_desc.getFeatureContributions(c, self.columns, ser_X)
         for c in self.clfs]
     df_mean = dfs[0] - dfs[0]
     df_std = dfs[0] - dfs[0]
+    ser_tot_mean = pd.Series(np.repeat(0, len(self.classes)), index=self.classes)
+    ser_tot_std = pd.Series(np.repeat(0, len(self.classes)), index=self.classes)
     for idx in df_mean.index:
+      # mean value of cross product
+      ser_tot_mean.loc[idx] = np.mean([df.loc[idx, :].sum() for df in dfs])
+      # std of value of cross product
+      ser_tot_std.loc[idx] = np.std([df.loc[idx, :].sum() for df in dfs])
       for col in df_mean.columns:
         values = [df.loc[idx, col] for df in dfs]
         df_mean.loc[idx, col] = np.mean(values)
         df_std.loc[idx, col] = np.std(values)
-    import pdb; pdb.set_trace()
+    mean_dct = {i: df_mean.loc[i,:].mean() for i in self.classes}
+    std_dct = {i: df_std.loc[i,:].std() for i in self.classes}
     # Plot the contributions for each instance
     if ax is None:
       _, ax = plt.subplots(1)
-    df_mean.plot(kind="bar", stacked=True, yerr=df_std.values)
+    values = df_std.values
+    (nrow, ncol) = np.shape(values)
+    values = np.reshape(values, (ncol, nrow))
+    df_mean.plot(kind="bar", stacked=True, yerr=values, ax=ax, width=0.25)
+    ax.legend(self.columns, bbox_to_anchor=(1.0, 1), loc='upper left')
+    xvalues = [c + .25 for c in self.classes]
+    ax.bar(xvalues, ser_tot_mean, yerr=ser_tot_std.values, fill=False,
+        width=0.25)
+    ax.plot([0, len(df_mean)+1], [0, 0], linestyle="dashed", color="black")
+    if true_class is not None:
+      ax.axvspan(true_class-0.25, true_class+0.4, facecolor='grey', alpha=0.2)
+    ax.set_xticklabels(self.classes, rotation=0)
+    ax.set_xlabel("class")
+    ax.set_ylabel("contribution to class selection measure")
+    ax.set_title(title)
+    if is_plot:
+      plt.show()
 
   def _makeFeatureDF(self, df_values):
     """

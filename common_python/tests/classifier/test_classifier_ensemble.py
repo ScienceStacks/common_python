@@ -48,7 +48,7 @@ DF_X, SER_Y = test_helpers.getData()
 DF_X_LONG, SER_Y_LONG = test_helpers.getDataLong()
 HOLDOUTS = 1
 SVM_ENSEMBLE = ClassifierEnsemble( ClassifierDescriptorSVM(),
-    filter_high_rank=15,
+    filter_high_rank=10,
     size=SIZE, holdouts=HOLDOUTS)
 FITTED_SVM_ENSEMBLE_LONG = copy.deepcopy(SVM_ENSEMBLE)
 FITTED_SVM_ENSEMBLE_LONG.fit(DF_X_LONG, SER_Y_LONG)
@@ -230,10 +230,11 @@ class TestClassifierEnsemble(unittest.TestCase):
   def testPlotFeatureContributions(self):
     # TESTING
     self._init()
+    instance = "T3.0"
     svm_ensemble = copy.deepcopy(FITTED_SVM_ENSEMBLE_LONG)
-    ser_X = self.df_X_long.loc["T1.0"]
-    svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT)
-    import pdb; pdb.set_trace()
+    ser_X = self.df_X_long.loc[instance]
+    svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT,
+        title=instance, true_class=self.ser_y_long.loc[instance])
 
   def testPlotRank(self):
     if IGNORE_TEST:
