@@ -34,11 +34,13 @@ import pandas as pd
 from sklearn import svm
 
 
+
 ###############################################
 class ClassifierDescriptor(object):
   # Describes a classifier used to create an ensemble
 
-  def __init__(self):
+  def __init__(self, df_X=None):
+    self.df_X = df_X
     self.clf = None # Must assign to a classifier Type
 
   def getImportance(self, clf, **kwargs):
@@ -59,18 +61,22 @@ class ClassifierDescriptorSVM(ClassifierDescriptor):
   classifier for each class.
   """
   
-  def __init__(self, clf=svm.LinearSVC()):
+  def __init__(self, clf=svm.LinearSVC(), **kwargs):
+    super().__init__(**kwargs)
     self.clf = clf
 
   def getImportance(self, clf, class_selection=None):
     """
-    Calculates the importances of features.
+    Calculates the importances of features. Takes into account
+    the replications, if desired.
     :param Classifier clf:
+    :param DataFrame df_X:
     :param int class_selection: class for which importance is computed
     :return list-float:
     """
     if class_selection is None:
-      # If none specified, choose the largest value.
+      # If none specified, choose the largest magnitude coefficient across the
+      # 1-vs-rest classifiers.
       coefs = [max([np.abs(x) for x in xv]) for xv in zip(*clf.coef_)]
     else:
       coefs = [np.abs(x) for x in clf.coef_[class_selection]]
@@ -104,8 +110,7 @@ class ClassifierDescriptorSVM(ClassifierDescriptor):
 class ClassifierEnsemble(ClassifierCollection):
  
   def __init__(self, clf_desc=ClassifierDescriptorSVM(),
-      holdouts=1, size=1,
-      filter_high_rank=None,
+      holdouts=1, size=1, filter_high_rank=None,
       **kwargs):
     """
     :param ClassifierDescriptor clf_desc:
@@ -136,6 +141,7 @@ class ClassifierEnsemble(ClassifierCollection):
           self.clf_desc.clf, df_X, ser_y, self.size, 
           holdouts=self.holdouts)
     #
+    self.clf_desc.df_X = df_X
     self.classes = list(set(ser_y.values))
     if collectionMaker is None:
       collectionMaker = defaultCollectionMaker
@@ -266,7 +272,7 @@ class ClassifierEnsemble(ClassifierCollection):
     df_values = pd.DataFrame()
     for idx, clf in enumerate(self.clfs):
       values = self.clf_desc.getImportance(clf,
-         class_selection=class_selection)
+          class_selection=class_selection)
       df_values[idx] = pd.Series(values, index=self.features)
     df_result = self._makeFeatureDF(df_values)
     df_result[ABS_MEAN] = [np.abs(x) for x in df_result[cn.MEAN]]
@@ -405,9 +411,8 @@ class ClassifierEnsemble(ClassifierCollection):
     kwargs = util.setValue(kwargs, cn.PLT_YLABEL, "Importance")
     self._plot(df, top, fig, ax, is_plot, **kwargs)
 
-  # FIXME: Add shading to indicate the true class
   def plotFeatureContributions(self, ser_X, title="", ax=None,
-     true_class=None,  is_plot=True):
+     true_class=None,  is_plot=True, is_legend=True):
     """
     Plots the contribution of each feature to the final score by class
     averaged across the ensemble.  This is presented as a bar plot.
@@ -446,6 +451,9 @@ class ClassifierEnsemble(ClassifierCollection):
     values = np.reshape(values, (ncol, nrow))
     df_mean.plot(kind="bar", stacked=True, yerr=values, ax=ax, width=0.25)
     ax.legend(self.columns, bbox_to_anchor=(1.0, 1), loc='upper left')
+    if not is_legend:
+      legend = ax.get_legend()
+      legend.remove()
     xvalues = [c + .25 for c in self.classes]
     ax.bar(xvalues, ser_tot_mean, yerr=ser_tot_std.values, fill=False,
         width=0.25)

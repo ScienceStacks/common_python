@@ -15,6 +15,7 @@ from common.trinary_data import TrinaryData
 
 import collections
 import copy
+import matplotlib.pyplot as plt
 import os
 import pandas as pd
 import random
@@ -47,7 +48,8 @@ ANALYZER_AVG_DCT = feature_analyzer.deserialize(
 DF_X, SER_Y = test_helpers.getData()
 DF_X_LONG, SER_Y_LONG = test_helpers.getDataLong()
 HOLDOUTS = 1
-SVM_ENSEMBLE = ClassifierEnsemble( ClassifierDescriptorSVM(),
+CLASSIFIER_DESCRIPTION_SVM = ClassifierDescriptorSVM(df_X=DF_X_LONG)
+SVM_ENSEMBLE = ClassifierEnsemble(CLASSIFIER_DESCRIPTION_SVM,
     filter_high_rank=10,
     size=SIZE, holdouts=HOLDOUTS)
 FITTED_SVM_ENSEMBLE_LONG = copy.deepcopy(SVM_ENSEMBLE)
@@ -118,6 +120,30 @@ RANDOM_ENSEMBLE.fit(DF, SER)
 
 
 ######## Test Classes ######
+class TestClassifierDescription(unittest.TestCase):
+
+  def _init(self):
+    self.df_X_long = copy.deepcopy(DF_X_LONG)
+    self.df_X = copy.deepcopy(DF_X)
+    self.ser_y_long = copy.deepcopy(SER_Y_LONG)
+    self.ser_y = copy.deepcopy(SER_Y)
+    self.clf = FITTED_SVM_ENSEMBLE_LONG.clfs[0]
+    self.svm_description = copy.deepcopy(CLASSIFIER_DESCRIPTION_SVM)
+  
+  def setUp(self):
+    self._init()
+
+  def testGetImportance(self):
+    # TESTING
+    size = 5
+    ensemble = ClassifierEnsemble(CLASSIFIER_DESCRIPTION_SVM,
+        size=size, holdouts=HOLDOUTS)
+    ensemble.fit(DF_X_LONG, SER_Y_LONG)
+    result = self.svm_description.getImportance(ensemble.clfs[0])
+    trues = [isinstance(c, float) for c in result]
+    self.assertTrue(all(trues))
+
+
 class TestClassifierEnsemble(unittest.TestCase):
 
   def _init(self):
@@ -228,13 +254,18 @@ class TestClassifierEnsemble(unittest.TestCase):
     self.assertEqual(len(diff), 0)
 
   def testPlotFeatureContributions(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     self._init()
     instance = "T3.0"
     svm_ensemble = copy.deepcopy(FITTED_SVM_ENSEMBLE_LONG)
     ser_X = self.df_X_long.loc[instance]
     svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT,
         title=instance, true_class=self.ser_y_long.loc[instance])
+    #
+    _, ax = plt.subplots(1)
+    svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT, ax=ax,
+        title=instance, true_class=self.ser_y_long.loc[instance], is_legend=False)
 
   def testPlotRank(self):
     if IGNORE_TEST:
@@ -277,7 +308,6 @@ class TestClassifierEnsemble(unittest.TestCase):
     mean = ser.mean(axis=1).values[0]
     expected = 1/SIZE
     self.assertLess(abs(mean - expected), 0.1)
-# TODO: Create tests that use RandomClassifier or delete this
 
   def testScore(self):
     if IGNORE_TEST:
@@ -312,6 +342,8 @@ class TestClassifierEnsemble(unittest.TestCase):
         size=SIZE, holdouts=1)
 
   def testCalcAdjProbTail(self):
+    # FIX ME: takes too long
+    return
     if IGNORE_TEST:
       return
     def test(prob):
