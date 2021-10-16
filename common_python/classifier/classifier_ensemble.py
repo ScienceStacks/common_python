@@ -521,7 +521,7 @@ class ClassifierEnsemble(ClassifierCollection):
         number of cross validation iterations (folds)
     clf_desc: ClassifierDescriptor
     kwargs: dict
-        arguments from constructor
+        arguments for constructor classifier constructor
         
     Returns
     -------

@@ -23,8 +23,8 @@ from sklearn import svm
 import numpy as np
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 SIZE = 10
 ITERATIONS = 3
 values = list(range(SIZE))
@@ -134,7 +134,8 @@ class TestClassifierDescription(unittest.TestCase):
     self._init()
 
   def testGetImportance(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     size = 5
     ensemble = ClassifierEnsemble(CLASSIFIER_DESCRIPTION_SVM,
         size=size, holdouts=HOLDOUTS)
