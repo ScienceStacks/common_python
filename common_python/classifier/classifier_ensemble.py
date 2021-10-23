@@ -33,6 +33,9 @@ import numpy as np
 import pandas as pd
 from sklearn import svm
 
+#
+MULTI_COLUMN_SEP = "--"
+
 
 
 ###############################################
@@ -111,18 +114,21 @@ class ClassifierEnsemble(ClassifierCollection):
  
   def __init__(self, clf_desc=ClassifierDescriptorSVM(),
       holdouts=1, size=1, filter_high_rank=None,
+      is_display_errors=True,
       **kwargs):
     """
     :param ClassifierDescriptor clf_desc:
     :param int holdouts: number of holdouts when fitting
     :param int size: size of the ensemble
     :param int/None filter_high_rank: maximum feature rank considered
+    :param bool is_display_errors: Show errors found in data
     :param dict kwargs: keyword arguments used by parent classes
     """
     self.clf_desc = clf_desc
     self.filter_high_rank = filter_high_rank
     self.holdouts = holdouts
     self.size = size
+    self._is_display_errors = is_display_errors
     self.columns = None # Columns used in prediction
     self.classes = None
     super().__init__(**kwargs)
@@ -178,12 +184,34 @@ class ClassifierEnsemble(ClassifierCollection):
       raise ValueError("Must pass dataframe indexed by instance")
     #
     indices = df_X.index
-    try:
-      df_X_sub = df_X[self.columns]
-    except:
-      import pdb; pdb.set_trace()
+    missing_columns = list(set(self.columns).difference(df_X.columns))
+    new_df_X = df_X.copy()
+    rename_dct = {}
+    if len(missing_columns) > 0:
+      if self._is_display_errors:
+        msg = "***Warning: missing columns in prediction vector. \n %s"  \
+            % str(missing_columns)
+        print (msg)
+      # Handle correlated columns by using the first one as surrogate
+      # This should work if the prediction is done on data
+      # with all of the genes.
+      zero_columns = []
+      for column in missing_columns:
+        if MULTI_COLUMN_SEP in column:
+          pos = column.index(MULTI_COLUMN_SEP)
+          rename_dct[missing_column] = column[0:pos]
+        else:
+          # Column is not present in the prediction features
+          zero_columns.append(column)
+      zeroes = np.repeat(0, len(new_df_X))
+      for column in zero_columns:
+        new_df_X[column] = zeroes
+    # Update the prediction features to accommodate the training data
+    new_df_X = new_df_X.rename(rename_dct, axis='columns')
+    # Do the prediction
+    df_X_sub = new_df_X[self.columns]
     array = df_X_sub.values
-    array = array.reshape(len(df_X.index), len(df_X_sub.columns)) 
+    array = array.reshape(len(new_df_X.index), len(df_X_sub.columns)) 
     # Create a dataframe of class predictions
     clf_predictions = [clf.predict(df_X_sub)
         for clf in self.clfs]
@@ -412,12 +440,14 @@ class ClassifierEnsemble(ClassifierCollection):
     self._plot(df, top, fig, ax, is_plot, **kwargs)
 
   def plotFeatureContributions(self, ser_X, title="", ax=None,
-     true_class=None,  is_plot=True, is_legend=True):
+     true_class=None,  is_plot=True, is_legend=True,
+     is_xlabel=True, is_ylabel=True, class_names=None):
     """
     Plots the contribution of each feature to the final score by class
     averaged across the ensemble.  This is presented as a bar plot.
     :param Series ser_X:
     :param int true_class: true class for ser_X
+    :param list-str class_names:
     :param bool is_plot:
     """
     if not "getFeatureContributions" in dir(self.clf_desc):
@@ -449,6 +479,8 @@ class ClassifierEnsemble(ClassifierCollection):
     values = df_std.values
     (nrow, ncol) = np.shape(values)
     values = np.reshape(values, (ncol, nrow))
+    if class_names is None:
+      class_names = self.classes
     df_mean.plot(kind="bar", stacked=True, yerr=values, ax=ax, width=0.25)
     ax.legend(self.columns, bbox_to_anchor=(1.0, 1), loc='upper left')
     if not is_legend:
@@ -460,9 +492,19 @@ class ClassifierEnsemble(ClassifierCollection):
     ax.plot([0, len(df_mean)+1], [0, 0], linestyle="dashed", color="black")
     if true_class is not None:
       ax.axvspan(true_class-0.25, true_class+0.4, facecolor='grey', alpha=0.2)
-    ax.set_xticklabels(self.classes, rotation=0)
-    ax.set_xlabel("class")
-    ax.set_ylabel("contribution to class selection measure")
+    if isinstance(class_names[0], int):
+      rotation = 0
+    else:
+      rotation = 30
+    ax.set_xticklabels(class_names, rotation=rotation)
+    if is_xlabel:
+      ax.set_xlabel("class")
+    else:
+      ax.set_xticklabels([])
+    if is_ylabel:
+      ax.set_ylabel("contribution to class selection measure")
+    else:
+      ax.set_yticklabels([])
     ax.set_title(title)
     if is_plot:
       plt.show()

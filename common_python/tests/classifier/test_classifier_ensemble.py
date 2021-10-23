@@ -12,6 +12,7 @@ from common_python.testing import helpers
 from common_python.util import util
 from common_python.tests.classifier import helpers as test_helpers
 from common.trinary_data import TrinaryData
+from common.data_provider import DataProvider
 
 import collections
 import copy
@@ -29,6 +30,8 @@ SIZE = 10
 ITERATIONS = 3
 values = list(range(SIZE))
 values.extend(values)
+PROVIDER = DataProvider()
+PROVIDER.do()
 DF = pd.DataFrame({
     'A': [10*v for v in values],
     'B': np.repeat(1, 2*SIZE),
@@ -261,12 +264,17 @@ class TestClassifierEnsemble(unittest.TestCase):
     instance = "T3.0"
     svm_ensemble = copy.deepcopy(FITTED_SVM_ENSEMBLE_LONG)
     ser_X = self.df_X_long.loc[instance]
+    ser_y = self.ser_y_long
+    class_names = PROVIDER.getStageNames(ser_y)
     svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT,
-        title=instance, true_class=self.ser_y_long.loc[instance])
+        title=instance, true_class=self.ser_y_long.loc[instance],
+        class_names=class_names)
     #
     _, ax = plt.subplots(1)
     svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT, ax=ax,
-        title=instance, true_class=self.ser_y_long.loc[instance], is_legend=False)
+        title=instance, true_class=self.ser_y_long.loc[instance],
+        is_xlabel=False,
+        is_legend=False)
 
   def testPlotRank(self):
     if IGNORE_TEST:
@@ -301,14 +309,40 @@ class TestClassifierEnsemble(unittest.TestCase):
     trues = [c in range(SIZE) for c in ser_predict.values]
     self.assertTrue(all(trues))
 
-  def testPredict(self):
+  def _predict(self, df, ser_y, clf=None):
+    if clf is None:
+      self._init()
+      clf = self.classifier_ensemble_random
+    df_p = clf.predict(df)
+    # calculate accuracy
+    accuracy = np.mean([df_p.loc[idx, value] for idx, value in ser_y.items()])
+    return accuracy
+
+  def testPredict1(self):
     if IGNORE_TEST:
       return
     self._init()
-    ser = self.classifier_ensemble_random.predict(DF)
-    mean = ser.mean(axis=1).values[0]
+    score = self._predict(DF, SER)
     expected = 1/SIZE
-    self.assertLess(abs(mean - expected), 0.1)
+    self.assertLess(abs(score - expected), 0.1)
+
+  def testPredictMissingFeature(self):
+    if IGNORE_TEST:
+      return
+    # Data
+    values = [0 if i < SIZE else 1 for i in range(2*SIZE)]
+    df_X = pd.DataFrame({
+        'A': values,
+        'B': np.random.uniform(2*SIZE)
+        })
+    ser_y = pd.Series(values)
+    svm_ensemble = ClassifierEnsemble(is_display_errors=False)
+    svm_ensemble.fit(df_X, ser_y)
+    accurate_score = self._predict(df_X, ser_y, clf=svm_ensemble)
+    df_X_1 = df_X.copy()
+    del df_X_1['A']
+    inaccurate_score = self._predict(df_X_1, ser_y, clf=svm_ensemble)
+    self.assertGreater(accurate_score, inaccurate_score)
 
   def testScore(self):
     if IGNORE_TEST:

@@ -9,8 +9,8 @@ import pandas as pd
 import sys
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 TMP_FILE1 = "util_tmp.csv"
 TMP_FILES = [TMP_FILE1]
 
@@ -264,7 +264,8 @@ class TestFunctions(unittest.TestCase):
     self.assertTrue(obj1 == obj2)
 
   def testIsEqual(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     class TestClass:
         def __init__(self, a, df):
           self.a = a
