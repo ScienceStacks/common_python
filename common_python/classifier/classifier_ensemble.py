@@ -439,16 +439,37 @@ class ClassifierEnsemble(ClassifierCollection):
     kwargs = util.setValue(kwargs, cn.PLT_YLABEL, "Importance")
     self._plot(df, top, fig, ax, is_plot, **kwargs)
 
-  def plotFeatureContributions(self, ser_X, title="", ax=None,
-     true_class=None,  is_plot=True, is_legend=True,
-     is_xlabel=True, is_ylabel=True, class_names=None):
+  def plotSVMCoefficients(self, **kwargs):
+    """
+    Bar plot of the SVM coefficients.
+
+    Parameters
+    ----------
+    kwargs: dict
+        optional arguments for plotting
+    """
+    ser_X = pd.Series(np.repeat(1, len(self.features)))
+    ser_X.index = self.features
+    new_kwargs = dict(kwargs)
+    new_kwargs["is_plot"] = False
+    ax = self._plotFeatureBars(ser_X, **new_kwargs)
+    ax.set_ylabel("Coefficient")
+    self._showPlot(kwargs)
+
+  @staticmethod
+  def _showPlot(kwargs):
+    if "is_plot" in kwargs:
+      if kwargs["is_plot"]:
+        plt.show()
+    else:
+      plt.show()
+
+  def old_plotFeatureContributions(self, ser_X, **kwargs):
     """
     Plots the contribution of each feature to the final score by class
     averaged across the ensemble.  This is presented as a bar plot.
     :param Series ser_X:
-    :param int true_class: true class for ser_X
-    :param list-str class_names:
-    :param bool is_plot:
+    :return pyplot.Axes:
     """
     if not "getFeatureContributions" in dir(self.clf_desc):
       raise RuntimeError(
@@ -508,6 +529,127 @@ class ClassifierEnsemble(ClassifierCollection):
     ax.set_title(title)
     if is_plot:
       plt.show()
+    return ax
+
+  def plotFeatureContributions(self, ser_X, **kwargs):
+    """
+    Plots the contribution of each feature to the final score by class
+    averaged across the ensemble.  This is presented as a bar plot.
+    :param Series ser_X:
+    :return pyplot.Axes:
+    """
+    def getKwarg(key, default=None):
+      if key in kwargs.keys():
+        return kwargs[key]
+      else:
+        return default
+    #
+    true_class = getKwarg("true_class", None)
+    is_plot = getKwarg("is_plot", True)
+    class_names = getKwarg("class_names", self.classes)
+    is_xlabel = getKwarg("is_xlabel", True)
+    is_ylabel = getKwarg("is_ylabel", True)
+    title = getKwarg("title", None)
+    if not "getFeatureContributions" in dir(self.clf_desc):
+      raise RuntimeError(
+          "Classifier description must have the method getFeatureContributions")
+    if self.classes is None:
+      raise RuntimeError("Must fit before doing plotFeatureContributions")
+    # Plot the contributions of features
+    new_kwargs = dict(kwargs)
+    new_kwargs["is_plot"] = False
+    ax = self._plotFeatureBars(ser_X, **new_kwargs)
+    # Calculate the mean and standard deviations of feature contributions
+    ser_tot_mean = pd.Series(np.repeat(0, len(self.classes)), index=self.classes)
+    ser_tot_std = pd.Series(np.repeat(0, len(self.classes)), index=self.classes)
+    dfs = [self.clf_desc.getFeatureContributions(c, self.columns, ser_X)
+        for c in self.clfs]
+    for idx in self.classes:
+      ser_tot_mean.loc[idx] = np.mean([df.loc[idx, :].sum() for df in dfs])
+      ser_tot_std.loc[idx] = np.std([df.loc[idx, :].sum() for df in dfs])
+    # Plot the contributions for each instance
+    xvalues = [c + .25 for c in self.classes]
+    ax.bar(xvalues, ser_tot_mean, yerr=ser_tot_std.values, fill=False,
+        width=0.25)
+    ax.plot([0, len(self.classes)+1], [0, 0], linestyle="dashed", color="black")
+    if true_class is not None:
+      ax.axvspan(true_class-0.25, true_class+0.4, facecolor='grey', alpha=0.2)
+    if isinstance(class_names[0], int):
+      rotation = 0
+    else:
+      rotation = 30
+    ax.set_xticklabels(class_names, rotation=rotation)
+    if is_xlabel:
+      ax.set_xlabel("class")
+    else:
+      ax.set_xticklabels([])
+    if is_ylabel:
+      ax.set_ylabel("contribution to class selection measure")
+    else:
+      ax.set_yticklabels([])
+    ax.set_title(title)
+    if "is_plot" in kwargs:
+      if kwargs["is_plot"]:
+        plt.show()
+    else:
+      plt.show()
+    return ax
+
+  def _plotFeatureBars(self, ser_X, ax=None, title="",
+     true_class=None,  is_plot=True, is_legend=True,
+     is_xlabel=True, is_ylabel=True, class_names=None):
+    """
+    Plots the contribution of each feature to the final score by class
+    averaged across the ensemble.  This is presented as a bar plot.
+    :param Series ser_X:
+    :param int true_class: true class for ser_X
+    :param list-str class_names:
+    :param bool is_plot:
+    :return pyplot.Axes:
+    """
+    # Calculate the mean and standard deviations of feature contributions
+    dfs = [self.clf_desc.getFeatureContributions(c, self.columns, ser_X)
+        for c in self.clfs]
+    df_mean = dfs[0] - dfs[0]
+    df_std = dfs[0] - dfs[0]
+    for idx in df_mean.index:
+      for col in df_mean.columns:
+        values = [df.loc[idx, col] for df in dfs]
+        df_mean.loc[idx, col] = np.mean(values)
+        df_std.loc[idx, col] = np.std(values)
+    mean_dct = {i: df_mean.loc[i,:].mean() for i in self.classes}
+    std_dct = {i: df_std.loc[i,:].std() for i in self.classes}
+    # Plot the contributions for each instance
+    if ax is None:
+      _, ax = plt.subplots(1)
+    values = df_std.values
+    (nrow, ncol) = np.shape(values)
+    values = np.reshape(values, (ncol, nrow))
+    if class_names is None:
+      class_names = self.classes
+    df_mean.plot(kind="bar", stacked=True, yerr=values, ax=ax, width=0.25)
+    ax.legend(self.columns, bbox_to_anchor=(1.0, 1), loc='upper left')
+    if not is_legend:
+      legend = ax.get_legend()
+      legend.remove()
+    ax.plot([0, len(df_mean)+1], [0, 0], linestyle="dashed", color="black")
+    if isinstance(class_names[0], int):
+      rotation = 0
+    else:
+      rotation = 30
+    ax.set_xticklabels(class_names, rotation=rotation)
+    if is_xlabel:
+      ax.set_xlabel("class")
+    else:
+      ax.set_xticklabels([])
+    if is_ylabel:
+      ax.set_ylabel("contribution to class selection measure")
+    else:
+      ax.set_yticklabels([])
+    ax.set_title(title)
+    if is_plot:
+      plt.show()
+    return ax
 
   def _makeFeatureDF(self, df_values):
     """

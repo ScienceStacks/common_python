@@ -273,8 +273,14 @@ class TestClassifierEnsemble(unittest.TestCase):
     _, ax = plt.subplots(1)
     svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT, ax=ax,
         title=instance, true_class=self.ser_y_long.loc[instance],
-        is_xlabel=False,
-        is_legend=False)
+        is_xlabel=False, is_legend=False)
+
+  def testPlotSVMCoefficients(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    self.svm_ensemble.fit(self.df_X, self.ser_y)
+    self.svm_ensemble.plotSVMCoefficients(title="SVM", is_plot=IS_PLOT)
 
   def testPlotRank(self):
     if IGNORE_TEST:
