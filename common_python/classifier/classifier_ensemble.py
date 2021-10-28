@@ -32,9 +32,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn import svm
+import string
 
 #
 MULTI_COLUMN_SEP = "--"
+LETTERS = string.ascii_lowercase
 
 
 
@@ -100,7 +102,8 @@ class ClassifierDescriptorSVM(ClassifierDescriptor):
     -------
     DataFrame: column - feature, row - class, value - contribution
     """
-    ser_X_sub = ser_X.loc[features]
+    labels = set(features).intersection(ser_X.index)
+    ser_X_sub = ser_X.loc[labels]
     df_coef = pd.DataFrame(clf.coef_, columns=features)
     df_X = pd.concat([ser_X_sub for _ in range(len(clf.coef_))], axis=1)
     df_X = df_X.T
@@ -464,73 +467,6 @@ class ClassifierEnsemble(ClassifierCollection):
     else:
       plt.show()
 
-  def old_plotFeatureContributions(self, ser_X, **kwargs):
-    """
-    Plots the contribution of each feature to the final score by class
-    averaged across the ensemble.  This is presented as a bar plot.
-    :param Series ser_X:
-    :return pyplot.Axes:
-    """
-    if not "getFeatureContributions" in dir(self.clf_desc):
-      raise RuntimeError(
-          "Classifier description must have the method getFeatureContributions")
-    if self.classes is None:
-      raise RuntimeError("Must fit before doing plotFeatureContributions")
-    # Calculate the mean and standard deviations of feature contributions
-    dfs = [self.clf_desc.getFeatureContributions(c, self.columns, ser_X)
-        for c in self.clfs]
-    df_mean = dfs[0] - dfs[0]
-    df_std = dfs[0] - dfs[0]
-    ser_tot_mean = pd.Series(np.repeat(0, len(self.classes)), index=self.classes)
-    ser_tot_std = pd.Series(np.repeat(0, len(self.classes)), index=self.classes)
-    for idx in df_mean.index:
-      # mean value of cross product
-      ser_tot_mean.loc[idx] = np.mean([df.loc[idx, :].sum() for df in dfs])
-      # std of value of cross product
-      ser_tot_std.loc[idx] = np.std([df.loc[idx, :].sum() for df in dfs])
-      for col in df_mean.columns:
-        values = [df.loc[idx, col] for df in dfs]
-        df_mean.loc[idx, col] = np.mean(values)
-        df_std.loc[idx, col] = np.std(values)
-    mean_dct = {i: df_mean.loc[i,:].mean() for i in self.classes}
-    std_dct = {i: df_std.loc[i,:].std() for i in self.classes}
-    # Plot the contributions for each instance
-    if ax is None:
-      _, ax = plt.subplots(1)
-    values = df_std.values
-    (nrow, ncol) = np.shape(values)
-    values = np.reshape(values, (ncol, nrow))
-    if class_names is None:
-      class_names = self.classes
-    df_mean.plot(kind="bar", stacked=True, yerr=values, ax=ax, width=0.25)
-    ax.legend(self.columns, bbox_to_anchor=(1.0, 1), loc='upper left')
-    if not is_legend:
-      legend = ax.get_legend()
-      legend.remove()
-    xvalues = [c + .25 for c in self.classes]
-    ax.bar(xvalues, ser_tot_mean, yerr=ser_tot_std.values, fill=False,
-        width=0.25)
-    ax.plot([0, len(df_mean)+1], [0, 0], linestyle="dashed", color="black")
-    if true_class is not None:
-      ax.axvspan(true_class-0.25, true_class+0.4, facecolor='grey', alpha=0.2)
-    if isinstance(class_names[0], int):
-      rotation = 0
-    else:
-      rotation = 30
-    ax.set_xticklabels(class_names, rotation=rotation)
-    if is_xlabel:
-      ax.set_xlabel("class")
-    else:
-      ax.set_xticklabels([])
-    if is_ylabel:
-      ax.set_ylabel("contribution to class selection measure")
-    else:
-      ax.set_yticklabels([])
-    ax.set_title(title)
-    if is_plot:
-      plt.show()
-    return ax
-
   def plotFeatureContributions(self, ser_X, **kwargs):
     """
     Plots the contribution of each feature to the final score by class
@@ -596,13 +532,17 @@ class ClassifierEnsemble(ClassifierCollection):
     return ax
 
   def _plotFeatureBars(self, ser_X, ax=None, title="",
-     true_class=None,  is_plot=True, is_legend=True,
+     true_class=None,  is_plot=True, is_legend=True, is_bar_label=True,
      is_xlabel=True, is_ylabel=True, class_names=None):
     """
     Plots the contribution of each feature to the final score by class
     averaged across the ensemble.  This is presented as a bar plot.
     :param Series ser_X:
+    :param Matplotlib.Axes ax:
+    :param str title:
     :param int true_class: true class for ser_X
+    :param bool is_plot:
+    :param bool is_legend: plot the legend
     :param list-str class_names:
     :param bool is_plot:
     :return pyplot.Axes:
@@ -627,8 +567,40 @@ class ClassifierEnsemble(ClassifierCollection):
     values = np.reshape(values, (ncol, nrow))
     if class_names is None:
       class_names = self.classes
-    df_mean.plot(kind="bar", stacked=True, yerr=values, ax=ax, width=0.25)
-    ax.legend(self.columns, bbox_to_anchor=(1.0, 1), loc='upper left')
+    # Write text on bar components
+    bar_ax = df_mean.plot(kind="bar", stacked=True, yerr=values,
+        ax=ax, width=0.25)
+    letter_dct = {}
+    cur_letter = 0
+    for rect in bar_ax.patches:
+      # Find where everything is located
+      height = rect.get_height()
+      width = rect.get_width()
+      x = rect.get_x()
+      y = rect.get_y()
+      # The height of the bar is the data value and can be used as the label
+      key = rect.get_facecolor()
+      if key in letter_dct.keys():
+        label = letter_dct[key]
+      else:
+        label = LETTERS[cur_letter]
+        cur_letter += 1
+        letter_dct[key] = label
+      #label_text = "%2.2f" % height
+      # ax.text(x, y, text)
+      label_x = x + width / 2
+      label_y = y + height / 2
+      # plot only when height is greater than specified value
+      if is_bar_label and (np.abs(height) > 0.1):
+        ax.text(label_x, label_y, label, color="white", ha='center',
+            va='center', fontsize=8)
+    # Construct the legend
+    letters = list(letter_dct.values())
+    if is_bar_label:
+      legends = ["%s: %s" % (letters[i], c) for i, c in enumerate(self.columns)]
+    else:
+      legends = ["%s" % c for i, c in enumerate(self.columns)]
+    ax.legend(legends, bbox_to_anchor=(1.0, 1), loc='upper left')
     if not is_legend:
       legend = ax.get_legend()
       legend.remove()

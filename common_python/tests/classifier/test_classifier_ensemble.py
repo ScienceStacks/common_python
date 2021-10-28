@@ -57,6 +57,8 @@ SVM_ENSEMBLE = ClassifierEnsemble(CLASSIFIER_DESCRIPTION_SVM,
     size=SIZE, holdouts=HOLDOUTS)
 FITTED_SVM_ENSEMBLE_LONG = copy.deepcopy(SVM_ENSEMBLE)
 FITTED_SVM_ENSEMBLE_LONG.fit(DF_X_LONG, SER_Y_LONG)
+FITTED_SVM_ENSEMBLE = copy.deepcopy(SVM_ENSEMBLE)
+FITTED_SVM_ENSEMBLE.fit(DF_X, SER_Y)
 CLASSES = list(set(SER_Y.values))
 CLASSES_LONG = list(set(SER_Y_LONG.values))
 
@@ -261,18 +263,20 @@ class TestClassifierEnsemble(unittest.TestCase):
     if IGNORE_TEST:
       return
     self._init()
-    instance = "T3.0"
-    svm_ensemble = copy.deepcopy(FITTED_SVM_ENSEMBLE_LONG)
-    ser_X = self.df_X_long.loc[instance]
-    ser_y = self.ser_y_long
+    instance = "T3"
+    svm_ensemble = copy.deepcopy(FITTED_SVM_ENSEMBLE)
+    ser_X = self.df_X.loc[instance]
+    value_dct = {0:4, 1:0, 2:3, 3:1, 4:2}
+    values = [value_dct[v] for v in self.ser_y]
+    ser_y = pd.Series(values, index=self.ser_y.index)
     class_names = PROVIDER.getStageNames(ser_y)
     svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT,
-        title=instance, true_class=self.ser_y_long.loc[instance],
+        title=instance, true_class=self.ser_y.loc[instance],
         class_names=class_names)
     #
     _, ax = plt.subplots(1)
     svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT, ax=ax,
-        title=instance, true_class=self.ser_y_long.loc[instance],
+        title=instance, true_class=self.ser_y.loc[instance],
         is_xlabel=False, is_legend=False)
 
   def testPlotSVMCoefficients(self):
