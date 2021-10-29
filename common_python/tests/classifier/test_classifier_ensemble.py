@@ -32,6 +32,7 @@ values = list(range(SIZE))
 values.extend(values)
 PROVIDER = DataProvider()
 PROVIDER.do()
+TRINARY = TrinaryData()
 DF = pd.DataFrame({
     'A': [10*v for v in values],
     'B': np.repeat(1, 2*SIZE),
@@ -53,7 +54,7 @@ DF_X_LONG, SER_Y_LONG = test_helpers.getDataLong()
 HOLDOUTS = 1
 CLASSIFIER_DESCRIPTION_SVM = ClassifierDescriptorSVM(df_X=DF_X_LONG)
 SVM_ENSEMBLE = ClassifierEnsemble(CLASSIFIER_DESCRIPTION_SVM,
-    filter_high_rank=10,
+    filter_high_rank=11,
     size=SIZE, holdouts=HOLDOUTS)
 FITTED_SVM_ENSEMBLE_LONG = copy.deepcopy(SVM_ENSEMBLE)
 FITTED_SVM_ENSEMBLE_LONG.fit(DF_X_LONG, SER_Y_LONG)
@@ -266,10 +267,8 @@ class TestClassifierEnsemble(unittest.TestCase):
     instance = "T3"
     svm_ensemble = copy.deepcopy(FITTED_SVM_ENSEMBLE)
     ser_X = self.df_X.loc[instance]
-    value_dct = {0:4, 1:0, 2:3, 3:1, 4:2}
-    values = [value_dct[v] for v in self.ser_y]
-    ser_y = pd.Series(values, index=self.ser_y.index)
-    class_names = PROVIDER.getStageNames(ser_y)
+    class_names = PROVIDER.getStageNames(self.ser_y)
+    #
     svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT,
         title=instance, true_class=self.ser_y.loc[instance],
         class_names=class_names)
@@ -278,6 +277,20 @@ class TestClassifierEnsemble(unittest.TestCase):
     svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT, ax=ax,
         title=instance, true_class=self.ser_y.loc[instance],
         is_xlabel=False, is_legend=False)
+
+  def testPlotFeatureContributions2(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    instances = ["T2"]
+    svm_ensemble = copy.deepcopy(FITTED_SVM_ENSEMBLE)
+    class_names = PROVIDER.getStageNames(self.ser_y)
+    #
+    for instance in instances:
+        svm_ensemble.plotFeatureContributions(self.df_X.loc[instance, :],
+                        title=instance, true_class=SER_Y.loc[instance],
+                        class_names=class_names,
+                        is_plot=IS_PLOT)
 
   def testPlotSVMCoefficients(self):
     if IGNORE_TEST:
@@ -300,14 +313,14 @@ class TestClassifierEnsemble(unittest.TestCase):
     self._init()
     cvrs = []
     num_clfs = 10 # number of classifiers created randomly
-    for fltr in [6, 1515]:
+    for fltr in [1, 1515]:
       clf = classifier_ensemble.ClassifierEnsemble(
           classifier_ensemble.ClassifierDescriptorSVM(),
           filter_high_rank=fltr, size=10)
       cvrs.append(
           classifier_collection.ClassifierCollection.crossValidateByState(
           clf, self.df_X, self.ser_y, num_clfs))
-    self.assertGreater(cvrs[1], cvrs[0])
+    self.assertGreater(cvrs[1].mean, cvrs[0].mean)
 
   def testRandomClassifier(self):
     if IGNORE_TEST:

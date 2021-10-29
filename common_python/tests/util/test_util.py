@@ -3,6 +3,7 @@
 import common_python.constants as cn
 import common_python.util.util as ut
 
+import matplotlib.colors as mcolors
 import numpy as np
 import os
 import pandas as pd
@@ -289,7 +290,20 @@ class TestFunctions(unittest.TestCase):
     obj2 = TestClass(a, df)
     self.assertTrue(ut.isEqual(obj1, obj2))
     
-    
+  def testGetColors(self):
+    if IGNORE_TEST:
+      return
+    def test(count, excludes=None):
+      colors = ut.getColors(count, excludes=excludes) 
+      diff = set(colors).difference(mcolors.TABLEAU_COLORS)
+      expected = max(0, count - len(mcolors.TABLEAU_COLORS))
+      self.assertEqual(len(diff), expected)
+    #
+    test(12, excludes=["grey"])
+    test(5)
+    test(1)
+    test(12)
+     
 
 
 

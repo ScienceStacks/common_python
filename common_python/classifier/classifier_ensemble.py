@@ -39,7 +39,6 @@ MULTI_COLUMN_SEP = "--"
 LETTERS = string.ascii_lowercase
 
 
-
 ###############################################
 class ClassifierDescriptor(object):
   # Describes a classifier used to create an ensemble
@@ -568,7 +567,9 @@ class ClassifierEnsemble(ClassifierCollection):
     if class_names is None:
       class_names = self.classes
     # Write text on bar components
-    bar_ax = df_mean.plot(kind="bar", stacked=True, yerr=values,
+    excluded_colors = ["grey", "gray", "white", "light"]
+    colors = util.getColors(len(df_mean.columns), excludes=excluded_colors)
+    bar_ax = df_mean.plot(kind="bar", stacked=True, yerr=values, color=colors,
         ax=ax, width=0.25)
     letter_dct = {}
     cur_letter = 0

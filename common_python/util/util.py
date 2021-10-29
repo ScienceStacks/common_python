@@ -6,10 +6,17 @@ import os
 import random
 import sys
 import pandas as pd
+import matplotlib.colors as mcolors
 import numpy as np
+import string
 
-LETTERS = 'abcdefghijklmnopqrstuvwxyz'
+LETTERS = string.ascii_lowercase
 UNNAMED = "Unnamed: 0"
+EXTRA_COLORS = np.array(list(mcolors.CSS4_COLORS.keys()))
+new_order = np.random.permutation(list(range(
+    len(EXTRA_COLORS))))
+EXTRA_COLORS = EXTRA_COLORS[new_order]
+
 
 def ConvertType(v):
   # Converts to int, float, str as required
@@ -484,3 +491,34 @@ def isEqual(obj1, obj2):
         result = False
   #
   return result
+
+def getColors(count, excludes=None):
+  """
+  Returns a list of unique colors
+  Parameters
+  ----------
+  count: int - Number of colors requested
+  excludes: list-str - colors to exclude
+  
+  Returns
+  -------
+  """
+  def checkColor(color):
+    result = all([c not in color for c in excludes])
+    return result
+  #
+  if excludes is None:
+    excludes = []
+  colors = [c for c in list(mcolors.TABLEAU_COLORS) if checkColor(c)]
+  #
+  if count <= len(colors):
+    return colors[:count]
+  # Add more colors at random
+  for idx in range(len(EXTRA_COLORS)):
+    if len(colors) >= count:
+      break
+    new_color = EXTRA_COLORS[idx]
+    if checkColor(new_color) and (new_color not in colors):
+      colors.append(new_color)
+    #
+  return colors
