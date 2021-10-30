@@ -293,14 +293,16 @@ class TestFunctions(unittest.TestCase):
   def testGetColors(self):
     if IGNORE_TEST:
       return
-    def test(count, excludes=None):
-      colors = ut.getColors(count, excludes=excludes) 
+    def test(count, excludes=None, includes=None):
+      colors = ut.getColors(count, excludes=excludes,
+          includes=includes) 
       diff = set(colors).difference(mcolors.TABLEAU_COLORS)
       expected = max(0, count - len(mcolors.TABLEAU_COLORS))
       self.assertEqual(len(diff), expected)
     #
     test(12, excludes=["grey"])
     test(5)
+    test(12, includes=["dark"])
     test(1)
     test(12)
      

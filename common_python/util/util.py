@@ -492,24 +492,33 @@ def isEqual(obj1, obj2):
   #
   return result
 
-def getColors(count, excludes=None):
+def getColors(count, excludes=None, includes=None):
   """
   Returns a list of unique colors
   Parameters
   ----------
   count: int - Number of colors requested
   excludes: list-str - colors to exclude
+  includes: list-str - substrings of names that should be present
   
   Returns
   -------
   """
-  def checkColor(color):
+  def checkIncludes(color):
+    if len(includes) == 0:
+      return True
+    result = any([c in color for c in includes])
+    return result
+  #
+  def checkExcludes(color):
     result = all([c not in color for c in excludes])
     return result
   #
   if excludes is None:
     excludes = []
-  colors = [c for c in list(mcolors.TABLEAU_COLORS) if checkColor(c)]
+  if includes is None:
+    includes = []
+  colors = [c for c in list(mcolors.TABLEAU_COLORS) if checkExcludes(c)]
   #
   if count <= len(colors):
     return colors[:count]
@@ -518,7 +527,8 @@ def getColors(count, excludes=None):
     if len(colors) >= count:
       break
     new_color = EXTRA_COLORS[idx]
-    if checkColor(new_color) and (new_color not in colors):
+    if (checkIncludes(new_color) and
+        checkExcludes(new_color) and (new_color not in colors)):
       colors.append(new_color)
     #
   return colors
