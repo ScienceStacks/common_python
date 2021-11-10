@@ -567,7 +567,9 @@ class ClassifierEnsemble(ClassifierCollection):
     if class_names is None:
       class_names = self.classes
     # Write text on bar components
-    excluded_colors = ["grey", "gray", "white", "light"]
+    excluded_colors = ["grey", "gray", "white", "light", "snow", "linen",
+        "oldlace", "cornsilk", "ivory", "beige", "honeydew", 
+        "mintcream", "azure", "aliceblue", "lavender"]
     colors = util.getColors(len(df_mean.columns), excludes=excluded_colors)
     bar_ax = df_mean.plot(kind="bar", stacked=True, yerr=values, color=colors,
         ax=ax, width=0.25)
