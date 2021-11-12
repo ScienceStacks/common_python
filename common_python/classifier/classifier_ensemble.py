@@ -30,6 +30,7 @@ import collections
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
+from operator import itemgetter
 import pandas as pd
 from sklearn import svm
 import string
@@ -471,6 +472,7 @@ class ClassifierEnsemble(ClassifierCollection):
     Plots the contribution of each feature to the final score by class
     averaged across the ensemble.  This is presented as a bar plot.
     :param Series ser_X:
+    :param dict kwargs: options when plotting feature bars
     :return pyplot.Axes:
     """
     def getKwarg(key, default=None):
@@ -507,8 +509,18 @@ class ClassifierEnsemble(ClassifierCollection):
     ax.bar(xvalues, ser_tot_mean, yerr=ser_tot_std.values, fill=False,
         width=0.25)
     ax.plot([0, len(self.classes)+1], [0, 0], linestyle="dashed", color="black")
+    is_misclassification = False
     if true_class is not None:
       ax.axvspan(true_class-0.25, true_class+0.4, facecolor='grey', alpha=0.2)
+      tuples  = list(enumerate(ser_tot_mean.values))
+      idx, _ = max(tuples, key=itemgetter(1))
+      predicted_class = self.classes[idx]
+      if predicted_class != true_class:
+        is_misclassification = True
+        # Indicate an inaccurate prediction
+        # max_value = ser_tot_mean.max()*1.2
+        # ax.text(xvalues[0], max_value, "x", color="red", fontsize=18, weight="bold")
+    # xaxis label
     if isinstance(class_names[0], int):
       rotation = 0
     else:
@@ -518,11 +530,17 @@ class ClassifierEnsemble(ClassifierCollection):
       ax.set_xlabel("class")
     else:
       ax.set_xticklabels([])
+    # yaxis label
     if is_ylabel:
       ax.set_ylabel("contribution to class selection measure")
     else:
       ax.set_yticklabels([])
-    ax.set_title(title)
+    # Title
+    if is_misclassification:
+      new_title = "**%s**" % title
+    else:
+      new_title = title
+    ax.set_title(new_title)
     if "is_plot" in kwargs:
       if kwargs["is_plot"]:
         plt.show()
