@@ -846,8 +846,8 @@ class ClassifierEnsemble(ClassifierCollection):
     if ax is None:
       _, ax = plt.subplots(1)
     if self._class_names is None:
-      class_dct = {k: str(k) for k in self.ser_y.values}
-      class_names = list(class_dct(values))
+      class_dct = {k: str(k) for k in self._ser_y.values}
+      class_names = list(class_dct.values())
     else:
       class_names = list(self._class_names)
     class_names.insert(0, "")
