@@ -37,10 +37,10 @@ class ClassifierCollection(object):
     Updates the values of the collection with those in other.
     :param ClassifierCollection other:
     """
-    self.clfs = other.clfs
-    self.features = other.features
-    self.classes = other.classes
-    self.scores = other.scores
+    self.clfs = copy.deepcopy(other.clfs)
+    self.features = list(other.features)
+    self.classes = list(other.classes)
+    self.scores = list(other.scores)
 
   @classmethod
   def _partitionIndices(cls, container, all_indices, test_indices):
@@ -94,7 +94,7 @@ class ClassifierCollection(object):
     # Initializations
     clfs = []
     scores = []
-    classes = ser_y.unique()
+    classes = list(set(ser_y.unique()))
     dff_X = df_X.copy()
     serr_y = ser_y.copy()
     indices = dff_X.index.tolist()

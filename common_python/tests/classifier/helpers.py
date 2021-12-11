@@ -3,6 +3,7 @@
 from common_python.util.persister import Persister
 from common_python.classifier import feature_analyzer
 
+import collections
 import os
 import numpy as np
 import pandas as pd
@@ -19,6 +20,8 @@ TEST_ANALYZER_PATH = os.path.join(DIR_PATH,
     "test_feature_analyzer_%d" % CLASS)
 TEST_SER_COMB_PATH = os.path.join(DIR_PATH,
     "test_ser_comb_%d.csv" % CLASS)
+
+DataInfo = collections.namedtuple("DataInfo", "df_X ser_y, class_names")
 
 
 if not PERSISTER.isExist():
@@ -39,6 +42,7 @@ else:
     DATA_LONG = None
     PROVIDER = None
 
+# TODO: Deprecate. Use getDataInfo instead
 def getData():
   """
   Provides classification data
@@ -47,6 +51,17 @@ def getData():
   df_X.columns = DATA.features
   ser_y = DATA.ser_y
   return df_X, ser_y
+
+def getDataInfo():
+  """
+  Provides classification data
+  """
+  df_X = DATA.df_X
+  df_X.columns = DATA.features
+  ser_y = DATA.ser_y
+  class_names = PROVIDER.getStateNames(ser_y)
+  data_info = DataInfo(df_X=df_X, ser_y=ser_y, class_names=class_names)
+  return data_info
 
 def getDataLong():
   """

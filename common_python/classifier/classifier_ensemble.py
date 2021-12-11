@@ -134,38 +134,46 @@ class ClassifierEnsemble(ClassifierCollection):
     self._is_display_errors = is_display_errors
     self.columns = None # Columns used in prediction
     self.classes = None
+    self._df_X = None
+    self._ser_y = None
+    self._class_names = None
     super().__init__(**kwargs)
 
-  def fit(self, df_X, ser_y, collectionMaker=None):
+  def fit(self, df_X, ser_y, class_names=None, collectionMaker=None):
     """
     Fits the number of classifiers desired to the data with
     holdouts. Selects holdouts independent of class.
-    :param Function collectionMaker: function of df_X, ser_y
-        that makes a collection
     :param pd.DataFrame df_X: feature vectors; indexed by instance
     :param pd.Series ser_y: classes; indexed by instance
+    :param Function collectionMaker: function of df_X, ser_y
+        that makes a collection
+    :param class_names list-str: list of names of classes for values in ser_y
     """
+    # Initializations
+    self._df_X = df_X
+    self._ser_y = ser_y
+    self._class_names = class_names
     def defaultCollectionMaker(df_X, ser_y):
       return ClassifierCollection.makeByRandomHoldout(
           self.clf_desc.clf, df_X, ser_y, self.size, 
           holdouts=self.holdouts)
     #
-    self.clf_desc.df_X = df_X
-    self.classes = list(set(ser_y.values))
+    self.clf_desc.df_X = self._df_X
+    self.classes = list(set(self._ser_y.values))
     if collectionMaker is None:
       collectionMaker = defaultCollectionMaker
-    collection = collectionMaker(df_X, ser_y)
+    collection = collectionMaker(self._df_X, self._ser_y)
     self.update(collection)
     if self.filter_high_rank is None:
-      self.columns = df_X.columns.tolist()
+      self.columns = self._df_X.columns.tolist()
       return
     # Select the features
     df_rank = self.makeRankDF()
     df_rank_sub = df_rank.loc[
         df_rank.index[0:self.filter_high_rank], :]
     self.columns = df_rank_sub.index.tolist()
-    df_X_sub = df_X[self.columns]
-    collection = collectionMaker(df_X_sub, ser_y)
+    df_X_sub = self._df_X[self.columns]
+    collection = collectionMaker(df_X_sub, self._ser_y)
     self.update(collection)
 
   def predict(self, df_X):
@@ -477,13 +485,13 @@ class ClassifierEnsemble(ClassifierCollection):
     """
     def getKwarg(key, default=None):
       if key in kwargs.keys():
-        return kwargs[key]
-      else:
-        return default
+        if kwargs[key] is not None:
+          return kwargs[key]
+      return default
     #
     true_class = getKwarg("true_class", None)
     is_plot = getKwarg("is_plot", True)
-    class_names = getKwarg("class_names", self.classes)
+    class_names = getKwarg("class_names", default=self.classes)
     is_xlabel = getKwarg("is_xlabel", True)
     is_ylabel = getKwarg("is_ylabel", True)
     title = getKwarg("title", None)
@@ -497,8 +505,10 @@ class ClassifierEnsemble(ClassifierCollection):
     new_kwargs["is_plot"] = False
     ax = self._plotFeatureBars(ser_X, **new_kwargs)
     # Calculate the mean and standard deviations of feature contributions
-    ser_tot_mean = pd.Series(np.repeat(0, len(self.classes)), index=self.classes)
-    ser_tot_std = pd.Series(np.repeat(0, len(self.classes)), index=self.classes)
+    ser_tot_mean = pd.Series(np.repeat(0, len(self.classes)),
+        index=list(self.classes))
+    ser_tot_std = pd.Series(np.repeat(0, len(self.classes)),
+        index=list(self.classes))
     dfs = [self.clf_desc.getFeatureContributions(c, self.columns, ser_X)
         for c in self.clfs]
     for idx in self.classes:
@@ -752,3 +762,121 @@ class ClassifierEnsemble(ClassifierCollection):
           total_correct += df_pred.loc[idx, true_cls]
     accuracy = total_correct/(num_holdout*num_iter*len(all_classes))
     return accuracy
+
+  def evaluateClassifierOnInstances(self, df_X=None, ser_y=None,
+      is_plot=True, nrow=6, ncol=4, suptitle=""):
+    """
+    Constructs evaluation plots for the classifier based on data
+    that without labels.
+
+    Parameters
+    ----------
+    df_X: DataFrame
+        columns: feature
+        rows: instances
+        values: trinary
+    ser_y: Series
+        rows: instances
+        values: int (classes)
+    is_plot: bool
+    nrow: int
+    ncol: integer
+    suptitle: str
+    """
+    if df_X is None:
+      df_X = self._df_X
+      if ser_y is None:
+        ser_y = self._ser_y
+    _, axes = plt.subplots(nrow, ncol, figsize=(18,12))
+    for irow in range(nrow):
+        for icol in range(ncol):
+          ax = axes[irow, icol]
+          instance_num = irow*ncol + icol + 2
+          instance = "T%d" % instance_num
+          if instance not in df_X.index:
+            break
+          ser_X = df_X.loc[instance, :]
+          if (icol + 1 == ncol) and (irow==0):
+            is_legend = True
+          else:
+              is_legend = False
+          if (irow + 1 == nrow):
+            is_xlabel = True
+            if icol == 0:
+                is_ylabel = True
+            else:
+                is_ylabel = False
+          else:
+            is_ylabel = False
+            is_xlabel = False
+          self.plotFeatureContributions(ser_X, ax=ax,
+              title=instance, true_class=ser_y.loc[instance], 
+              is_plot=False, is_legend=is_legend, class_names=self._class_names,
+                  is_xlabel=is_xlabel, is_ylabel=is_ylabel)
+    plt.suptitle(suptitle)
+    if not is_plot:
+      plt.close()
+    else:
+      plt.show()
+
+  def plotReplicationsOverTime(self, df_X, replFunc, timeFunc,
+      title="", ax=None, is_plot=True):
+    """
+    Plots the dominate state predicted over time for each replication.
+    
+    Parameters
+    ----------
+    df_X: DataFrame
+        column: Feature
+        row: instance (str)
+    replFunc: Function
+        Extracts replication information from instance
+        Arguments: row instance
+        Returns: str
+    timeFunc: Function
+        Extracts time information from instance
+        Arguments: row instance
+        Returns: str
+    title: str
+    ax: Matplotlib.axes
+    is_plot: bool
+
+    Notes: must do fit first.
+    """
+    if ax is None:
+      _, ax = plt.subplots(1)
+    if self._class_names is None:
+      class_dct = {k: str(k) for k in self.ser_y.values}
+      class_names = list(class_dct(values))
+    else:
+      class_names = list(self._class_names)
+    class_names.insert(0, "")
+    prediction_df = self.predict(df_X)
+    repl_strs = list(set([replFunc(i) for i in prediction_df.index]))
+    time_strs = [timeFunc(i) for i in prediction_df.index]
+    for repl_str in repl_strs:
+      indices = list(prediction_df.index)
+      bools = [repl_str in i for i in indices]
+      if any(bools):
+        indices = [i for i in prediction_df.index if repl_str in i]
+        y_vals = []
+        x_vals = []
+        for idx in indices:
+          x_vals.append(timeFunc(idx))
+          row = prediction_df.loc[idx, :]
+          val = row.max()
+          # Account for the blank row in the plot
+          y_val = 1 + [c for c in row.index if row[c] == val][0]
+          y_vals.append(y_val)
+        ax.plot(x_vals, y_vals)
+        ax.set_ylim(0, len(class_names))
+        yticks = ax.get_yticklabels()[0]
+        labels = list(class_names)
+        ax.set_xticklabels(x_vals, rotation=90)
+        ax.set_yticklabels(labels)
+    plt.legend(repl_strs)
+    plt.title(title)
+    if is_plot:
+      plt.show()
+    else:
+      plt.close()

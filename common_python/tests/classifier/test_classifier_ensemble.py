@@ -24,8 +24,8 @@ from sklearn import svm
 import numpy as np
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 SIZE = 10
 ITERATIONS = 3
 values = list(range(SIZE))
@@ -33,6 +33,7 @@ values.extend(values)
 PROVIDER = DataProvider()
 PROVIDER.do()
 TRINARY = TrinaryData()
+CLASS_NAMES = PROVIDER.getStateNames(TRINARY.ser_y)
 DF = pd.DataFrame({
     'A': [10*v for v in values],
     'B': np.repeat(1, 2*SIZE),
@@ -49,7 +50,10 @@ ANALYZER_PATH_AVG = os.path.join(DATA_PATH, "feature_analyzer_averaged")
 ANALYZER_PATH_AVG_PAT = os.path.join(ANALYZER_PATH_AVG, "%d") 
 ANALYZER_AVG_DCT = feature_analyzer.deserialize(
     {s: ANALYZER_PATH_AVG_PAT % s for s in range(5)})
-DF_X, SER_Y = test_helpers.getData()
+data_info = test_helpers.getDataInfo()
+DF_X = data_info.df_X
+SER_Y = data_info.ser_y
+CLASS_NAMES = data_info.class_names
 DF_X_LONG, SER_Y_LONG = test_helpers.getDataLong()
 HOLDOUTS = 1
 CLASSIFIER_DESCRIPTION_SVM = ClassifierDescriptorSVM(df_X=DF_X_LONG)
@@ -267,7 +271,7 @@ class TestClassifierEnsemble(unittest.TestCase):
     instance = "T3"
     svm_ensemble = copy.deepcopy(FITTED_SVM_ENSEMBLE)
     ser_X = self.df_X.loc[instance]
-    class_names = PROVIDER.getStageNames(self.ser_y)
+    class_names = PROVIDER.getStateNames(self.ser_y)
     #
     svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT,
         title=instance, true_class=self.ser_y.loc[instance],
@@ -284,7 +288,7 @@ class TestClassifierEnsemble(unittest.TestCase):
     self._init()
     instances = ["T2"]
     svm_ensemble = copy.deepcopy(FITTED_SVM_ENSEMBLE)
-    class_names = PROVIDER.getStageNames(self.ser_y)
+    class_names = PROVIDER.getStateNames(self.ser_y)
     #
     for instance in instances:
         svm_ensemble.plotFeatureContributions(self.df_X.loc[instance, :],
@@ -497,6 +501,23 @@ class TestClassifierEnsemble(unittest.TestCase):
         result_analysis.ensemble = ensemble
     #
     evaluate(IDXs) # Updates objects in analysis_dct
+
+  def testEvaluateClassifierOnInstances(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=CLASS_NAMES)
+    self.svm_ensemble.evaluateClassifierOnInstances(is_plot=IS_PLOT)
+
+  def testPlotReplicationsOverTime(self):
+    # TESTING
+    self._init()
+    self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=CLASS_NAMES)
+    replFunc = lambda i: "T"
+    timeFunc = lambda i: i[1:]
+    self.svm_ensemble.plotReplicationsOverTime(self.df_X, replFunc, timeFunc,
+        is_plot=IS_PLOT)
+    import pdb; pdb.set_trace()
      
 
 if __name__ == '__main__':
