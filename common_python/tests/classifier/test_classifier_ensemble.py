@@ -24,8 +24,8 @@ from sklearn import svm
 import numpy as np
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 SIZE = 10
 ITERATIONS = 3
 values = list(range(SIZE))
@@ -510,14 +510,14 @@ class TestClassifierEnsemble(unittest.TestCase):
     self.svm_ensemble.evaluateClassifierOnInstances(is_plot=IS_PLOT)
 
   def testPlotReplicationsOverTime(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     self._init()
     self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=CLASS_NAMES)
     replFunc = lambda i: "T"
     timeFunc = lambda i: i[1:]
     self.svm_ensemble.plotReplicationsOverTime(self.df_X, replFunc, timeFunc,
         is_plot=IS_PLOT)
-    import pdb; pdb.set_trace()
      
 
 if __name__ == '__main__':

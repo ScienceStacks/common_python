@@ -597,8 +597,13 @@ class ClassifierEnsemble(ClassifierCollection):
     # Write text on bar components
     excluded_colors = ["grey", "gray", "white", "light", "snow", "linen",
         "oldlace", "cornsilk", "ivory", "beige", "honeydew", 
-        "mintcream", "azure", "aliceblue", "lavender"]
+        "mintcream", "azure", "aliceblue", "lavender", "pink"]
     colors = util.getColors(len(df_mean.columns), excludes=excluded_colors)
+    # Ensure bars are in sorted order
+    columns = list(df_mean.columns)
+    columns.sort()
+    df_mean = df_mean[columns]
+    # Construct plot
     bar_ax = df_mean.plot(kind="bar", stacked=True, yerr=values, color=colors,
         ax=ax, width=0.25)
     letter_dct = {}
@@ -628,9 +633,9 @@ class ClassifierEnsemble(ClassifierCollection):
     # Construct the legend
     letters = list(letter_dct.values())
     if is_bar_label:
-      legends = ["%s: %s" % (letters[i], c) for i, c in enumerate(self.columns)]
+      legends = ["%s: %s" % (letters[i], c) for i, c in enumerate(columns)]
     else:
-      legends = ["%s" % c for i, c in enumerate(self.columns)]
+      legends = ["%s" % c for i, c in enumerate(columns)]
     ax.legend(legends, bbox_to_anchor=(1.0, 1), loc='upper left')
     if not is_legend:
       legend = ax.get_legend()
