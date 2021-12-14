@@ -305,7 +305,6 @@ class TestFunctions(unittest.TestCase):
     test(12, includes=["dark"])
     test(1)
     test(12)
-     
 
 
 

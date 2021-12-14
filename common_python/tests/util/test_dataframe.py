@@ -5,12 +5,18 @@ import unittest
 import common_python.util.dataframe as dataframe
 
 IGNORE_TEST = False
+IS_PLOT = False
 COL_A = 'a'
 COL_B = 'b'
+COL_C = 'c'
 DF = pd.DataFrame({COL_A: range(3)})
 DF[COL_B] = 10*DF[COL_A]
 SIZE = 3
 DFS = [DF for _ in range(SIZE)]
+DF1 = pd.DataFrame({COL_A: range(SIZE), COL_B: range(SIZE)})
+DF2 = pd.DataFrame({COL_A: range(SIZE), COL_C: range(SIZE)})
+DF1.index = [10, 20, 30]
+DF2.index = [10, 30, 40]
 
 
 class TestFunctions(unittest.TestCase):
@@ -36,6 +42,21 @@ class TestFunctions(unittest.TestCase):
     df_std = dataframe.std(DFS)
     df_falses = df_std.applymap(lambda v: not np.isclose(v, 0))
     self.assertEqual(df_falses.sum().sum(), 0)
+
+  def testIntersection(self):
+    if IGNORE_TEST:
+      return
+    def test(axis, predicate):
+      df1 = DF1.copy()
+      df2 = DF2.copy()
+      df = dataframe.intersection(df1, df2, axis=axis)
+      self.assertTrue(predicate(df))
+    #
+    predicate = lambda df: (len(df.columns) == 1) and (len(df) == SIZE)
+    test(1, predicate)
+    predicate = lambda df: (len(df.columns) == 2) and (len(df) == SIZE - 1)
+    test(0, predicate)
+      
 
 
 if __name__ == '__main__':
