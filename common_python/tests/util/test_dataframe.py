@@ -47,9 +47,12 @@ class TestFunctions(unittest.TestCase):
     if IGNORE_TEST:
       return
     def test(axis, predicate):
-      df1 = DF1.copy()
-      df2 = DF2.copy()
-      df = dataframe.intersection(df1, df2, axis=axis)
+      df = DF1.copy()
+      if axis == 1:
+        items = DF2.columns
+      else:
+        items = DF2.index
+      df = dataframe.subset(df, items, axis=axis)
       self.assertTrue(predicate(df))
     #
     predicate = lambda df: (len(df.columns) == 1) and (len(df) == SIZE)
