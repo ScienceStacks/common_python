@@ -560,7 +560,7 @@ class ClassifierEnsemble(ClassifierCollection):
 
   def _plotFeatureBars(self, ser_X, ax=None, title="",
      true_class=None,  is_plot=True, is_legend=True, is_bar_label=True,
-     is_xlabel=True, is_ylabel=True, class_names=None):
+     is_xlabel=True, is_ylabel=True, class_names=None, is_legend_on_plot=False):
     """
     Plots the contribution of each feature to the final score by class
     averaged across the ensemble.  This is presented as a bar plot.
@@ -572,6 +572,8 @@ class ClassifierEnsemble(ClassifierCollection):
     :param bool is_legend: plot the legend
     :param list-str class_names:
     :param bool is_plot:
+    :param bool is_legend_on_plot: leave space for legend to appear 
+        on the plot
     :return pyplot.Axes:
     """
     # Calculate the mean and standard deviations of feature contributions
@@ -603,6 +605,19 @@ class ClassifierEnsemble(ClassifierCollection):
     columns = list(df_mean.columns)
     columns.sort()
     df_mean = df_mean[columns]
+    if is_legend_on_plot:
+      # Add two blank rows for the legend so legend appears on plot
+      df_mean_T = df_mean.transpose()
+      df_mean_T["blank1"] = 0
+      df_mean_T["blank2"] = 0
+      df_mean = df_mean_T.transpose()
+      df_values = pd.DataFrame(values)
+      df_values["blank1"] = 0.0
+      df_values["blank2"] = 0.0
+      values = df_values.values
+      loc = "upper right"
+    else:
+      loc = "upper left"
     # Construct plot
     bar_ax = df_mean.plot(kind="bar", stacked=True, yerr=values, color=colors,
         ax=ax, width=0.25)
@@ -636,10 +651,11 @@ class ClassifierEnsemble(ClassifierCollection):
       legends = ["%s: %s" % (letters[i], c) for i, c in enumerate(columns)]
     else:
       legends = ["%s" % c for i, c in enumerate(columns)]
-    ax.legend(legends, bbox_to_anchor=(1.0, 1), loc='upper left')
+    ax.legend(legends, bbox_to_anchor=(1.0, 1), loc=loc)
     if not is_legend:
       legend = ax.get_legend()
       legend.remove()
+    # Leave one blank class for legend
     ax.plot([0, len(df_mean)+1], [0, 0], linestyle="dashed", color="black")
     if isinstance(class_names[0], int):
       rotation = 0

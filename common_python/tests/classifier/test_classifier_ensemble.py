@@ -302,6 +302,8 @@ class TestClassifierEnsemble(unittest.TestCase):
     self._init()
     self.svm_ensemble.fit(self.df_X, self.ser_y)
     self.svm_ensemble.plotSVMCoefficients(title="SVM", is_plot=IS_PLOT)
+    self.svm_ensemble.plotSVMCoefficients(title="SVM", is_plot=IS_PLOT,
+        is_legend_on_plot=True)
 
   def testPlotRank(self):
     if IGNORE_TEST:

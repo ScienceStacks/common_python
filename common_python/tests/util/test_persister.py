@@ -21,7 +21,7 @@ class TestPersister(unittest.TestCase):
       os.remove(TEST_PATH)
 
   def testConstructor(self):
-    self.assertEqual(self.persister._path, TEST_PATH)
+    self.assertEqual(self.persister.path, TEST_PATH)
 
   def testIsExist(self):
     self.assertFalse(self.persister.isExist())
