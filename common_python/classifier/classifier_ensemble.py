@@ -840,10 +840,42 @@ class ClassifierEnsemble(ClassifierCollection):
     else:
       plt.show()
 
-  def plotReplicationsOverTime(self, df_X, replFunc, timeFunc,
-      title="", ax=None, is_plot=True):
+  def plotConditions(self, clf, df_X, conditionFunc, state_names=None, ax=None,
+      is_plot=True): 
     """
-    Plots the dominate state predicted over time for each replication.
+    Plots predictions for data that has distinct conditions.
+
+    Parameters
+    ----------
+    clf: ClassifierEnsemble
+    df_X: DataFrame (feature matrix)
+    conditionFunc: function
+        parameters: str (index in df_X)
+        returns: str (condition)
+    state_names: names for the states predicted
+    """
+    indices = df_X.index
+    indices = sorted(list(indices), key=conditionFunc)
+    newdf_X = df_X.copy()
+    newdf_X.index = indices
+    df_prediction = clf.predict(newdf_X)
+    if state_names is None:
+      state_names = [str(n) for n in df_prediction.columns]
+    if ax is None:
+      _, ax = plt.subplots(1)
+    markers = ["o", "+", "^", "s", "*"]
+    for idx, stage in enumerate(df_prediction.columns):
+        ax.scatter(indices, df_prediction[stage], marker=markers[idx], s=50)
+        ax.set_xticklabels(indices, rotation=45)
+    ax.legend(state_names)
+    if is_plot:
+      plt.show()
+
+  def plotProgression(self, df_X, replFunc, timeFunc,
+      title="", ax=None, label_fontsize=16, is_plot=True):
+    """
+    Plots the progression of dominate states predicted over time
+    for each replication.
     
     Parameters
     ----------
@@ -864,6 +896,10 @@ class ClassifierEnsemble(ClassifierCollection):
 
     Notes: must do fit first.
     """
+    def deDup(lst):
+      seen = set()
+      seen_add = seen.add
+      return [x for x in lst if not (x in seen or seen_add(x))]
     if ax is None:
       _, ax = plt.subplots(1)
     if self._class_names is None:
@@ -872,32 +908,35 @@ class ClassifierEnsemble(ClassifierCollection):
     else:
       class_names = list(self._class_names)
     class_names.insert(0, "")
-    prediction_df = self.predict(df_X)
-    repl_strs = list(set([replFunc(i) for i in prediction_df.index]))
-    time_strs = [timeFunc(i) for i in prediction_df.index]
+    df_prediction = self.predict(df_X)
+    repl_strs = deDup([replFunc(i) for i in df_prediction.index])
+    time_strs = deDup([timeFunc(i) for i in df_prediction.index])
+    repl_dct = {}
     for repl_str in repl_strs:
-      indices = list(prediction_df.index)
+      indices = list(df_prediction.index)
       bools = [repl_str in i for i in indices]
       if any(bools):
-        indices = [i for i in prediction_df.index if repl_str in i]
-        y_vals = []
-        x_vals = []
+        indices = [i for i in df_prediction.index if repl_str in i]
+        y_vals = np.repeat(np.nan, len(time_strs))
         for idx in indices:
-          x_vals.append(timeFunc(idx))
-          row = prediction_df.loc[idx, :]
+          time_str = timeFunc(idx)
+          pos = time_strs.index(time_str)
+          row = df_prediction.loc[idx, :]
           val = row.max()
           # Account for the blank row in the plot
           y_val = 1 + [c for c in row.index if row[c] == val][0]
-          y_vals.append(y_val)
-        ax.plot(x_vals, y_vals)
-        ax.set_ylim(0, len(class_names))
-        yticks = ax.get_yticklabels()[0]
-        labels = list(class_names)
-        ax.set_xticklabels(x_vals, rotation=90)
-        ax.set_yticklabels(labels)
+          y_vals[pos] = y_val
+        repl_dct[repl_str] = y_vals
+    # Construct plot, starting with longest first
+    for y_vals in repl_dct.values():
+      ax.plot(time_strs, y_vals, marker="o")
+      ax.set_ylim(0, len(class_names))
+      yticks = ax.get_yticklabels()[0]
+      labels = list(class_names)
+      ax.set_xticklabels(time_strs, rotation=90, fontsize=label_fontsize)
+      ax.set_yticklabels(labels, fontsize=label_fontsize)
     plt.legend(repl_strs)
-    plt.title(title)
+    fontsize = label_fontsize + 2
+    plt.title(title, fontsize=fontsize)
     if is_plot:
       plt.show()
-    else:
-      plt.close()

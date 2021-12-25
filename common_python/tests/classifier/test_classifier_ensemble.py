@@ -1,6 +1,7 @@
 """Tests for classifier_ensemble.ClassifierEnsemble."""
 
 import common_python.constants as cn
+from common import constants as cxn
 from common_python.classifier import classifier_collection
 from common_python.classifier import classifier_ensemble
 from common_python.classifier import feature_analyzer
@@ -511,15 +512,26 @@ class TestClassifierEnsemble(unittest.TestCase):
     self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=CLASS_NAMES)
     self.svm_ensemble.evaluateClassifierOnInstances(is_plot=IS_PLOT)
 
-  def testPlotReplicationsOverTime(self):
+  def testProgression(self):
     if IGNORE_TEST:
       return
     self._init()
     self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=CLASS_NAMES)
     replFunc = lambda i: "T"
     timeFunc = lambda i: i[1:]
-    self.svm_ensemble.plotReplicationsOverTime(self.df_X, replFunc, timeFunc,
+    self.svm_ensemble.plotProgression(self.df_X, replFunc, timeFunc,
         is_plot=IS_PLOT)
+
+  def testPlotConditions(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=CLASS_NAMES)
+    conditionFunc = lambda i: i[1:]
+    state_names = list(cxn.STATE_NAMES)
+    state_names.remove("Normoxia")
+    self.svm_ensemble.plotConditions(self.svm_ensemble, self.df_X,
+        conditionFunc, state_names=state_names, is_plot=IS_PLOT)
      
 
 if __name__ == '__main__':
