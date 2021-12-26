@@ -25,8 +25,8 @@ from sklearn import svm
 import numpy as np
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 SIZE = 10
 ITERATIONS = 3
 values = list(range(SIZE))
@@ -523,15 +523,15 @@ class TestClassifierEnsemble(unittest.TestCase):
         is_plot=IS_PLOT)
 
   def testPlotConditions(self):
-    if IGNORE_TEST:
-      return
+    # TESTING
     self._init()
     self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=CLASS_NAMES)
     conditionFunc = lambda i: i[1:]
     state_names = list(cxn.STATE_NAMES)
     state_names.remove("Normoxia")
-    self.svm_ensemble.plotConditions(self.svm_ensemble, self.df_X,
-        conditionFunc, state_names=state_names, is_plot=IS_PLOT)
+    self.svm_ensemble.plotConditions(self.df_X,
+        conditionFunc, state_names=state_names, is_plot=IS_PLOT,
+        fontsize_label=5)
      
 
 if __name__ == '__main__':

@@ -840,14 +840,13 @@ class ClassifierEnsemble(ClassifierCollection):
     else:
       plt.show()
 
-  def plotConditions(self, clf, df_X, conditionFunc, state_names=None, ax=None,
-      is_plot=True): 
+  def plotConditions(self, df_X, conditionFunc, state_names=None, ax=None,
+      is_plot=True, fontsize_label=10): 
     """
-    Plots predictions for data that has distinct conditions.
+    Plots predictions for data that have distinct conditions.
 
     Parameters
     ----------
-    clf: ClassifierEnsemble
     df_X: DataFrame (feature matrix)
     conditionFunc: function
         parameters: str (index in df_X)
@@ -858,15 +857,15 @@ class ClassifierEnsemble(ClassifierCollection):
     indices = sorted(list(indices), key=conditionFunc)
     newdf_X = df_X.copy()
     newdf_X.index = indices
-    df_prediction = clf.predict(newdf_X)
+    df_prediction = self.predict(newdf_X)
     if state_names is None:
       state_names = [str(n) for n in df_prediction.columns]
     if ax is None:
       _, ax = plt.subplots(1)
     markers = ["o", "+", "^", "s", "*"]
     for idx, stage in enumerate(df_prediction.columns):
-        ax.scatter(indices, df_prediction[stage], marker=markers[idx], s=50)
-        ax.set_xticklabels(indices, rotation=45)
+      ax.scatter(indices, df_prediction[stage], marker=markers[idx], s=50)
+      ax.set_xticklabels(indices, rotation=45, fontsize=fontsize_label)
     ax.legend(state_names)
     if is_plot:
       plt.show()
