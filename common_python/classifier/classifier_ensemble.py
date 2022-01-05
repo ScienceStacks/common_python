@@ -39,6 +39,30 @@ import string
 MULTI_COLUMN_SEP = "--"
 LETTERS = string.ascii_lowercase
 
+######### Functions
+def _selStrFromList(item_str, lst_str):
+  """
+  Selects a string from a list if it is a substring of the item.
+
+  Parameters
+  ----------
+  item_str: str
+      string for which the selection is done
+  list_str: list-str
+      list from which selection is done
+  
+  Returns
+  -------
+  str
+  """
+  strs = [s for s in lst_str if item_str == s]
+  if len(strs) != 1:
+    strs = [s for s in lst_str if s in item_str]
+  if len(strs) != 1:
+    raise ValueError("Cannot find %s uniquely in %s"
+        % (item_str, str(lst_str)))
+  return strs[0]
+
 
 ###############################################
 class ClassifierDescriptor(object):
@@ -840,7 +864,7 @@ class ClassifierEnsemble(ClassifierCollection):
     else:
       plt.show()
 
-  def plotConditions(self, df_X, conditionFunc, state_names=None, ax=None,
+  def plotConditions(self, df_X, condition_strs, state_names=None, ax=None,
       is_plot=True, fontsize_label=10): 
     """
     Plots predictions for data that have distinct conditions.
@@ -848,15 +872,20 @@ class ClassifierEnsemble(ClassifierCollection):
     Parameters
     ----------
     df_X: DataFrame (feature matrix)
-    conditionFunc: function
-        parameters: str (index in df_X)
-        returns: str (condition)
+    condition_strs: list-str
+        Strings that identify conditions
     state_names: names for the states predicted
     """
-    indices = df_X.index
-    indices = sorted(list(indices), key=conditionFunc)
+    def getConditionPosition(idx):
+      new_condition_strs = list(condition_strs)
+      condition_str = _selStrFromList(idx, new_condition_strs)
+      return new_condition_strs.index(condition_str)
+    #
+    plot_indices = df_X.index
+    plot_indices = sorted(list(plot_indices), key=getConditionPosition)
+    x_vals = range(len(plot_indices))
     newdf_X = df_X.copy()
-    newdf_X.index = indices
+    newdf_X.index = plot_indices
     df_prediction = self.predict(newdf_X)
     if state_names is None:
       state_names = [str(n) for n in df_prediction.columns]
@@ -864,13 +893,34 @@ class ClassifierEnsemble(ClassifierCollection):
       _, ax = plt.subplots(1)
     markers = ["o", "+", "^", "s", "*"]
     for idx, stage in enumerate(df_prediction.columns):
-      ax.scatter(indices, df_prediction[stage], marker=markers[idx], s=50)
-      ax.set_xticklabels(indices, rotation=45, fontsize=fontsize_label)
-    ax.legend(state_names)
+      ax.scatter(x_vals, df_prediction[stage], marker=markers[idx], s=50)
+      ax.plot(plot_indices, np.repeat(-1, len(plot_indices)))
+    ax.set_xticklabels(plot_indices, rotation=45)
+    ax.legend(state_names, loc="lower left")
+    ax.set_ylim([0, 1.1])
+    # Add shading
+    is_shade = False
+    indices = list(df_prediction.index)
+    last_condition = _selStrFromList(indices[0], condition_strs)
+    start_pos = 0
+    for pos, index in enumerate(indices):
+      cur_condition = _selStrFromList(index, condition_strs)
+      if last_condition != cur_condition:
+        if is_shade:
+          x_end = indices.index(cur_condition) - 1 # ending x-value
+          ax.axvspan(start_pos-0.25, x_end+0.25, ymin=0,
+              ymax=max(df_prediction.columns), facecolor='grey', alpha=0.2)
+        is_shade = True if (not is_shade) else False
+        start_pos = pos
+    # Handle last segment
+    if is_shade:
+      x_end = indices.index(cur_condition)
+      ax.axvspan(start_pos-0.25, x_end+0.25, ymin=0,
+          ymax=max(df_prediction.columns), facecolor='grey', alpha=0.2)
     if is_plot:
       plt.show()
 
-  def plotProgression(self, df_X, replFunc, timeFunc,
+  def plotProgression(self, df_X, repl_strs, time_strs,
       title="", ax=None, label_fontsize=16, is_plot=True):
     """
     Plots the progression of dominate states predicted over time
@@ -881,14 +931,10 @@ class ClassifierEnsemble(ClassifierCollection):
     df_X: DataFrame
         column: Feature
         row: instance (str)
-    replFunc: Function
-        Extracts replication information from instance
-        Arguments: row instance
-        Returns: str
-    timeFunc: Function
-        Extracts time information from instance
-        Arguments: row instance
-        Returns: str
+    repl_strs: list-str
+        String that identify the replication
+    time_strs: list-str
+        Strings that identify times, in sequence
     title: str
     ax: Matplotlib.axes
     is_plot: bool
@@ -899,6 +945,7 @@ class ClassifierEnsemble(ClassifierCollection):
       seen = set()
       seen_add = seen.add
       return [x for x in lst if not (x in seen or seen_add(x))]
+    #   
     if ax is None:
       _, ax = plt.subplots(1)
     if self._class_names is None:
@@ -908,8 +955,6 @@ class ClassifierEnsemble(ClassifierCollection):
       class_names = list(self._class_names)
     class_names.insert(0, "")
     df_prediction = self.predict(df_X)
-    repl_strs = deDup([replFunc(i) for i in df_prediction.index])
-    time_strs = deDup([timeFunc(i) for i in df_prediction.index])
     repl_dct = {}
     for repl_str in repl_strs:
       indices = list(df_prediction.index)
@@ -918,7 +963,7 @@ class ClassifierEnsemble(ClassifierCollection):
         indices = [i for i in df_prediction.index if repl_str in i]
         y_vals = np.repeat(np.nan, len(time_strs))
         for idx in indices:
-          time_str = timeFunc(idx)
+          time_str = _selStrFromList(idx, time_strs)
           pos = time_strs.index(time_str)
           row = df_prediction.loc[idx, :]
           val = row.max()

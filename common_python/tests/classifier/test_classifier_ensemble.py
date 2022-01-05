@@ -25,8 +25,8 @@ from sklearn import svm
 import numpy as np
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 SIZE = 10
 ITERATIONS = 3
 values = list(range(SIZE))
@@ -516,21 +516,26 @@ class TestClassifierEnsemble(unittest.TestCase):
     if IGNORE_TEST:
       return
     self._init()
-    self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=CLASS_NAMES)
+    self.svm_ensemble.fit(self.df_X, self.ser_y,
+        class_names=CLASS_NAMES)
     replFunc = lambda i: "T"
     timeFunc = lambda i: i[1:]
-    self.svm_ensemble.plotProgression(self.df_X, replFunc, timeFunc,
-        is_plot=IS_PLOT)
+    repl_strs = ["T"]
+    time_strs = list(self.df_X.index)
+    self.svm_ensemble.plotProgression(self.df_X, repl_strs,
+        time_strs, is_plot=IS_PLOT)
 
   def testPlotConditions(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     self._init()
-    self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=CLASS_NAMES)
+    self.svm_ensemble.fit(self.df_X, self.ser_y,
+        class_names=CLASS_NAMES)
     conditionFunc = lambda i: i[1:]
     state_names = list(cxn.STATE_NAMES)
     state_names.remove("Normoxia")
-    self.svm_ensemble.plotConditions(self.df_X,
-        conditionFunc, state_names=state_names, is_plot=IS_PLOT,
+    self.svm_ensemble.plotConditions(self.df_X, self.df_X.index,
+        state_names=state_names, is_plot=IS_PLOT,
         fontsize_label=5)
      
 
