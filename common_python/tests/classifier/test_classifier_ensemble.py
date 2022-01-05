@@ -40,7 +40,10 @@ DF = pd.DataFrame({
     'B': np.repeat(1, 2*SIZE),
     })
 SER = pd.Series(values)
-TEST_FILE = "test_classifier_ensemble.pcl"
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+TEST_SERIALIZE_FILE = "test_classifier_ensemble.pcl"
+TEST_SAMPLE_PATH = os.path.join(TEST_DIR,
+    "test_classifier_ensemble_sample.csv")
 REPO_PATH = util.findRepositoryRoot("xstate")
 DATA_PATH = os.path.join(REPO_PATH, "data")
 ANALYZER_PATH_REPL = os.path.join(DATA_PATH, "feature_analyzer_with_replicas")
@@ -75,8 +78,8 @@ class RandomClassifier(object):
   def __init__(self):
     self.class_probs = None
     self.coef_ = []
-    if os.path.exists(TEST_FILE):
-      os.remove(TEST_FILE)
+    if os.path.exists(TEST_SERIALIZE_FILE):
+      os.remove(TEST_SERIALIZE_FILE)
 
   def fit(self, df_X, ser_y):
     """
@@ -386,8 +389,8 @@ class TestClassifierEnsemble(unittest.TestCase):
     if IGNORE_TEST:
       return
     self.svm_ensemble.fit(self.df_X, self.ser_y)
-    self.svm_ensemble.serialize(TEST_FILE)
-    svm_ensemble = ClassifierEnsemble.deserialize(TEST_FILE)
+    self.svm_ensemble.serialize(TEST_SERIALIZE_FILE)
+    svm_ensemble = ClassifierEnsemble.deserialize(TEST_SERIALIZE_FILE)
     diff = set(self.svm_ensemble.features).symmetric_difference(
         svm_ensemble.features)
     self.assertEqual(len(diff), 0)
@@ -531,10 +534,14 @@ class TestClassifierEnsemble(unittest.TestCase):
     self._init()
     self.svm_ensemble.fit(self.df_X, self.ser_y,
         class_names=CLASS_NAMES)
-    conditionFunc = lambda i: i[1:]
+    df_X = pd.read_csv(TEST_SAMPLE_PATH)
+    df_X = df_X.set_index("Unnamed: 0")
+    df_X.index.name = "condition"
+    condition_names = ["TB_HIGH", "TB_LOW", "TB_AW",
+        "TB_IM", "TB_AM"]
     state_names = list(cxn.STATE_NAMES)
     state_names.remove("Normoxia")
-    self.svm_ensemble.plotConditions(self.df_X, self.df_X.index,
+    self.svm_ensemble.plotConditions(df_X, condition_names,
         state_names=state_names, is_plot=IS_PLOT,
         fontsize_label=5)
      

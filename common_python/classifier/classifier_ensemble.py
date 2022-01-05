@@ -865,7 +865,7 @@ class ClassifierEnsemble(ClassifierCollection):
       plt.show()
 
   def plotConditions(self, df_X, condition_strs, state_names=None, ax=None,
-      is_plot=True, fontsize_label=10): 
+      is_plot=True, fontsize_label=10, shading_offset=0.25): 
     """
     Plots predictions for data that have distinct conditions.
 
@@ -875,6 +875,8 @@ class ClassifierEnsemble(ClassifierCollection):
     condition_strs: list-str
         Strings that identify conditions
     state_names: names for the states predicted
+    shading_offset: float
+        Offset from x tick for shading begin and end
     """
     def getConditionPosition(idx):
       new_condition_strs = list(condition_strs)
@@ -895,7 +897,7 @@ class ClassifierEnsemble(ClassifierCollection):
     for idx, stage in enumerate(df_prediction.columns):
       ax.scatter(x_vals, df_prediction[stage], marker=markers[idx], s=50)
       ax.plot(plot_indices, np.repeat(-1, len(plot_indices)))
-    ax.set_xticklabels(plot_indices, rotation=45)
+    ax.set_xticklabels(plot_indices, rotation=45, fontsize=fontsize_label)
     ax.legend(state_names, loc="lower left")
     ax.set_ylim([0, 1.1])
     # Add shading
@@ -906,16 +908,21 @@ class ClassifierEnsemble(ClassifierCollection):
     for pos, index in enumerate(indices):
       cur_condition = _selStrFromList(index, condition_strs)
       if last_condition != cur_condition:
+        last_condition = cur_condition
         if is_shade:
-          x_end = indices.index(cur_condition) - 1 # ending x-value
-          ax.axvspan(start_pos-0.25, x_end+0.25, ymin=0,
+          cur_condition_indices = [i for i in indices if cur_condition in i]
+          end_pos = indices.index(cur_condition_indices[0]) - 1
+          ax.axvspan(start_pos-shading_offset, end_pos+shading_offset, ymin=0,
               ymax=max(df_prediction.columns), facecolor='grey', alpha=0.2)
+        # Toggle shading
         is_shade = True if (not is_shade) else False
+        # Starting position for next block of conditions
         start_pos = pos
     # Handle last segment
     if is_shade:
-      x_end = indices.index(cur_condition)
-      ax.axvspan(start_pos-0.25, x_end+0.25, ymin=0,
+      cur_condition_indices = [i for i in indices if cur_condition in i]
+      end_pos = indices.index(cur_condition_indices[-1]) # ending x-value
+      ax.axvspan(start_pos-shading_offset, end_pos+shading_offset, ymin=0,
           ymax=max(df_prediction.columns), facecolor='grey', alpha=0.2)
     if is_plot:
       plt.show()
