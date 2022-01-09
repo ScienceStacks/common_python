@@ -865,7 +865,7 @@ class ClassifierEnsemble(ClassifierCollection):
       plt.show()
 
   def plotConditions(self, df_X, condition_strs, state_names=None, ax=None,
-      is_plot=True, fontsize_label=10, shading_offset=0.25): 
+      is_plot=True, fontsize_label=10, shading_offset=0.25, state_probs=None): 
     """
     Plots predictions for data that have distinct conditions.
 
@@ -877,12 +877,37 @@ class ClassifierEnsemble(ClassifierCollection):
     state_names: names for the states predicted
     shading_offset: float
         Offset from x tick for shading begin and end
+    state_probs: list-float
+        Probabilities of the states under a null hypothesis
     """
     def getConditionPosition(idx):
       new_condition_strs = list(condition_strs)
       condition_str = _selStrFromList(idx, new_condition_strs)
       return new_condition_strs.index(condition_str)
     #
+    def calculateSignificance(state_probs, num, num_rpl, num_cnd, num_exp):
+      """
+      Calculates the probability of at least one study in
+      assuming equally likely outcomes
+  
+      Parameters
+      ----------
+      state_probs: float/list-float
+      """
+      ps = np.array(state_probs)
+      num_state = len(state_probs)
+      p_ks = 1 - binom.cdf(num - 1, num_rpl, ps)
+      # Calculate the product of the p_ks not equal to n
+      p_tilde_func = lambda n: np.prod([1 - p_ks[m]
+          for m in range(num_state) if m != n])
+      p_tilde = sum([p_ks[n]*p_tilde_func(n) for n in range(num_state)])
+      q_tilde = p_tilde**num_cnd
+      q = 1 - (1 - q_tilde)**num_exp
+      return p_ks, p_tilde, q_tilde, q
+
+
+
+
     plot_indices = df_X.index
     plot_indices = sorted(list(plot_indices), key=getConditionPosition)
     x_vals = range(len(plot_indices))
