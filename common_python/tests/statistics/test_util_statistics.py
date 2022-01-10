@@ -7,8 +7,8 @@ import pandas as pd
 import scipy.stats
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 SIZE = 10
 DF = pd.DataFrame({
     'nz-1': range(SIZE),
@@ -163,7 +163,8 @@ class TestFunctions(unittest.TestCase):
     test(10, 5, 0.02)
 
   def testGeneralizedBinomialTail2(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     SIZE = 5
     PROB_LOW = 0.3
     PROB_HIGH = 0.4
@@ -175,7 +176,7 @@ class TestFunctions(unittest.TestCase):
     r_smpl = util_statistics.generalizedBinomialTail(
         PROBS, 0, is_sampled=True)
     self.assertTrue(np.isclose(r_exact, 1))
-    self.assertTrue(np.isclose(r_smpl, 1, atol=0.001))
+    self.assertTrue(np.isclose(r_smpl, 1, atol=0.01))
 
   def testChoose(self):
     if IGNORE_TEST:
@@ -187,6 +188,32 @@ class TestFunctions(unittest.TestCase):
         r2 = util_statistics.choose(num_total, 
             num_total - num_choose)
         self.assertEqual(r1, r2)
+
+  def testCalcFstat(self):
+    if IGNORE_TEST:
+      return
+    CONDITION_STRS = ["a", "b", "c"]
+    NUM_REPL = 4
+    def test(small_factor=2, large_factor=10, is_equal=False):
+      fstats = []
+      indices = [["%s%d" % (c, n) for n in range(NUM_REPL)]
+          for c in CONDITION_STRS]
+      indices = list(np.array(indices).flatten())
+      # Process each factor
+      for factor in [small_factor, large_factor]:
+        values = [ [(factor**(i+1))*n for n in range(1, NUM_REPL+1)]
+            for i, _ in enumerate(CONDITION_STRS)]
+        values = list(np.array(values).flatten())
+        ser= pd.Series(values, index=indices)
+        fstat = util_statistics.calcFstat(ser, CONDITION_STRS)
+        fstats.append(fstat)
+      if is_equal:
+        self.assertEqual(fstats[1], fstats[0])
+      else:
+        self.assertGreater(fstats[1], fstats[0])
+    #
+    test(0, 1, is_equal=True)
+    test()
       
 
 if __name__ == '__main__':

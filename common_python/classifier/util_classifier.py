@@ -216,6 +216,52 @@ def makeFstatSer(df_X, ser_y,
     ser_fstat = ser_fstat[~sel]
   return ser_fstat
 
+def makeFstatSer(df_X, ser_y,
+     is_prune=True, state_equ=None):
+  """
+  Constructs the state F-static for gene features.
+  This statistic quantifies the variation of the
+  gene expression between states to that within
+  states.
+  :param pd.DataFrame df_X:
+      column: gene
+      row: instance
+      value: trinary
+  :param pd.Series ser_y:
+      row: instance
+      value: state
+  :param bo0l is_prune: removes nan and inf values
+  :param dict state_equ: Provides for state equivalences
+      key: state in ser_y
+      value: new state
+  """
+  if state_equ is None:
+      state_equ = {s: s for s in ser_y.unique()}
+  # Construct the groups
+  df_X = df_X.copy()
+  df_X[STATE] = ser_y.apply(lambda v: state_equ[v])
+  # Calculate aggregations
+  dfg = df_X.groupby(STATE)
+  dfg_std = dfg.std()
+  dfg_mean = dfg.mean()
+  dfg_count = dfg.count()
+  # Calculate SSB
+  ser_mean = df_X.mean()
+  del ser_mean[STATE]
+  df_ssb = dfg_count*(dfg_mean - ser_mean)**2
+  ser_ssb = df_ssb.sum()
+  # SSW
+  df_ssw = dfg_std*(dfg_count - 1)
+  ser_ssw = df_ssw.sum()
+  # Calculate the F-Statistic
+  ser_fstat = ser_ssb/ser_ssw
+  ser_fstat = ser_fstat.sort_values(ascending=False)
+  if is_prune:
+    ser_fstat = ser_fstat[ser_fstat != np.inf]
+    sel = ser_fstat.isnull()
+    ser_fstat = ser_fstat[~sel]
+  return ser_fstat
+
 def plotStateFstat(state, df_X, ser_y, is_plot=True):
   """
   Plot state F-statistic

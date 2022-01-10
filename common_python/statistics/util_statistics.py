@@ -156,3 +156,46 @@ def generalizedBinomialTail(probs, num_choose,
     result += generalizedBinomialDensity(probs, num,
         **kwargs)
   return result
+
+def calcFstat(ser, condition_strs, min_ssw=0.1):
+  """
+  Constructs the state F-static for the conditions
+  indicated, treating instances with the same condition
+  as replications.
+  Conditions are substrings of the index.
+
+  Parameters
+  ----------
+  ser: Series
+      values: used to compute statistic
+      index: indicates conditions
+  condition_strs: list-str
+  min_ssw: float
+      Value used if SSW == 0
+  """
+  # The F-statistic is the ratio of the
+  # sum of squares between to the sum of squares within
+  # Calculate aggregations
+  num_cnd = len(condition_strs)
+  new_ser = ser.copy()
+  new_index = [[c for c in condition_strs if c in i] for i in new_ser.index]
+  if any([len(i) != 1 for i in new_index]):
+    raise RuntimeError("Conditions are not unique.")
+  new_index = [i[0] for i in new_index]
+  df = pd.DataFrame({"a": ser, "b": new_index})
+  dfg = df.groupby("b")
+  dfg_std = dfg.std()
+  dfg_mean = dfg.mean()
+  dfg_count = dfg.count()
+  # Calculate SSB
+  ser_mean = new_ser.mean()
+  ser_ssb = (dfg_mean - ser_mean)**2
+  ser_ssb = (ser_ssb.sum()/(num_cnd - 1)).values[0]
+  # SSW
+  ser_ssw = dfg_std*(dfg_count - 1)
+  ssw = ser_ssw.sum()/(len(ser) - num_cnd)
+  ssw = ssw.values[0]
+  ssw = max(ssw, min_ssw)
+  # Calculate the F-Statistic
+  fstat = ser_ssb/ssw
+  return fstat

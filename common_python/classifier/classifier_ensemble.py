@@ -32,6 +32,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from operator import itemgetter
 import pandas as pd
+from scipy.stats import binom
 from sklearn import svm
 import string
 
@@ -865,7 +866,8 @@ class ClassifierEnsemble(ClassifierCollection):
       plt.show()
 
   def plotConditions(self, df_X, condition_strs, state_names=None, ax=None,
-      is_plot=True, fontsize_label=10, shading_offset=0.25, state_probs=None): 
+      is_plot=True, fontsize_label=10, shading_offset=0.25, state_probs=None,
+      num_exp=None): 
     """
     Plots predictions for data that have distinct conditions.
 
@@ -879,6 +881,14 @@ class ClassifierEnsemble(ClassifierCollection):
         Offset from x tick for shading begin and end
     state_probs: list-float
         Probabilities of the states under a null hypothesis
+    num_exp: int
+        Number of experiments for which state significance level
+        is calculated
+
+    Results
+    -------
+    str
+        string describing the results of the significance test
     """
     def getConditionPosition(idx):
       new_condition_strs = list(condition_strs)
@@ -887,27 +897,44 @@ class ClassifierEnsemble(ClassifierCollection):
     #
     def calculateSignificance(state_probs, num, num_rpl, num_cnd, num_exp):
       """
-      Calculates the probability of at least one study in
-      assuming equally likely outcomes
+      Calculates the significance of at least one study (plot)
+      having a large "score" assuming equally likely outcomes
+      from the classifier. See writeup 
+      "Calculating Significance of Condition-Based Classification".
   
       Parameters
       ----------
       state_probs: float/list-float
+          State probabilites. Default is uniform
+      num: int
+          Number of same class outcomes
+      num_rpl: int
+          Number of replications within a condition
+      num_cnd: int
+          Number of conditions
+      num_exp: int
+          Number of experiments
+
+      Returns
+      -------
+      float: significance level for at least one plot having 
       """
       ps = np.array(state_probs)
       num_state = len(state_probs)
+      # Binomial tail probabilities for each state
       p_ks = 1 - binom.cdf(num - 1, num_rpl, ps)
-      # Calculate the product of the p_ks not equal to n
+      # Calculate the probability of obtaining at least n
+      # replications for each state
       p_tilde_func = lambda n: np.prod([1 - p_ks[m]
           for m in range(num_state) if m != n])
       p_tilde = sum([p_ks[n]*p_tilde_func(n) for n in range(num_state)])
+      # Probability that the foregoing happens for each condition
+      # in the study variation (plot)
       q_tilde = p_tilde**num_cnd
+      # Probability that this happens at least once within the studies
       q = 1 - (1 - q_tilde)**num_exp
-      return p_ks, p_tilde, q_tilde, q
-
-
-
-
+      return q
+    #
     plot_indices = df_X.index
     plot_indices = sorted(list(plot_indices), key=getConditionPosition)
     x_vals = range(len(plot_indices))
@@ -922,6 +949,8 @@ class ClassifierEnsemble(ClassifierCollection):
     for idx, stage in enumerate(df_prediction.columns):
       ax.scatter(x_vals, df_prediction[stage], marker=markers[idx], s=50)
       ax.plot(plot_indices, np.repeat(-1, len(plot_indices)))
+      # Add score as title
+      
     ax.set_xticklabels(plot_indices, rotation=45, fontsize=fontsize_label)
     ax.legend(state_names, loc="lower left")
     ax.set_ylim([0, 1.1])
@@ -949,8 +978,27 @@ class ClassifierEnsemble(ClassifierCollection):
       end_pos = indices.index(cur_condition_indices[-1]) # ending x-value
       ax.axvspan(start_pos-shading_offset, end_pos+shading_offset, ymin=0,
           ymax=max(df_prediction.columns), facecolor='grey', alpha=0.2)
+    # Calculate the return string
+    if (state_probs is not None) and (num_exp is not None):
+      num_cnd = len(condition_strs)
+      num_rpl = len(df_prediction) // num_cnd
+      if not np.isclose(len(df_prediction) / num_cnd - num_rpl, 0):
+        raise RuntimeError(
+            "Replications do not evenly divide total experiments.")
+      # Find significance level for 1 or 0 replications differing
+      sl1 = calculateSignificance(
+          state_probs, num_rpl-1, num_rpl, num_cnd, num_exp)
+      sl0 = calculateSignificance(
+          state_probs, num_rpl-0, num_rpl, num_cnd, num_exp)
+      sl1 = np.round(sl1, 3)
+      sl0 = np.round(sl0, 3)
+      significance_str =  "SL1: %1.4f, SL0: %1.4f" % (sl1, sl0)
+    else:
+      significance_str =  ""
+    #
     if is_plot:
       plt.show()
+    return significance_str
 
   def plotProgression(self, df_X, repl_strs, time_strs,
       title="", ax=None, label_fontsize=16, is_plot=True):

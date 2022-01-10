@@ -537,13 +537,24 @@ class TestClassifierEnsemble(unittest.TestCase):
     df_X = pd.read_csv(TEST_SAMPLE_PATH)
     df_X = df_X.set_index("Unnamed: 0")
     df_X.index.name = "condition"
-    condition_names = ["TB_HIGH", "TB_LOW", "TB_AW",
+    condition_names = ["TB_HIGH", "TB_LOW",
         "TB_IM", "TB_AM"]
     state_names = list(cxn.STATE_NAMES)
     state_names.remove("Normoxia")
-    self.svm_ensemble.plotConditions(df_X, condition_names,
+    significance_str = self.svm_ensemble.plotConditions(
+        df_X, condition_names,
+        state_names=state_names, is_plot=False,
+        fontsize_label=5, state_probs=cxn.STATE_PROBS,
+        num_exp=24)
+    if IS_PLOT:
+      plt.suptitle(significance_str)
+      plt.show()
+    self.assertGreater(len(significance_str), 0)
+    significance_str = self.svm_ensemble.plotConditions(
+        df_X, condition_names,
         state_names=state_names, is_plot=IS_PLOT,
         fontsize_label=5)
+    self.assertEqual(len(significance_str), 0)
      
 
 if __name__ == '__main__':
