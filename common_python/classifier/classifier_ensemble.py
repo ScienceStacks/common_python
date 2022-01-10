@@ -552,9 +552,6 @@ class ClassifierEnsemble(ClassifierCollection):
       predicted_class = self.classes[idx]
       if predicted_class != true_class:
         is_misclassification = True
-        # Indicate an inaccurate prediction
-        # max_value = ser_tot_mean.max()*1.2
-        # ax.text(xvalues[0], max_value, "x", color="red", fontsize=18, weight="bold")
     # xaxis label
     if isinstance(class_names[0], int):
       rotation = 0
@@ -941,6 +938,8 @@ class ClassifierEnsemble(ClassifierCollection):
     newdf_X = df_X.copy()
     newdf_X.index = plot_indices
     df_prediction = self.predict(newdf_X)
+    ser_cls = self.findPredictedClass(df_prediction)
+    fstat = util_statistics.calcFstat(ser_cls, condition_strs)
     if state_names is None:
       state_names = [str(n) for n in df_prediction.columns]
     if ax is None:
@@ -949,11 +948,10 @@ class ClassifierEnsemble(ClassifierCollection):
     for idx, stage in enumerate(df_prediction.columns):
       ax.scatter(x_vals, df_prediction[stage], marker=markers[idx], s=50)
       ax.plot(plot_indices, np.repeat(-1, len(plot_indices)))
-      # Add score as title
-      
     ax.set_xticklabels(plot_indices, rotation=45, fontsize=fontsize_label)
     ax.legend(state_names, loc="lower left")
     ax.set_ylim([0, 1.1])
+    ax.text(0, 0.7, "Score: %1.2f" % fstat, fontsize=8)
     # Add shading
     is_shade = False
     indices = list(df_prediction.index)
@@ -1000,6 +998,32 @@ class ClassifierEnsemble(ClassifierCollection):
       plt.show()
     return significance_str
 
+  @staticmethod
+  def findPredictedClass(df_prediction):
+    """
+    Finds the predicted class (largest probability) from a prediction dataframe.
+
+    Parameters
+    ----------
+    df_prediction: DataFrame
+        column: class
+        index: instance
+        value: probability
+    
+    Returns
+    -------
+    Series
+        index: instance
+        value: class
+    """
+    classes = np.repeat(0, len(df_prediction))
+    for pos, idx in enumerate(df_prediction.index):
+      row = df_prediction.loc[idx, :]
+      val = row.max()
+      classes[pos] = [c for c in row.index if row[c] == val][0]
+    ser = pd.Series(classes, index=list(df_prediction.index))
+    return ser
+
   def plotProgression(self, df_X, repl_strs, time_strs,
       title="", ax=None, label_fontsize=16, is_plot=True):
     """
@@ -1042,6 +1066,7 @@ class ClassifierEnsemble(ClassifierCollection):
       if any(bools):
         indices = [i for i in df_prediction.index if repl_str in i]
         y_vals = np.repeat(np.nan, len(time_strs))
+        # Select the dominate class from the prediction
         for idx in indices:
           time_str = _selStrFromList(idx, time_strs)
           pos = time_strs.index(time_str)

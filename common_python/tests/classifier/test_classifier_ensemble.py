@@ -25,8 +25,8 @@ from sklearn import svm
 import numpy as np
 import unittest
 
-IGNORE_TEST = False
-IS_PLOT = False
+IGNORE_TEST = True
+IS_PLOT = True
 SIZE = 10
 ITERATIONS = 3
 values = list(range(SIZE))
@@ -529,8 +529,7 @@ class TestClassifierEnsemble(unittest.TestCase):
         time_strs, is_plot=IS_PLOT)
 
   def testPlotConditions(self):
-    if IGNORE_TEST:
-      return
+    # TESTING
     self._init()
     self.svm_ensemble.fit(self.df_X, self.ser_y,
         class_names=CLASS_NAMES)
@@ -555,6 +554,20 @@ class TestClassifierEnsemble(unittest.TestCase):
         state_names=state_names, is_plot=IS_PLOT,
         fontsize_label=5)
     self.assertEqual(len(significance_str), 0)
+
+  def testFindPredictedClass(self):
+    if IGNORE_TEST:
+      return
+    ensemble = classifier_ensemble.ClassifierEnsemble(
+        filter_high_rank=100, size=100)
+    ensemble.fit(DF_X, SER_Y)
+    # Eliminate out of order class indices and predict
+    df_X_test = DF_X.drop(labels=["T8", "T9", "T11"])
+    df_prediction = ensemble.predict(df_X_test)
+    ser = ensemble.findPredictedClass(df_prediction)
+    arr = np.array(ser)
+    diff_arr = arr[1:] - arr[0:-1]
+    self.assertEqual(np.sum(diff_arr), 4)  # Distinct classes
      
 
 if __name__ == '__main__':
