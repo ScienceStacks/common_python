@@ -63,6 +63,7 @@ class TrinaryDistance():
         # Accumulate the result
         result_mat = result_mat + new_mat
     # Convert to dataframe
+    result_mat = np.vectorize(lambda v: np.sqrt(v)) (result_mat)
     self.df_distance = pd.DataFrame(result_mat, columns=self.columns,
         index=self.columns)
 
