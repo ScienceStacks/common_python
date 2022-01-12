@@ -25,8 +25,8 @@ from sklearn import svm
 import numpy as np
 import unittest
 
-IGNORE_TEST = True
-IS_PLOT = True
+IGNORE_TEST = False
+IS_PLOT = False
 SIZE = 10
 ITERATIONS = 3
 values = list(range(SIZE))
@@ -231,6 +231,7 @@ class TestClassifierEnsemble(unittest.TestCase):
   def testMakeImportanceDF(self):
     if IGNORE_TEST:
       return
+    self._init()
     self.svm_ensemble.fit(self.df_X, self.ser_y)
     #
     def test(class_selection):
@@ -248,8 +249,12 @@ class TestClassifierEnsemble(unittest.TestCase):
   def testPlotImportance(self):
     if IGNORE_TEST:
       return
+    self._init()
     self.svm_ensemble.fit(self.df_X, self.ser_y)
     # Smoke tests
+    _ = self.svm_ensemble.plotImportance(top=40, title="SVM",
+        is_plot=IS_PLOT, ylabel="XXX", class_selection=1,
+        ylim=[-1, 1], is_vertical=False)
     _ = self.svm_ensemble.plotImportance(top=40, title="SVM",
         is_plot=IS_PLOT, ylabel="XXX")
     _ = self.svm_ensemble.plotImportance(top=40, title="SVM-class 2", 
@@ -529,7 +534,8 @@ class TestClassifierEnsemble(unittest.TestCase):
         time_strs, is_plot=IS_PLOT)
 
   def testPlotConditions(self):
-    # TESTING
+    if IGNORE_TEST:
+      return
     self._init()
     self.svm_ensemble.fit(self.df_X, self.ser_y,
         class_names=CLASS_NAMES)
@@ -568,6 +574,15 @@ class TestClassifierEnsemble(unittest.TestCase):
     arr = np.array(ser)
     diff_arr = arr[1:] - arr[0:-1]
     self.assertEqual(np.sum(diff_arr), 4)  # Distinct classes
+
+  def testPlotSVMProfile(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    state_names = list(cxn.STATE_NAMES)
+    state_names.remove("Normoxia")
+    self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=state_names)
+    self.svm_ensemble.plotSVMProfile(is_plot=IS_PLOT)
      
 
 if __name__ == '__main__':

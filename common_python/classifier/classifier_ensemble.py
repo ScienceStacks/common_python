@@ -345,12 +345,14 @@ class ClassifierEnsemble(ClassifierCollection):
     df_result = df_result.fillna(0)
     return df_result
 
-  def _plot(self, df, top, fig, ax, is_plot, **kwargs):
+  def _plot(self, df, top, fig, ax, is_plot, is_vertical=True,
+      is_ygrid=False, color=["blue"], **kwargs):
     """
     Common plotting codes
     :param pd.DataFrame: cn.MEAN, cn.STD, indexed by feature
     :param str ylabel:
     :param int top:
+        number of features to display
     :param bool is_plot: produce the plot
     :param ax, fig: matplotlib
     :param dict kwargs: keyword arguments for plot
@@ -364,20 +366,43 @@ class ClassifierEnsemble(ClassifierCollection):
     # Plot
     if ax is None:
       fig, ax = plt.subplots()
-    ax.bar(indices, df[cn.MEAN], yerr=df[cn.STD],
-        align='center', 
-        alpha=0.5, ecolor='black', capsize=10)
+    if is_vertical:
+      ax.bar(indices, df[cn.MEAN],
+          yerr=df[cn.STD],
+          color=color,
+          alpha=0.5, ecolor='black', capsize=10)
+    else:
+      ax.barh(indices, df[cn.MEAN],
+          #yerr=df[cn.STD],
+          color=color,
+          alpha=0.5, ecolor='black', capsize=10)
+      # Add the error bars so don't get double lines
+      for index in indices:
+        val = df.loc[index, cn.MEAN]
+        std = df.loc[index, cn.STD]
+        ax.plot([val-std, val+std], [index, index], linewidth=2, color="black")
     bottom = util.getValue(kwargs, "bottom", 0.25)
+    ylabel = util.getValue(kwargs, cn.PLT_YLABEL, "")
     plt.gcf().subplots_adjust(bottom=bottom)
-    ax.set_xticklabels(indices, rotation=90, fontsize=10)
-    ax.set_ylabel(kwargs[cn.PLT_YLABEL])
-    ax.set_xlabel(util.getValue(kwargs, cn.PLT_XLABEL, "Gene Group"))
     this_max = max(df[cn.MEAN] + df[cn.STD])*1.1
     this_min = min(df[cn.MEAN] - df[cn.STD])*1.1
     this_min = min(this_min, 0)
-    ylim = util.getValue(kwargs, cn.PLT_YLIM,
-        [this_min, this_max])
-    ax.set_ylim(ylim)
+    if is_vertical:
+      ylim = util.getValue(kwargs, cn.PLT_YLIM,
+          [this_min, this_max])
+      ax.set_ylim(ylim)
+      ax.set_xticklabels(indices, rotation=90, fontsize=10)
+      ax.set_ylabel(ylabel)
+      ax.set_xlabel(util.getValue(kwargs, cn.PLT_XLABEL, "Gene Group"))
+    else:
+      xlim = util.getValue(kwargs, cn.PLT_YLIM,
+          [this_min, this_max])
+      ax.set_xlim(xlim)
+      ax.set_yticklabels(indices, fontsize=10)
+      ax.set_xlabel(ylabel)
+      ax.set_ylabel(util.getValue(kwargs, cn.PLT_XLABEL, "Gene Group"))
+    if is_ygrid:
+      ax.grid(axis="y")
     if cn.PLT_TITLE in kwargs:
       ax.set_title(kwargs[cn.PLT_TITLE])
     if is_plot:
@@ -463,7 +488,7 @@ class ClassifierEnsemble(ClassifierCollection):
     self._plot(df, top, fig, ax, is_plot, **kwargs)
 
   def plotImportance(self, top=None, fig=None, ax=None, 
-      is_plot=True, **kwargs):
+      is_plot=True, class_selection=None, **kwargs):
     """
     Plots the rank of features for the top valued features.
     :param int top:
@@ -471,9 +496,49 @@ class ClassifierEnsemble(ClassifierCollection):
     :param ax, fig: matplotlib
     :param dict kwargs: keyword arguments for plot
     """
-    df = self.makeImportanceDF()
+    df = self.makeImportanceDF(class_selection=class_selection)
     kwargs = util.setValue(kwargs, cn.PLT_YLABEL, "Importance")
     self._plot(df, top, fig, ax, is_plot, **kwargs)
+
+  def plotSVMProfile(self, is_plot=True, **kwargs):
+    """
+    Plots a profile based on the SVM Coefficients for each state.
+    The profile consists of a vertical bar plot for each state
+    in sequence.
+
+    Parameters
+    ----------
+    kwargs: dict
+    """
+    # Use getimportance for each class and each clf to get average
+    # importance value for each feature
+    # Construct importance dataframes by class
+    COLORS = ["blue", "red", "green", "brown"]
+    dfs = [self.makeImportanceDF(class_selection=c) for c in self.classes]
+    ymin = 0.9*min([df.values.flatten().min() for df in dfs])
+    ymax = 1.1*max([df.values.flatten().max() for df in dfs])
+    ylim = [ymin, ymax]
+    fig, axes = plt.subplots(1, len(dfs))
+    is_first = True
+    for cls, ax, df in zip(self.classes, axes, dfs):
+      df_new = df.sort_index(ascending=False)
+      self._plot(df_new, None, fig, ax, False, is_vertical=False,
+        is_ygrid=False, color=COLORS,
+        ylim=ylim, **kwargs)
+      ax.plot([0, 0], [0, len(df)])
+      if is_first:
+        is_first = False
+      else:
+        ax.set_ylabel("")
+        ax.set_yticklabels([])
+      if self._class_names is not None:
+        title = self._class_names[cls]
+      else:
+        title = str(cls)
+      ax.set_title(title)
+    if is_plot:
+      plt.show()
+    
 
   def plotSVMCoefficients(self, **kwargs):
     """
