@@ -583,6 +583,9 @@ class TestClassifierEnsemble(unittest.TestCase):
     state_names.remove("Normoxia")
     self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=state_names)
     self.svm_ensemble.plotSVMProfile(is_plot=IS_PLOT)
+    trinary = TrinaryData(is_stage_averaged=True)
+    self.svm_ensemble.plotSVMProfile(df_class=trinary.indexToInt(),
+        is_plot=IS_PLOT)
      
 
 if __name__ == '__main__':

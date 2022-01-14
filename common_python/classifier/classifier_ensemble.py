@@ -500,7 +500,7 @@ class ClassifierEnsemble(ClassifierCollection):
     kwargs = util.setValue(kwargs, cn.PLT_YLABEL, "Importance")
     self._plot(df, top, fig, ax, is_plot, **kwargs)
 
-  def plotSVMProfile(self, is_plot=True, **kwargs):
+  def plotSVMProfile(self, df_class=None, is_plot=True, **kwargs):
     """
     Plots a profile based on the SVM Coefficients for each state.
     The profile consists of a vertical bar plot for each state
@@ -508,13 +508,31 @@ class ClassifierEnsemble(ClassifierCollection):
 
     Parameters
     ----------
+    df_class: DataFrame
+        column: Feature
+        index: state
+        value: trinary for average across state)
+      if non-None, then calculate average feature contributions for state
+    is_plot: bool
     kwargs: dict
     """
     # Use getimportance for each class and each clf to get average
     # importance value for each feature
     # Construct importance dataframes by class
     COLORS = ["blue", "red", "green", "brown"]
-    dfs = [self.makeImportanceDF(class_selection=c) for c in self.classes]
+    if df_class is None:
+      dfs = [self.makeImportanceDF(class_selection=c) for c in self.classes]
+    else:
+      dfs = []
+      for cls in df_class.index:
+        ser_X = df_class.loc[cls, :]
+        # Accumulate the feature contribution for each classifier
+        # over the class averaged values
+        sers = [self.clf_desc.getFeatureContributions(
+            c, self.columns, ser_X).loc[cls, :] for c in self.clfs]
+        df_values = pd.concat(sers, axis=1)
+        df = self._makeFeatureDF(df_values)
+        dfs.append(df)
     ymin = 0.9*min([df.values.flatten().min() for df in dfs])
     ymax = 1.1*max([df.values.flatten().max() for df in dfs])
     ylim = [ymin, ymax]
@@ -666,8 +684,10 @@ class ClassifierEnsemble(ClassifierCollection):
     # Calculate the mean and standard deviations of feature contributions
     dfs = [self.clf_desc.getFeatureContributions(c, self.columns, ser_X)
         for c in self.clfs]
+    # Initialize values
     df_mean = dfs[0] - dfs[0]
     df_std = dfs[0] - dfs[0]
+    # Compute values
     for idx in df_mean.index:
       for col in df_mean.columns:
         values = [df.loc[idx, col] for df in dfs]
