@@ -14,6 +14,7 @@ from common_python.util import util
 from common_python.tests.classifier import helpers as test_helpers
 from common.trinary_data import TrinaryData
 from common.data_provider import DataProvider
+from tools.make_classification_data import ClassificationData
 
 import collections
 import copy
@@ -168,6 +169,8 @@ class TestClassifierEnsemble(unittest.TestCase):
     self.ser_y = copy.deepcopy(SER_Y)
     self.svm_ensemble = copy.deepcopy(SVM_ENSEMBLE)
     self.classifier_ensemble_random = copy.deepcopy(RANDOM_ENSEMBLE)
+    self.data = ClassificationData()
+    self.namespace_dct = self.data.getDct()
   
   def setUp(self):
     if IGNORE_TEST:
@@ -532,6 +535,28 @@ class TestClassifierEnsemble(unittest.TestCase):
     time_strs = list(self.df_X.index)
     self.svm_ensemble.plotProgression(self.df_X, repl_strs,
         time_strs, is_plot=IS_PLOT)
+
+  def testProgression2(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    sample_dct = self.namespace_dct["SAMPLE_DCT"]
+    classifier_dct = self.namespace_dct["CLASSIFIER_DCT"]
+    REF_TYPE_SELF = self.namespace_dct["REF_TYPE_SELF"]
+    classifier = classifier_dct[('pooled', 'mycobactin_bacterioferritin')]
+
+    df_X = sample_dct[REF_TYPE_SELF]["rustad"].copy()
+    repl_strs = ["_rep%d" % n for n in range(1, 4)]
+    indices = [i for i in df_X.index 
+        if any([r in i for r in repl_strs]) and (not "10" in i)]
+    df_X = df_X.loc[indices, :]
+    indices = [i.replace("H37Rv_hypoxia_", "") for i in df_X.index]
+    indices = [i.replace("rep", "") for i in indices]
+    df_X.index = indices
+    drop_indices = [i for i in indices if "4hr" in i]
+    df_X = df_X.drop(index=drop_indices)
+    repl_strs = ["_%d" % n for n in range(1, 4)]
+    classifier.plotProgression(df_X, repl_strs, list(df_X.index))
 
   def testPlotConditions(self):
     if IGNORE_TEST:

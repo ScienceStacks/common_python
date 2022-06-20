@@ -947,6 +947,47 @@ class ClassifierEnsemble(ClassifierCollection):
     else:
       plt.show()
 
+  @staticmethod
+  def calculateSignificance(state_probs, num, num_rpl, num_cnd, num_exp):
+    """
+    Calculates the significance of at least one study (plot)
+    having a large "score" assuming equally likely outcomes
+    from the classifier. See writeup 
+    "Calculating Significance of Condition-Based Classification".
+
+    Parameters
+    ----------
+    state_probs: float/list-float
+        State probabilites. Default is uniform
+    num: int
+        Number of same class outcomes
+    num_rpl: int
+        Number of replications within a condition
+    num_cnd: int
+        Number of conditions
+    num_exp: int
+        Number of experiments
+
+    Returns
+    -------
+    float: significance level for at least one plot having 
+    """
+    ps = np.array(state_probs)
+    num_state = len(state_probs)
+    # Binomial tail probabilities for each state
+    p_ks = 1 - binom.cdf(num - 1, num_rpl, ps)
+    # Calculate the probability of obtaining at least n
+    # replications for each state
+    p_tilde_func = lambda n: np.prod([1 - p_ks[m]
+        for m in range(num_state) if m != n])
+    p_tilde = sum([p_ks[n]*p_tilde_func(n) for n in range(num_state)])
+    # Probability that the foregoing happens for each condition
+    # in the study variation (plot)
+    q_tilde = p_tilde**num_cnd
+    # Probability that this happens at least once within the studies
+    q = 1 - (1 - q_tilde)**num_exp
+    return q
+
   def plotConditions(self, df_X, condition_strs, state_names=None, ax=None,
       is_plot=True, fontsize_label=10, shading_offset=0.25, state_probs=None,
       num_exp=None): 
@@ -977,45 +1018,6 @@ class ClassifierEnsemble(ClassifierCollection):
       condition_str = _selStrFromList(idx, new_condition_strs)
       return new_condition_strs.index(condition_str)
     #
-    def calculateSignificance(state_probs, num, num_rpl, num_cnd, num_exp):
-      """
-      Calculates the significance of at least one study (plot)
-      having a large "score" assuming equally likely outcomes
-      from the classifier. See writeup 
-      "Calculating Significance of Condition-Based Classification".
-  
-      Parameters
-      ----------
-      state_probs: float/list-float
-          State probabilites. Default is uniform
-      num: int
-          Number of same class outcomes
-      num_rpl: int
-          Number of replications within a condition
-      num_cnd: int
-          Number of conditions
-      num_exp: int
-          Number of experiments
-
-      Returns
-      -------
-      float: significance level for at least one plot having 
-      """
-      ps = np.array(state_probs)
-      num_state = len(state_probs)
-      # Binomial tail probabilities for each state
-      p_ks = 1 - binom.cdf(num - 1, num_rpl, ps)
-      # Calculate the probability of obtaining at least n
-      # replications for each state
-      p_tilde_func = lambda n: np.prod([1 - p_ks[m]
-          for m in range(num_state) if m != n])
-      p_tilde = sum([p_ks[n]*p_tilde_func(n) for n in range(num_state)])
-      # Probability that the foregoing happens for each condition
-      # in the study variation (plot)
-      q_tilde = p_tilde**num_cnd
-      # Probability that this happens at least once within the studies
-      q = 1 - (1 - q_tilde)**num_exp
-      return q
     #
     plot_indices = df_X.index
     plot_indices = sorted(list(plot_indices), key=getConditionPosition)
@@ -1069,9 +1071,9 @@ class ClassifierEnsemble(ClassifierCollection):
         raise RuntimeError(
             "Replications do not evenly divide total experiments.")
       # Find significance level for 1 or 0 replications differing
-      sl1 = calculateSignificance(
+      sl1 = self.calculateSignificance(
           state_probs, num_rpl-1, num_rpl, num_cnd, num_exp)
-      sl0 = calculateSignificance(
+      sl0 = self.calculateSignificance(
           state_probs, num_rpl-0, num_rpl, num_cnd, num_exp)
       sl1 = np.round(sl1, 3)
       sl0 = np.round(sl0, 3)
@@ -1110,7 +1112,7 @@ class ClassifierEnsemble(ClassifierCollection):
     return ser
 
   def plotProgression(self, df_X, repl_strs, time_strs,
-      title="", ax=None, label_fontsize=16, is_plot=True):
+      title="", ax=None, label_fontsize=16, is_plot=True, figsize=(10, 10)):
     """
     Plots the progression of dominate states predicted over time
     for each replication.
@@ -1136,7 +1138,7 @@ class ClassifierEnsemble(ClassifierCollection):
       return [x for x in lst if not (x in seen or seen_add(x))]
     #   
     if ax is None:
-      _, ax = plt.subplots(1)
+      _, ax = plt.subplots(1, figsize=figsize)
     if self._class_names is None:
       class_dct = {k: str(k) for k in self._ser_y.values}
       class_names = list(class_dct.values())
@@ -1169,7 +1171,7 @@ class ClassifierEnsemble(ClassifierCollection):
       labels = list(class_names)
       ax.set_xticklabels(time_strs, rotation=90, fontsize=label_fontsize)
       ax.set_yticklabels(labels, fontsize=label_fontsize)
-    plt.legend(repl_strs)
+    ax.legend(repl_strs, bbox_to_anchor=(1.0, 1), loc="upper right")
     fontsize = label_fontsize + 2
     plt.title(title, fontsize=fontsize)
     if is_plot:
