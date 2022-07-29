@@ -583,6 +583,45 @@ class ClassifierEnsemble(ClassifierCollection):
     else:
       plt.show()
 
+  def calculateFeatureWeights(self):
+    """
+    Calculates the mean and standard deviation of the feature weights
+    feature to the class.
+
+    Parameters
+    ----------
+    :param Series ser_X:
+    
+    Returns
+    -------
+    pd.DataFrame
+        column: gene
+        index: Class
+        value: weight
+    pd.DataFrame
+        column: gene
+        index: Class
+        value: weight
+    """
+    instances = list(self._df_X.index)
+    ser_X = pd.Series(np.repeat(1, len(self.columns)), index=self.columns)
+    df_mean = pd.concat([ser_X for _ in self.classes], axis = 1)
+    df_mean = df_mean.transpose()
+    df_mean.index= self.classes
+    df_std = df_mean.copy()
+    dfs = [self.clf_desc.getFeatureContributions(c, self.columns, ser_X)
+        for c in self.clfs]
+    for idx in self.classes:
+      sers  = pd.concat([df.loc[idx, :] for df in dfs], axis=1)
+      ser = sers.mean(axis=1)
+      df_mean.loc[idx, :] = ser
+      ser = sers.std(axis=1)
+      df_std.loc[idx, :] = ser
+    if self._class_names is not None:
+      df_mean.index = self._class_names
+      df_std.index = self._class_names
+    return df_mean, df_std
+
   def plotFeatureContributions(self, ser_X, **kwargs):
     """
     Plots the contribution of each feature to the final score by class
@@ -990,6 +1029,7 @@ class ClassifierEnsemble(ClassifierCollection):
 
   def plotConditions(self, df_X, condition_strs, state_names=None, ax=None,
       is_plot=True, fontsize_label=10, shading_offset=0.25, state_probs=None,
+      is_legend=True, marker_size=50,
       num_exp=None): 
     """
     Plots predictions for data that have distinct conditions.
@@ -1033,10 +1073,12 @@ class ClassifierEnsemble(ClassifierCollection):
       _, ax = plt.subplots(1)
     markers = ["o", "+", "^", "s", "*"]
     for idx, stage in enumerate(df_prediction.columns):
-      ax.scatter(x_vals, df_prediction[stage], marker=markers[idx], s=50)
+      ax.scatter(x_vals, df_prediction[stage], marker=markers[idx],
+            s=marker_size)
       ax.plot(plot_indices, np.repeat(-1, len(plot_indices)))
     ax.set_xticklabels(plot_indices, rotation=45, fontsize=fontsize_label)
-    ax.legend(state_names, loc="lower left")
+    if is_legend:
+      ax.legend(state_names, loc="lower left")
     ax.set_ylim([0, 1.1])
     ax.text(0, 0.7, "Score: %1.2f" % fstat, fontsize=8)
     # Add shading

@@ -71,6 +71,8 @@ FITTED_SVM_ENSEMBLE = copy.deepcopy(SVM_ENSEMBLE)
 FITTED_SVM_ENSEMBLE.fit(DF_X, SER_Y)
 CLASSES = list(set(SER_Y.values))
 CLASSES_LONG = list(set(SER_Y_LONG.values))
+STATE_NAMES = list(cxn.STATE_NAMES)
+STATE_NAMES.remove("Normoxia")
 
 
 ######## Helper Classes ######
@@ -263,20 +265,20 @@ class TestClassifierEnsemble(unittest.TestCase):
     _ = self.svm_ensemble.plotImportance(top=40, title="SVM-class 2", 
         class_selection=2, is_plot=IS_PLOT)
 
-  def testGetFeatureContributions(self):
+  def testGetFeatureWeights(self):
     if IGNORE_TEST:
       return
     self._init()
     self.svm_ensemble.fit(self.df_X_long, self.ser_y_long)
     clf = self.svm_ensemble.clfs[0]
-    df = self.svm_ensemble.clf_desc.getFeatureContributions(clf,
+    df = self.svm_ensemble.clf_desc.getFeatureWeights(clf,
         self.svm_ensemble.columns, self.df_X_long.loc["T1.0", :])
     self.assertEqual(len(df), len(CLASSES_LONG))
     self.assertTrue(isinstance(df, pd.DataFrame))
     diff = set(self.svm_ensemble.columns).symmetric_difference(df.columns)
     self.assertEqual(len(diff), 0)
 
-  def testPlotFeatureContributions(self):
+  def testPlotFeatureWeights(self):
     if IGNORE_TEST:
       return
     self._init()
@@ -285,16 +287,16 @@ class TestClassifierEnsemble(unittest.TestCase):
     ser_X = self.df_X.loc[instance]
     class_names = PROVIDER.getStateNames(self.ser_y)
     #
-    svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT,
+    svm_ensemble.plotFeatureWeights(ser_X, is_plot=IS_PLOT,
         title=instance, true_class=self.ser_y.loc[instance],
         class_names=class_names)
     #
     _, ax = plt.subplots(1)
-    svm_ensemble.plotFeatureContributions(ser_X, is_plot=IS_PLOT, ax=ax,
+    svm_ensemble.plotFeatureWeights(ser_X, is_plot=IS_PLOT, ax=ax,
         title=instance, true_class=self.ser_y.loc[instance],
         is_xlabel=False, is_legend=False)
 
-  def testPlotFeatureContributions2(self):
+  def testPlotFeatureWeights2(self):
     if IGNORE_TEST:
       return
     self._init()
@@ -303,7 +305,7 @@ class TestClassifierEnsemble(unittest.TestCase):
     class_names = PROVIDER.getStateNames(self.ser_y)
     #
     for instance in instances:
-        svm_ensemble.plotFeatureContributions(self.df_X.loc[instance, :],
+        svm_ensemble.plotFeatureWeights(self.df_X.loc[instance, :],
                         title=instance, true_class=SER_Y.loc[instance],
                         class_names=class_names,
                         is_plot=IS_PLOT)
@@ -604,13 +606,21 @@ class TestClassifierEnsemble(unittest.TestCase):
     if IGNORE_TEST:
       return
     self._init()
-    state_names = list(cxn.STATE_NAMES)
-    state_names.remove("Normoxia")
-    self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=state_names)
+    self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=STATE_NAMES)
     self.svm_ensemble.plotSVMProfile(is_plot=IS_PLOT)
     trinary = TrinaryData(is_stage_averaged=True)
     self.svm_ensemble.plotSVMProfile(df_class=trinary.indexToInt(),
         is_plot=IS_PLOT)
+
+  def testCalculateFeatureWeights(self):
+    if IGNORE_TEST:
+      return
+    self._init()
+    self.svm_ensemble.fit(self.df_X, self.ser_y, class_names=STATE_NAMES)
+    df_mean, df_std = self.svm_ensemble.calculateFeatureWeights()
+    self.assertEqual(len(df_mean), len(df_std))
+    self.assertTrue(isinstance(df_mean, pd.DataFrame))
+    self.assertTrue(isinstance(df_std, pd.DataFrame))
      
 
 if __name__ == '__main__':
