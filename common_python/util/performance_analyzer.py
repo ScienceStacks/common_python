@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import time
 
-SECS = 10**9  # Conversion from nano seconds
+SECS = 1e9  # Conversion from nano seconds
 
 
 class PerformanceAnalyzer():
@@ -61,5 +61,5 @@ class PerformanceAnalyzer():
             index: name
             value: total time in seconds
         """
-        ser = pd.Series(elf.elapsed_dct)
+        ser = pd.Series(self.elapsed_dct)
         return ser/SECS
