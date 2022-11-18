@@ -59,7 +59,7 @@ def findAdjacentStates(ser_y, index):
     """
     dist = -1  # Starting with current state
     ser = ser_y.loc[indices]
-    for _, state in ser.iteritems():
+    for _, state in ser.items():
       dist += 1
       if state != cur_state:
         return state, dist

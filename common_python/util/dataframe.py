@@ -9,7 +9,7 @@ def isLessEqual(df1, df2):
   Tests if each value in df1 is less than or equal the
   corresponding value in df2.
   """
-  indices = set(df1.index).intersection(df2.index)
+  indices = list(set(df1.index).intersection(df2.index))
   dff1 = df1.loc[indices, :]
   dff2 = df2.loc[indices, :]
   df = dff1 - dff2

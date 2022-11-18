@@ -44,7 +44,7 @@ class TestDensity(unittest.TestCase):
     variates = range(0, MAX_VALUE)
     ser = self.cls._makeDensity(SER, variates)
     self.assertTrue(all(
-        [v > 0 for i, v in ser.iteritems() if i > 0]))
+        [v > 0 for i, v in ser.items() if i > 0]))
     self.assertEqual(ser[0], 0)
 
   def testPlot(self):
