@@ -30,8 +30,14 @@ class Persister(object):
     :return object:
     Will throw FileNotFoundError if self.path does not exist
     """
+    result = None
     with open(self.path, 'rb') as fd:
-      return pickle.load(fd)
+      try:
+        result = pickle.load(fd)
+      except Exception as exp:
+        import pdb; pdb.set_trace()
+        raise ValueError("Persister error for path %s" % self.path)
+      return result
 
   def remove(self):
     """

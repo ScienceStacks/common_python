@@ -127,7 +127,7 @@ class ClassifierDescriptorSVM(ClassifierDescriptor):
     -------
     DataFrame: column - feature, row - class, value - contribution
     """
-    labels = set(features).intersection(ser_X.index)
+    labels = list(set(features).intersection(ser_X.index))
     ser_X_sub = ser_X.loc[labels]
     df_coef = pd.DataFrame(clf.coef_, columns=features)
     df_X = pd.concat([ser_X_sub for _ in range(len(clf.coef_))], axis=1)
